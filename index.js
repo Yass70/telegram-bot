@@ -220,12 +220,14 @@ function ownerKeyboard() {
     .text('📢 إدارة الاشتراك الإجباري', 'requiredmenu').row()
     .text('🔙 القائمة الرئيسية', 'home');
 }
+
 function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
     .text('👋 تعديل رسالة الترحيب', 'welcomeedit').row()
     .text(`${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`, 'togglelinks').row()
     .text(`${g.flood ? '🟢' : '⚪'} منع السبام: ${g.flood ? 'مفعّل' : 'متوقف'}`, 'toggleflood').row()
     .text(`${g.autoReply ? '🟢' : '⚪'} الردود التلقائية: ${g.autoReply ? 'مفعّلة' : 'متوقفة'}`, 'togglereplies').row()
+    .text('🛡️ التحذيرات والعقوبات', 'warningsmenu').row()
     .text('💬 إدارة الردود التلقائية', 'repliesmenu').row()
     .text('📊 إحصائيات المجموعة', 'groupstats').row()
     .text('🔙 رجوع', 'home');
