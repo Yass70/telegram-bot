@@ -135,6 +135,15 @@ const gameQuestions = [
   { q: 'شنو الحيوان اللي عنده درع ويحتمي بداخله؟ 🐢', a: 'السلحفاة' },
   { q: 'شنو اسم صغير الدجاجة؟ 🐥', a: 'الصوص' }
 ];
+function normalizeGameAnswer(value) {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('ar')
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ');
+}
 function ensureUser(ctx) {
   const id = userKey(ctx);
   if (!id) return;
@@ -246,6 +255,8 @@ function warningsKeyboard(g) {
     .text('🧹 تصفير تحذيرات عضو', 'warningsclear').row()
     .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
 }
+
+function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
     .text('👋 تعديل رسالة الترحيب', 'welcomeedit').row()
     .text(`${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`, 'togglelinks').row()
@@ -256,6 +267,7 @@ function warningsKeyboard(g) {
     .text('📊 إحصائيات المجموعة', 'groupstats').row()
     .text('🔙 رجوع', 'home');
 }
+
 function repliesKeyboard() {
   return new InlineKeyboard().text('➕ إضافة رد', 'replyadd').row()
     .text('📋 عرض الردود', 'replylist').row()
