@@ -365,7 +365,15 @@ bot.on('message:text', async ctx => {
     }
     if (g.autoReply) {
       const match = g.replies.find(r => r.trigger.toLocaleLowerCase() === text.toLocaleLowerCase());
-      if (match) { try { await ctx.reply(match.response); } catch {} }
+      if (match) {
+  try {
+    await ctx.reply(match.response, {
+      reply_to_message_id: ctx.message.message_id
+    });
+  } catch (e) {
+    console.error('Auto-reply error:', e);
+  }
+}
     }
     save(); return;
   }
