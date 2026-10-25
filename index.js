@@ -486,6 +486,163 @@ if (data === 'warningsmenu') {
     { reply_markup: warningsKeyboard(g) }
   );
 }
+  // ===== أزرار إعدادات التحذيرات والعقوبات =====
+
+if (data === 'warningstoggle') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  g.warningSettings ||= {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  g.warningSettings.enabled = !g.warningSettings.enabled;
+  save();
+
+  await answer(ctx, g.warningSettings.enabled
+    ? '✅ تم تفعيل إعدادات التحذيرات.'
+    : '⏸️ تم إيقاف إعدادات التحذيرات.');
+
+  return ctx.editMessageText(
+    `🛡️ التحذيرات والعقوبات\n\n` +
+    `المجموعة: ${g.title}\n` +
+    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+    `العقوبة: ${g.warningSettings.action}\n` +
+    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+    { reply_markup: warningsKeyboard(g) }
+  );
+}
+
+if (data === 'warningslimit') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  g.warningSettings ||= {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  const limits = [2, 3, 5, 10];
+  const index = limits.indexOf(Number(g.warningSettings.limit));
+  g.warningSettings.limit = limits[(index + 1) % limits.length];
+
+  save();
+  await answer(ctx, `🔢 عدد التحذيرات: ${g.warningSettings.limit}`);
+
+  return ctx.editMessageText(
+    `🛡️ التحذيرات والعقوبات\n\n` +
+    `المجموعة: ${g.title}\n` +
+    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+    `العقوبة: ${g.warningSettings.action}\n` +
+    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+    { reply_markup: warningsKeyboard(g) }
+  );
+}
+
+if (data === 'warningsaction') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  g.warningSettings ||= {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  const actions = ['mute', 'kick', 'ban'];
+  const index = actions.indexOf(g.warningSettings.action);
+  g.warningSettings.action = actions[(index + 1) % actions.length];
+
+  const names = {
+    mute: 'كتم',
+    kick: 'طرد',
+    ban: 'حظر'
+  };
+
+  save();
+  await answer(ctx, `⚖️ العقوبة المختارة: ${names[g.warningSettings.action]}`);
+
+  return ctx.editMessageText(
+    `🛡️ التحذيرات والعقوبات\n\n` +
+    `المجموعة: ${g.title}\n` +
+    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+    `العقوبة: ${names[g.warningSettings.action]}\n` +
+    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+    { reply_markup: warningsKeyboard(g) }
+  );
+}
+
+if (data === 'warningsduration') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  g.warningSettings ||= {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  const durations = [5, 10, 30, 60, 120];
+  const index = durations.indexOf(Number(g.warningSettings.duration));
+  g.warningSettings.duration = durations[(index + 1) % durations.length];
+
+  save();
+  await answer(ctx, `⏱️ مدة الكتم: ${g.warningSettings.duration} دقيقة`);
+
+  return ctx.editMessageText(
+    `🛡️ التحذيرات والعقوبات\n\n` +
+    `المجموعة: ${g.title}\n` +
+    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+    `العقوبة: ${g.warningSettings.action}\n` +
+    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+    { reply_markup: warningsKeyboard(g) }
+  );
+}
+
+if (data === 'warningslog') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  return answer(
+    ctx,
+    '📋 سجل التحذيرات غير متوفر بعد؛ نحتاج إضافة نظام لحفظ تحذيرات الأعضاء.'
+  );
+}
+
+if (data === 'warningsclear') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  return answer(
+    ctx,
+    '🧹 مسح التحذيرات غير متوفر بعد؛ نحتاج إضافة تخزين لتحذيرات كل عضو.'
+  );
+}
+
+// ===== نهاية أزرار إعدادات التحذيرات =====
   if (data === 'welcomeedit') { const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.'); pending(ctx, { action: 'welcome', groupId: g.id }); return answer(ctx, `👋 أرسل رسالة الترحيب الجديدة لمجموعة ${g.title}.\n\nتگدر تستخدم {name} لاسم العضو و{title} لاسم المجموعة.`); }
   if (data === 'togglelinks' || data === 'toggleflood' || data === 'togglereplies') {
     const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
