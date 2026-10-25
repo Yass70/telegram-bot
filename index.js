@@ -15,7 +15,7 @@ const freshGroup = () => ({
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
   floodUsers: {}
 });
-const freshDB = () => ({ groups: {}, selected: {}, pending: {}, users: [], requiredChats: [],
+const freshDB = () => ({ groups: {}, selected: {}, pending: {}, users: [], privateUsers: [], requiredChats: [],
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 } });
 let db = freshDB();
 function save() {
@@ -27,7 +27,7 @@ function load() {
     if (!fs.existsSync(DATA_FILE)) return;
     const old = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     db = { ...freshDB(), ...old };
-    db.groups ||= {}; db.selected ||= {}; db.pending ||= {}; db.users ||= []; db.requiredChats ||= [];
+    db.groups ||= {}; db.selected ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
@@ -44,9 +44,28 @@ const isOwner = (ctx) => !!ctx.from && String(ctx.from.id) === OWNER_ID;
 const isPrivate = (ctx) => ctx.chat?.type === 'private';
 const isGroup = (ctx) => ['group', 'supergroup'].includes(ctx.chat?.type);
 const userKey = (ctx) => String(ctx.from?.id || '');
+
 function ensureUser(ctx) {
   const id = userKey(ctx);
-  if (id && !db.users.includes(id)) { db.users.push(id); save(); }
+  if (!id) return;
+
+  let changed = false;
+
+  if (!db.users.includes(id)) {
+    db.users.push(id);
+    changed = true;
+  }
+
+  if (isPrivate(ctx)) {
+    db.privateUsers ||= [];
+
+    if (!db.privateUsers.includes(id)) {
+      db.privateUsers.push(id);
+      changed = true;
+    }
+  }
+
+  if (changed) save();
 }
 function groupFor(chat) {
   const id = String(chat.id);
