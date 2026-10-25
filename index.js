@@ -13,8 +13,18 @@ const freshGroup = () => ({
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
   welcomeText: 'أهلاً بيك {name} ❤️ نورت مجموعة {title}', replies: [],
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
-floodUsers: {},
-game: null
+
+  warningSettings: {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  },
+  warnings: {},
+  warningLog: [],
+
+  floodUsers: {},
+  game: null
 });
 const freshDB = () => ({
   groups: {},
@@ -49,6 +59,16 @@ function load() {
       g.id ||= id; g.replies ||= []; g.admins ||= [];
       g.stats = { ...freshGroup().stats, ...(g.stats || {}) };
       g.floodUsers ||= {};
+      g.warningSettings = {
+  enabled: false,
+  limit: 3,
+  action: 'mute',
+  duration: 10,
+  ...(g.warningSettings || {})
+};
+
+g.warnings ||= {};
+g.warningLog ||= [];
       db.groups[id] = g;
     }
   } catch (e) { console.error('Could not read database; starting with fresh data:', e); }
