@@ -221,7 +221,31 @@ function ownerKeyboard() {
     .text('🔙 القائمة الرئيسية', 'home');
 }
 
-function groupSettingsKeyboard(g) {
+
+function warningsKeyboard(g) {
+  const w = g.warningSettings || {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  const actionNames = {
+    none: 'بدون إجراء',
+    mute: 'كتم',
+    kick: 'طرد',
+    ban: 'حظر'
+  };
+
+  return new InlineKeyboard()
+    .text(`${w.enabled ? '🟢' : '⚪'} نظام التحذيرات: ${w.enabled ? 'مفعّل' : 'متوقف'}`, 'warningstoggle').row()
+    .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit').row()
+    .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction').row()
+    .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration').row()
+    .text('📋 سجل التحذيرات', 'warningslog').row()
+    .text('🧹 تصفير تحذيرات عضو', 'warningsclear').row()
+    .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
+}
   return new InlineKeyboard()
     .text('👋 تعديل رسالة الترحيب', 'welcomeedit').row()
     .text(`${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`, 'togglelinks').row()
@@ -424,6 +448,32 @@ bot.on('callback_query:data', async ctx => {
     setSelected(ctx, id); return showGroupSettings(ctx, g);
   }
   if (data === 'groupsettings') return showGroupSettings(ctx);
+  
+if (data === 'warningsmenu') {
+  const g = selectedGroup(ctx);
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  g.warningSettings ||= {
+    enabled: false,
+    limit: 3,
+    action: 'mute',
+    duration: 10
+  };
+
+  save();
+
+  return ctx.editMessageText(
+    `🛡️ التحذيرات والعقوبات\n\n` +
+    `المجموعة: ${g.title}\n` +
+    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+    `العقوبة: ${g.warningSettings.action}\n` +
+    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+    { reply_markup: warningsKeyboard(g) }
+  );
+}
   if (data === 'welcomeedit') { const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.'); pending(ctx, { action: 'welcome', groupId: g.id }); return answer(ctx, `👋 أرسل رسالة الترحيب الجديدة لمجموعة ${g.title}.\n\nتگدر تستخدم {name} لاسم العضو و{title} لاسم المجموعة.`); }
   if (data === 'togglelinks' || data === 'toggleflood' || data === 'togglereplies') {
     const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
