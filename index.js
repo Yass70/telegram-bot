@@ -2,21 +2,22 @@ import fs from "node:fs";
 import express from "express";
 import { Bot, InlineKeyboard } from "grammy";
 
-// 1. إعداد السيرفر لضمان استمرار الاستضافة (FadeHost)
+// 1. إعداد السيرفر لضمان استمرار عمل البوت على استضافة FadeHost
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.get("/", (req, res) => {
-  res.send("Bot is running successfully with grammY!");
+  app.get("/", (req, res) => {
+    res.send("Bot is running successfully with grammY!");
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`Web server running on port ${PORT}`);
 });
 
-// 2. إعداد البوت ومتغيرات البيئة
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const OWNER_ID = String(process.env.ADMIN_ID || process.env.BOT_OWNER_ID || "").trim();
+const OWNER_ID = String(process.env.BOT_OWNER_ID || process.env.ADMIN_ID || "").trim();
 
 if (!BOT_TOKEN) {
   console.error("❌ ERROR: TELEGRAM_BOT_TOKEN is not defined!");
@@ -26,7 +27,6 @@ if (!BOT_TOKEN) {
 const bot = new Bot(BOT_TOKEN);
 const DATA_FILE = "./bot_data.json";
 
-// 3. إدارة الملفات والإعدادات التلقائية
 const defaults = () => ({
   links: false,
   antiflood: false,
@@ -35,6 +35,7 @@ const defaults = () => ({
 });
 
 let data = {};
+
 try {
   data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 } catch {
@@ -59,7 +60,7 @@ function config(chatId) {
 }
 
 function isOwner(ctx) {
-  if (!OWNER_ID) return true; // إذا لم يُحدد معرف المالك، يتيح الوصول للتجربة
+  if (!OWNER_ID) return true;
   return String(ctx.from?.id || "") === OWNER_ID;
 }
 
@@ -87,16 +88,15 @@ function status(value) {
 function panelText() {
   return (
     "👑 لوحة مالك البوت\n\n" +
-    "أهلاً بيك! من هنا تقدر تتحكم بإعدادات الحماية والترحيب.\n\n" +
-    "⚠️ افتح اللوحة داخل المجموعة حتى تغيّرت إعداداتها."
+    "أهلاً بيك! من هنا تكدر تتحكم بإعدادات الحماية والترحيب.\n\n" +
+    "⚠️ افتح اللوحة داخل المجموعة حتى تغيّر إعداداتها."
   );
 }
 
-// ذاكرة مؤقتة لرسائل التكرار وحالة تعديل الترحيب
 const recentMessages = new Map();
 const pendingWelcome = new Set();
 
-// 4. الأوامر الأساسية
+// الأوامر الأساسية
 bot.command("start", async (ctx) => {
   if (isOwner(ctx)) {
     return ctx.reply(panelText(), {
@@ -162,7 +162,7 @@ bot.command("setwelcome", async (ctx) => {
   await ctx.reply("✅ تم حفظ نص الترحيب لهذه المجموعة.");
 });
 
-// 5. التفاعل مع أزرار لوحة التحكم
+// إدارة الأزرار التفاعلية
 bot.callbackQuery(
   ["links", "flood", "welcome", "edit_welcome", "settings", "help"],
   async (ctx) => {
@@ -200,7 +200,7 @@ bot.callbackQuery(
 
     if (!isGroup(ctx)) {
       return ctx.reply(
-        "افتح البوت داخل المجموعة واضغط /panel هناك حتى تغيّرت إعداداتها."
+        "افتح البوت داخل المجموعة واضغط /panel هناك حتى تغيّر إعداداتها."
       );
     }
 
@@ -240,7 +240,7 @@ bot.callbackQuery(
   }
 );
 
-// 6. الترحيب بالأعضاء الجدد
+// الترحيب بالأعضاء الجدد
 bot.on("message:new_chat_members", async (ctx) => {
   if (!isGroup(ctx)) return;
 
@@ -261,33 +261,35 @@ bot.on("message:new_chat_members", async (ctx) => {
   }
 });
 
-// 7. المعالج الموحد للرسائل النصية (مكافحة الروابط + التكرار + حفظ الترحيب)
+// المعالج الموحد المدمج للرسائل النصية (يحل مشكلة التعارض تماماً)
 bot.on("message:text", async (ctx) => {
-  // أولاً: التحقق من إدخال الترحيب المعلق
+  if (ctx.from?.is_bot) return;
+
+  // 1. معالجة حفظ الترحيب الجديد إذا كان المالك قد طلب ذلك
   if (isOwner(ctx) && pendingWelcome.has(ctx.from.id)) {
-    if (!ctx.message.text.startsWith("/")) {
-      pendingWelcome.delete(ctx.from.id);
+    if (ctx.message.text.startsWith("/")) return; // تجاوز الأوامر
 
-      if (!isGroup(ctx)) {
-        return ctx.reply(
-          "حتى أحفظ الترحيب لمجموعة محددة، أرسل الأمر داخل المجموعة:\n" +
-          "/setwelcome نص الترحيب"
-        );
-      }
+    pendingWelcome.delete(ctx.from.id);
 
-      config(String(ctx.chat.id)).welcomeText = ctx.message.text;
-      save();
-      return ctx.reply("✅ تم حفظ نص الترحيب.");
+    if (!isGroup(ctx)) {
+      return ctx.reply(
+        "حتى أحفظ الترحيب لمجموعة محددة، أرسل الأمر داخل المجموعة:\n" +
+        "/setwelcome نص الترحيب"
+      );
     }
+
+    config(String(ctx.chat.id)).welcomeText = ctx.message.text;
+    save();
+    return ctx.reply("✅ تم حفظ نص الترحيب بنجاح.");
   }
 
-  // ثانياً: الفحص داخل المجموعات (منع الروابط ومكافحة السبام)
-  if (!isGroup(ctx) || ctx.from?.is_bot) return;
+  // 2. تطبيق الحماية وفحص الروابط والسبام حصراً داخل المجموعات
+  if (!isGroup(ctx)) return;
 
   const c = config(String(ctx.chat.id));
   const text = ctx.message.text;
 
-  // منع الروابط
+  // فحص ومنع الروابط
   if (c.links && /(https?:\/\/|www\.|t\.me\/|telegram\.me\/)/i.test(text)) {
     try {
       await ctx.deleteMessage();
@@ -314,10 +316,10 @@ bot.on("message:text", async (ctx) => {
   }
 });
 
-// 8. تشغيل البوت ومعالجة الأخطاء
+// معالجة الأخطاء والتشغيل
 bot.catch((err) => {
-  console.error("حدث خطأ أثناء تشغيل البوت:", err);
+  console.error("حدث خطأ في البوت:", err);
 });
 
 bot.start();
-console.log("GrammY Bot started successfully!");
+console.log("Grammy Professional Bot started successfully!");
