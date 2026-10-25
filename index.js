@@ -1,66 +1,54 @@
+
 import fs from "node:fs";
-import express from "express";
-import { Bot, InlineKeyboard } from "grammy";
+import { Bot, InlineKeyboard, Keyboard } from "grammy";
 
-// 1. إعداد السيرفر لضمان استمرار عمل البوت على استضافة FadeHost
-const app = express();
-const PORT = process.env.PORT || 8080;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const OWNER_ID = String(process.env.BOT_OWNER_ID || "").trim();
+const DATA_FILE = "./bot_data.json";
 
-app.get("/", (req, res) => {
-  app.get("/", (req, res) => {
-    res.send("Bot is running successfully with grammY!");
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Web server running on port ${PORT}`);
-});
-
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const OWNER_ID = String(process.env.BOT_OWNER_ID || process.env.ADMIN_ID || "").trim();
-
-if (!BOT_TOKEN) {
-  console.error("❌ ERROR: TELEGRAM_BOT_TOKEN is not defined!");
+if (!TOKEN || !OWNER_ID) {
+  console.error("Missing TELEGRAM_BOT_TOKEN or BOT_OWNER_ID");
   process.exit(1);
 }
 
-const bot = new Bot(BOT_TOKEN);
-const DATA_FILE = "./bot_data.json";
+const bot = new Bot(TOKEN);
 
 const defaults = () => ({
+  title: "",
   links: false,
-  antiflood: false,
+  flood: false,
   welcomeEnabled: true,
+  autoReply: true,
   welcomeText: "أهلاً بيك {name} ❤️ نورت مجموعة {title}",
+  stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 }
 });
 
-let data = {};
+let db = {
+  groups: {},
+  selected: {},
+  pending: {}
+};
 
 try {
-  data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-} catch {
-  data = {};
-}
+  const saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  db = {
+    groups: saved.groups || {},
+    selected: saved.selected || {},
+    pending: saved.pending || {}
+  };
+} catch {}
+
+const recentMessages = new Map();
 
 function save() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error("خطأ في حفظ البيانات:", err);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+  } catch (e) {
+    console.error("[save]", e.message);
   }
 }
 
-function config(chatId) {
-  if (!data[chatId]) data[chatId] = defaults();
-  data[chatId] = {
-    ...defaults(),
-    ...data[chatId],
-  };
-  return data[chatId];
-}
-
 function isOwner(ctx) {
-  if (!OWNER_ID) return true;
   return String(ctx.from?.id || "") === OWNER_ID;
 }
 
@@ -68,46 +56,181 @@ function isGroup(ctx) {
   return ["group", "supergroup"].includes(ctx.chat?.type);
 }
 
-function panelKeyboard() {
+function getGroup(id) {
+  const key = String(id);
+  if (!db.groups[key]) db.groups[key] = defaults();
+
+  const c = db.groups[key];
+  const d = defaults();
+
+  c.title ??= "";
+  c.links ??= d.links;
+  c.flood ??= d.flood;
+  c.welcomeEnabled ??= d.welcomeEnabled;
+  c.autoReply ??= d.autoReply;
+  c.welcomeText ??= d.welcomeText;
+  c.stats = { ...d.stats, ...(c.stats || {}) };
+
+  return c;
+}
+
+function rememberGroup(ctx) {
+  if (!isGroup(ctx)) return;
+  getGroup(ctx.chat.id).title = ctx.chat.title || String(ctx.chat.id);
+  save();
+}
+
+function selectedId(ctx) {
+  if (isGroup(ctx)) return String(ctx.chat.id);
+  return db.selected[OWNER_ID] || null;
+}
+
+function state(v) {
+  return v ? "مفعّل ✅" : "متوقف ❌";
+}
+
+function ownerKeyboard() {
+  return new Keyboard()
+    .text("🏠 الرئيسية").text("📂 مجموعاتي").row()
+    .text("📊 الإحصائيات").text("⚙️ إعدادات المجموعة").row()
+    .text("📖 المساعدة").text("👨‍💻 المطور")
+    .resized();
+}
+
+function mainInlineKeyboard() {
   return new InlineKeyboard()
-    .text("🛡️ منع الروابط", "links")
-    .text("🚫 مكافحة السبام", "flood")
+    .text("📂 اختيار مجموعة", "groups")
     .row()
-    .text("👋 الترحيب", "welcome")
-    .text("✏️ تعديل الترحيب", "edit_welcome")
+    .text("⚙️ الإعدادات", "settings")
+    .text("📊 الإحصائيات", "stats")
     .row()
-    .text("📊 عرض الإعدادات", "settings")
-    .row()
-    .text("ℹ️ طريقة الاستخدام", "help");
+    .text("📖 المساعدة", "help");
 }
 
-function status(value) {
-  return value ? "مفعّل ✅" : "متوقف ❌";
+function settingsKeyboard() {
+  return new InlineKeyboard()
+    .text("🛡️ منع الروابط", "toggle:links")
+    .text("🚫 مكافحة السبام", "toggle:flood")
+    .row()
+    .text("👋 الترحيب", "toggle:welcome")
+    .text("💬 الردود", "toggle:reply")
+    .row()
+    .text("✏️ تعديل الترحيب", "editwelcome")
+    .row()
+    .text("📊 الإحصائيات", "stats")
+    .text("📂 المجموعات", "groups")
+    .row()
+    .text("🏠 الرئيسية", "home");
 }
 
-function panelText() {
-  return (
+function groupsKeyboard() {
+  const kb = new InlineKeyboard();
+  const groups = Object.entries(db.groups).slice(0, 40);
+
+  for (const [id, c] of groups) {
+    kb.text(`📁 ${(c.title || id).slice(0, 35)}`, `choose:${id}`).row();
+  }
+
+  kb.text("🔄 تحديث", "groups").text("🏠 الرئيسية", "home");
+  return kb;
+}
+
+async function home(ctx) {
+  await ctx.reply(
     "👑 لوحة مالك البوت\n\n" +
-    "أهلاً بيك! من هنا تكدر تتحكم بإعدادات الحماية والترحيب.\n\n" +
-    "⚠️ افتح اللوحة داخل المجموعة حتى تغيّر إعداداتها."
+    "أهلاً بيك. اختَر القسم الذي تريد إدارته.\n" +
+    "الأزرار خاصة بحساب المالك فقط.",
+    {
+      reply_markup: isOwner(ctx) && ctx.chat.type === "private"
+        ? ownerKeyboard()
+        : mainInlineKeyboard()
+    }
   );
 }
 
-const recentMessages = new Map();
-const pendingWelcome = new Set();
+async function showSettings(ctx, id) {
+  const c = getGroup(id);
 
-// الأوامر الأساسية
-bot.command("start", async (ctx) => {
-  if (isOwner(ctx)) {
-    return ctx.reply(panelText(), {
-      reply_markup: panelKeyboard(),
-    });
+  await ctx.reply(
+    `⚙️ إعدادات المجموعة\n📌 ${c.title || id}\n\n` +
+    `🛡️ منع الروابط: ${state(c.links)}\n` +
+    `🚫 مكافحة السبام: ${state(c.flood)}\n` +
+    `👋 الترحيب: ${state(c.welcomeEnabled)}\n` +
+    `💬 الردود التلقائية: ${state(c.autoReply)}\n\n` +
+    "اختَر الإعداد الذي تريد تغييره:",
+    { reply_markup: settingsKeyboard() }
+  );
+}
+
+async function showGroups(ctx) {
+  if (!Object.keys(db.groups).length) {
+    return ctx.reply(
+      "ما عندي مجموعات مسجلة بعد.\n\n" +
+      "أضف البوت لمجموعتك، ثم أرسل /panel داخل المجموعة مرة واحدة."
+    );
   }
 
-  return ctx.reply(
-    "أهلاً بيك ❤️\n" +
-    "أنا بوت إدارة وحماية المجموعات.\n" +
-    "أضفني لمجموعتك حتى أساعدك بالحماية والترحيب."
+  return ctx.reply("📂 اختَر المجموعة التي تريد إدارتها:", {
+    reply_markup: groupsKeyboard()
+  });
+}
+
+async function showStats(ctx, id) {
+  const c = getGroup(id);
+  let members = "غير متاح";
+
+  try {
+    members = String(await bot.api.getChatMemberCount(id));
+  } catch {
+    members = "تعذر الجلب";
+  }
+
+  await ctx.reply(
+    `📊 إحصائيات ${c.title || id}\n\n` +
+    `👥 الأعضاء الحاليون: ${members}\n` +
+    `💬 الرسائل المرصودة: ${c.stats.messages}\n` +
+    `🔗 الروابط المحذوفة: ${c.stats.deletedLinks}\n` +
+    `🚫 حالات السبام: ${c.stats.floodEvents}\n` +
+    `👋 رسائل الترحيب: ${c.stats.welcomed}\n\n` +
+    "إحصائيات الرسائل تبدأ من تشغيل هذه النسخة.",
+    { reply_markup: settingsKeyboard() }
+  );
+}
+
+bot.command("start", async (ctx) => {
+  if (isOwner(ctx)) {
+    if (isGroup(ctx)) {
+      rememberGroup(ctx);
+      db.selected[OWNER_ID] = String(ctx.chat.id);
+      save();
+    }
+
+    await ctx.reply(
+      "🚀 البوت يعمل!\nاستخدم الأزرار أدناه للتنقل، أو اكتب /panel.",
+      {
+        reply_markup: ctx.chat.type === "private"
+          ? ownerKeyboard()
+          : mainInlineKeyboard()
+      }
+    );
+
+    return home(ctx);
+  }
+
+  await ctx.reply(
+    "أهلاً بيك ❤️\nأنا بوت إدارة المجموعات والحماية.\nاكتب /help للمساعدة."
+  );
+});
+
+bot.command("help", async (ctx) => {
+  await ctx.reply(
+    "📖 المساعدة\n\n" +
+    "/start — البدء\n" +
+    "/help — المساعدة\n" +
+    "/id — رقم حسابك\n" +
+    "/panel — لوحة التحكم\n" +
+    "/developer — معلومات المطور\n\n" +
+    "لعمل الحماية، امنح البوت صلاحية حذف الرسائل داخل المجموعة."
   );
 });
 
@@ -115,14 +238,10 @@ bot.command("id", async (ctx) => {
   await ctx.reply(`🆔 رقم حسابك: ${ctx.from.id}`);
 });
 
-bot.command("help", async (ctx) => {
+bot.command("developer", async (ctx) => {
   await ctx.reply(
-    "📌 الأوامر المتوفرة:\n\n" +
-    "/start — فتح لوحة المالك\n" +
-    "/id — معرفة رقم حسابك\n" +
-    "/panel — فتح لوحة التحكم داخل المجموعة\n" +
-    "/setwelcome نص الترحيب — تعديل الترحيب داخل المجموعة\n\n" +
-    "لازم تمنح البوت صلاحية حذف الرسائل حتى يقدر يحذف الروابط والسبام."
+    "👨‍💻 معلومات المطور\n\n" +
+    "بوت لإدارة المجموعات والترحيب بالأعضاء والحماية من الروابط والسبام."
   );
 });
 
@@ -131,123 +250,194 @@ bot.command("panel", async (ctx) => {
     return ctx.reply("⛔ لوحة التحكم خاصة بمالك البوت.");
   }
 
-  await ctx.reply(panelText(), {
-    reply_markup: panelKeyboard(),
+  if (isGroup(ctx)) {
+    rememberGroup(ctx);
+    db.selected[OWNER_ID] = String(ctx.chat.id);
+    save();
+    return showSettings(ctx, ctx.chat.id);
+  }
+
+  return home(ctx);
+});
+
+bot.command("cancel", async (ctx) => {
+  if (!isOwner(ctx)) return;
+  delete db.pending[OWNER_ID];
+  save();
+  await ctx.reply("✅ تم إلغاء العملية.", {
+    reply_markup: ownerKeyboard()
   });
 });
 
-bot.command("setwelcome", async (ctx) => {
+bot.callbackQuery("home", async (ctx) => {
   if (!isOwner(ctx)) {
-    return ctx.reply("⛔ هذا الأمر خاص بالمالك.");
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
   }
 
-  if (!isGroup(ctx)) {
-    return ctx.reply(
-      "افتح المجموعة وأرسل الأمر هناك.\n" +
-      "مثال:\n/setwelcome أهلاً {name} ❤️ نورت {title}"
-    );
-  }
-
-  const text = ctx.match?.trim();
-
-  if (!text) {
-    return ctx.reply(
-      "استخدم:\n/setwelcome أهلاً {name} ❤️ نورت {title}"
-    );
-  }
-
-  config(String(ctx.chat.id)).welcomeText = text;
-  save();
-
-  await ctx.reply("✅ تم حفظ نص الترحيب لهذه المجموعة.");
+  await ctx.answerCallbackQuery();
+  return home(ctx);
 });
 
-// إدارة الأزرار التفاعلية
-bot.callbackQuery(
-  ["links", "flood", "welcome", "edit_welcome", "settings", "help"],
-  async (ctx) => {
-    if (!isOwner(ctx)) {
-      return ctx.answerCallbackQuery({
-        text: "⛔ هذا الزر خاص بمالك البوت.",
-        show_alert: true,
-      });
-    }
-
-    await ctx.answerCallbackQuery();
-
-    if (ctx.callbackQuery.data === "help") {
-      return ctx.reply(
-        "📖 طريقة الاستخدام:\n\n" +
-        "1. أضف البوت للمجموعة.\n" +
-        "2. امنحه صلاحية حذف الرسائل.\n" +
-        "3. افتح /panel داخل المجموعة.\n" +
-        "4. اضغط الأزرار لتغيير إعدادات المجموعة.\n\n" +
-        "تعديل الترحيب متاح من زر ✏️ تعديل الترحيب."
-      );
-    }
-
-    if (ctx.callbackQuery.data === "edit_welcome") {
-      pendingWelcome.add(ctx.from.id);
-
-      return ctx.reply(
-        "✏️ أرسل نص الترحيب الجديد برسالة واحدة.\n\n" +
-        "تقدر تستخدم:\n" +
-        "{name} — اسم العضو\n" +
-        "{title} — اسم المجموعة\n\n" +
-        "مثال:\nأهلاً {name} ❤️ نورت {title}"
-      );
-    }
-
-    if (!isGroup(ctx)) {
-      return ctx.reply(
-        "افتح البوت داخل المجموعة واضغط /panel هناك حتى تغيّر إعداداتها."
-      );
-    }
-
-    const c = config(String(ctx.chat.id));
-    const action = ctx.callbackQuery.data;
-
-    if (action === "links") c.links = !c.links;
-    if (action === "flood") c.antiflood = !c.antiflood;
-    if (action === "welcome") c.welcomeEnabled = !c.welcomeEnabled;
-
-    save();
-
-    if (action === "settings") {
-      return ctx.reply(
-        "📊 إعدادات المجموعة الحالية:\n\n" +
-        `🛡️ منع الروابط: ${status(c.links)}\n` +
-        `🚫 مكافحة السبام: ${status(c.antiflood)}\n` +
-        `👋 الترحيب: ${status(c.welcomeEnabled)}\n\n` +
-        `✏️ نص الترحيب:\n${c.welcomeText}`,
-        { reply_markup: panelKeyboard() }
-      );
-    }
-
-    const labels = {
-      links: "منع الروابط",
-      flood: "مكافحة السبام",
-      welcome: "الترحيب",
-    };
-
-    return ctx.reply(
-      `✅ تم تحديث ${labels[action]}.\n\n` +
-      `🛡️ منع الروابط: ${status(c.links)}\n` +
-      `🚫 مكافحة السبام: ${status(c.antiflood)}\n` +
-      `👋 الترحيب: ${status(c.welcomeEnabled)}`,
-      { reply_markup: panelKeyboard() }
-    );
+bot.callbackQuery("groups", async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
   }
-);
 
-// الترحيب بالأعضاء الجدد
-bot.on("message:new_chat_members", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  return showGroups(ctx);
+});
+
+bot.callbackQuery(/^choose:(-?\d+)$/, async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "غير مسموح.",
+      show_alert: true
+    });
+  }
+
+  const id = String(ctx.match[1]);
+
+  if (!db.groups[id]) {
+    return ctx.answerCallbackQuery({
+      text: "المجموعة غير مسجلة.",
+      show_alert: true
+    });
+  }
+
+  db.selected[OWNER_ID] = id;
+  save();
+
+  await ctx.answerCallbackQuery({ text: "تم اختيار المجموعة" });
+  return showSettings(ctx, id);
+});
+
+bot.callbackQuery("settings", async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
+  }
+
+  const id = selectedId(ctx);
+  await ctx.answerCallbackQuery();
+
+  if (!id || !db.groups[id]) return showGroups(ctx);
+  return showSettings(ctx, id);
+});
+
+bot.callbackQuery("stats", async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
+  }
+
+  const id = selectedId(ctx);
+  await ctx.answerCallbackQuery();
+
+  if (!id || !db.groups[id]) return showGroups(ctx);
+  return showStats(ctx, id);
+});
+
+bot.callbackQuery("help", async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
+  }
+
+  await ctx.answerCallbackQuery();
+  return ctx.reply(
+    "📖 طريقة الاستخدام\n\n" +
+    "1. أضف البوت للمجموعة.\n" +
+    "2. امنحه صلاحية حذف الرسائل.\n" +
+    "3. أرسل /panel داخل المجموعة.\n" +
+    "4. ارجع إلى الخاص واختر مجموعتك.\n" +
+    "5. استخدم الأزرار لتغيير الإعدادات."
+  );
+});
+
+bot.callbackQuery(/^toggle:(links|flood|welcome|reply)$/, async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "⛔ المالك فقط يستطيع تغيير الإعدادات.",
+      show_alert: true
+    });
+  }
+
+  const id = selectedId(ctx);
+
+  if (!id || !db.groups[id]) {
+    await ctx.answerCallbackQuery({ text: "اختَر مجموعة أولاً." });
+    return showGroups(ctx);
+  }
+
+  const c = getGroup(id);
+  const action = ctx.match[1];
+
+  if (action === "links") c.links = !c.links;
+  if (action === "flood") c.flood = !c.flood;
+  if (action === "welcome") c.welcomeEnabled = !c.welcomeEnabled;
+  if (action === "reply") c.autoReply = !c.autoReply;
+
+  save();
+  await ctx.answerCallbackQuery({ text: "تم تحديث الإعداد" });
+  return showSettings(ctx, id);
+});
+
+bot.callbackQuery("editwelcome", async (ctx) => {
+  if (!isOwner(ctx)) {
+    return ctx.answerCallbackQuery({
+      text: "هذا الخيار خاص بالمالك فقط.",
+      show_alert: true
+    });
+  }
+
+  const id = selectedId(ctx);
+
+  if (!id || !db.groups[id]) {
+    await ctx.answerCallbackQuery({ text: "اختَر مجموعة أولاً." });
+    return showGroups(ctx);
+  }
+
+  db.pending[OWNER_ID] = { action: "welcome", groupId: id };
+  save();
+
+  await ctx.answerCallbackQuery();
+  return ctx.reply(
+    "✏️ أرسل نص الترحيب الجديد في الخاص.\n\n" +
+    "{name} = اسم العضو\n{title} = اسم المجموعة\n\n" +
+    "للإلغاء أرسل /cancel"
+  );
+});
+
+bot.on("my_chat_member", async (ctx) => {
   if (!isGroup(ctx)) return;
 
-  const c = config(String(ctx.chat.id));
+  const status = ctx.myChatMember.new_chat_member.status;
+
+  if (["member", "administrator"].includes(status)) {
+    rememberGroup(ctx);
+  }
+});
+
+bot.on("message:new_chat_members", async (ctx) => {
+  rememberGroup(ctx);
+
+  const c = getGroup(ctx.chat.id);
+  if (!c.welcomeEnabled) return;
 
   for (const member of ctx.message.new_chat_members) {
-    if (member.is_bot || !c.welcomeEnabled) continue;
+    if (member.is_bot) continue;
 
     const name = [member.first_name, member.last_name]
       .filter(Boolean)
@@ -257,69 +447,160 @@ bot.on("message:new_chat_members", async (ctx) => {
       .replaceAll("{name}", name)
       .replaceAll("{title}", ctx.chat.title || "المجموعة");
 
-    await ctx.reply(text);
+    try {
+      await ctx.reply(text);
+      c.stats.welcomed++;
+    } catch (e) {
+      console.error("[welcome]", e.message);
+    }
   }
+
+  save();
 });
 
-// المعالج الموحد المدمج للرسائل النصية (يحل مشكلة التعارض تماماً)
 bot.on("message:text", async (ctx) => {
-  if (ctx.from?.is_bot) return;
+  const text = ctx.message.text || "";
 
-  // 1. معالجة حفظ الترحيب الجديد إذا كان المالك قد طلب ذلك
-  if (isOwner(ctx) && pendingWelcome.has(ctx.from.id)) {
-    if (ctx.message.text.startsWith("/")) return; // تجاوز الأوامر
+  if (isGroup(ctx)) rememberGroup(ctx);
 
-    pendingWelcome.delete(ctx.from.id);
-
-    if (!isGroup(ctx)) {
-      return ctx.reply(
-        "حتى أحفظ الترحيب لمجموعة محددة، أرسل الأمر داخل المجموعة:\n" +
-        "/setwelcome نص الترحيب"
-      );
+  // استقبال أزرار القائمة الدائمة في الخاص.
+  if (ctx.chat.type === "private" && isOwner(ctx)) {
+    if (text === "🏠 الرئيسية") return home(ctx);
+    if (text === "📂 مجموعاتي") return showGroups(ctx);
+    if (text === "📊 الإحصائيات") {
+      const id = selectedId(ctx);
+      return id && db.groups[id] ? showStats(ctx, id) : showGroups(ctx);
+    }
+    if (text === "⚙️ إعدادات المجموعة") {
+      const id = selectedId(ctx);
+      return id && db.groups[id] ? showSettings(ctx, id) : showGroups(ctx);
+    }
+    if (text === "📖 المساعدة") {
+      return ctx.reply("استخدم /start للبدء و/panel لفتح لوحة التحكم.");
+    }
+    if (text === "👨‍💻 المطور") {
+      return ctx.reply("👨‍💻 بوت إدارة المجموعات والحماية.");
     }
 
-    config(String(ctx.chat.id)).welcomeText = ctx.message.text;
-    save();
-    return ctx.reply("✅ تم حفظ نص الترحيب بنجاح.");
+    // حفظ الترحيب الذي أرسله المالك.
+    if (db.pending[OWNER_ID]?.action === "welcome") {
+      if (text.startsWith("/")) return;
+
+      const id = db.pending[OWNER_ID].groupId;
+
+      if (!db.groups[id]) {
+        delete db.pending[OWNER_ID];
+        save();
+        return ctx.reply("المجموعة غير مسجلة. أرسل /panel داخلها مجددًا.");
+      }
+
+      getGroup(id).welcomeText = text.slice(0, 1000);
+      delete db.pending[OWNER_ID];
+      save();
+
+      return ctx.reply("✅ تم حفظ نص الترحيب.", {
+        reply_markup: ownerKeyboard()
+      });
+    }
   }
 
-  // 2. تطبيق الحماية وفحص الروابط والسبام حصراً داخل المجموعات
-  if (!isGroup(ctx)) return;
+  // ردود المستخدمين في الخاص.
+  if (ctx.chat.type === "private" && !ctx.from?.is_bot) {
+    if (text.startsWith("/")) return;
 
-  const c = config(String(ctx.chat.id));
-  const text = ctx.message.text;
+    if (/^(هلا|هلو|مرحبا|السلام عليكم|سلام|شلونك)$/i.test(text.trim())) {
+      return ctx.reply("هلا بيك ❤️ نورت البوت! اكتب /help للمساعدة.");
+    }
 
-  // فحص ومنع الروابط
+    if (/(مساعدة|الأوامر|شلون|كيف)/i.test(text)) {
+      return ctx.reply("أنا بوت إدارة مجموعات ❤️\nاكتب /help حتى تعرف الوظائف.");
+    }
+
+    return ctx.reply(
+      "وصلتني رسالتك ❤️\nأنا بوت إدارة مجموعات وردودي مبرمجة مسبقاً.\nاكتب /help للمساعدة."
+    );
+  }
+
+  if (!isGroup(ctx) || ctx.from?.is_bot) return;
+
+  const c = getGroup(ctx.chat.id);
+  c.stats.messages++;
+
   if (c.links && /(https?:\/\/|www\.|t\.me\/|telegram\.me\/)/i.test(text)) {
     try {
       await ctx.deleteMessage();
-    } catch {}
+      c.stats.deletedLinks++;
+    } catch (e) {
+      console.error("[links]", e.message);
+    }
+
+    save();
     return;
   }
 
-  // مكافحة التكرار والسبام (Anti-Flood)
-  if (c.antiflood) {
+  if (c.flood) {
     const key = `${ctx.chat.id}:${ctx.from.id}`;
     const now = Date.now();
-    const previous = recentMessages.get(key) || [];
-    const current = previous.filter((time) => now - time < 5000);
+    const times = (recentMessages.get(key) || []).filter(t => now - t < 5000);
 
-    current.push(now);
-    recentMessages.set(key, current);
+    times.push(now);
+    recentMessages.set(key, times);
 
-    if (current.length >= 5) {
+    if (times.length >= 5) {
       try {
         await ctx.deleteMessage();
-      } catch {}
+        c.stats.floodEvents++;
+      } catch (e) {
+        console.error("[flood]", e.message);
+      }
+
+      save();
       return;
     }
   }
+
+  if (c.autoReply && !text.startsWith("/")) {
+    if (/^(هلا|هلو|مرحبا|السلام عليكم|سلام)$/i.test(text.trim())) {
+      await ctx.reply("وعليكم السلام ورحمة الله ❤️");
+    } else if (/^بوت$/i.test(text.trim())) {
+      await ctx.reply("تفضل ❤️ شنو تحتاج؟");
+    }
+  }
+
+  save();
 });
 
-// معالجة الأخطاء والتشغيل
 bot.catch((err) => {
-  console.error("حدث خطأ في البوت:", err);
+  console.error("[bot error]", err.error || err);
 });
 
-bot.start();
-console.log("Grammy Professional Bot started successfully!");
+async function setup() {
+  await bot.api.setMyCommands([
+    { command: "start", description: "🚀 البدء وتشغيل البوت" },
+    { command: "help", description: "📖 المساعدة وطريقة الاستخدام" },
+    { command: "panel", description: "⚙️ لوحة تحكم المالك" },
+    { command: "id", description: "🆔 معرفة رقم حسابك" },
+    { command: "developer", description: "👨‍💻 معلومات المطور" }
+  ], {
+    scope: { type: "all_private_chats" },
+    language_code: "ar"
+  });
+
+  await bot.api.setMyDescription(
+    "🤖 بوت إدارة المجموعات وحمايتها من الروابط والسبام، مع الترحيب بالأعضاء والإحصائيات."
+  );
+
+  await bot.api.setMyShortDescription(
+    "🛡️ إدارة المجموعات والحماية والترحيب"
+  );
+
+  const me = await bot.api.getMe();
+  console.log(`✅ Logged in as @${me.username}`);
+
+  await bot.start();
+}
+
+setup().catch((err) => {
+  console.error("[startup]", err);
+  process.exit(1);
+});
