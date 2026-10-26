@@ -1,4 +1,3 @@
-
 import fs from 'node:fs';
 import { Bot, InlineKeyboard } from 'grammy';
 
@@ -7,7 +6,6 @@ import {
   NORMAL_MEMBER_RULES_REPLY,
   findAutoReply
 } from './autoReplies.js';
-
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
@@ -20,6 +18,7 @@ const freshGroup = () => ({
   id: '', title: '', activated: false, activatedBy: '', admins: [], activatedAt: null,
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
   welcomeText: 'أهلاً بيك {name} ❤️ نورت مجموعة {title}', replies: [],
+  badWords: [], // قائمة الكلمات الممنوعة الخاصة بالمجموعة
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
 
   warningSettings: {
@@ -65,18 +64,19 @@ function load() {
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
+      g.badWords ||= [];
       g.stats = { ...freshGroup().stats, ...(g.stats || {}) };
       g.floodUsers ||= {};
       g.warningSettings = {
-  enabled: false,
-  limit: 3,
-  action: 'mute',
-  duration: 10,
-  ...(g.warningSettings || {})
-};
+        enabled: false,
+        limit: 3,
+        action: 'mute',
+        duration: 10,
+        ...(g.warningSettings || {})
+      };
 
-g.warnings ||= {};
-g.warningLog ||= [];
+      g.warnings ||= {};
+      g.warningLog ||= [];
       db.groups[id] = g;
     }
   } catch (e) { console.error('Could not read database; starting with fresh data:', e); }
@@ -280,7 +280,6 @@ function ownerKeyboard() {
     .text('🔙 القائمة الرئيسية', 'home');
 }
 
-
 function warningsKeyboard(g) {
   const w = g.warningSettings || {
     enabled: false,
@@ -301,6 +300,7 @@ function warningsKeyboard(g) {
     .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit').row()
     .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction').row()
     .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration').row()
+    .text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu').row()
     .text('📋 سجل التحذيرات', 'warningslog').row()
     .text('🧹 تصفير تحذيرات عضو', 'warningsclear').row()
     .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
@@ -431,6 +431,66 @@ async function showRequiredList(ctx) {
   return answer(ctx, `📋 قنوات الاشتراك الإجباري\n\n${db.requiredChats.map((c, i) => `${i + 1}. ${c.title || c.username || c.id}`).join('\n')}`, { reply_markup: kb });
 }
 
+// دالة معالجة المخالفات وإصدار التحذيرات والعقوبات التلقائية
+async function handleViolation(ctx, g, reason) {
+  const userId = userKey(ctx);
+  const name = ctx.from.first_name || 'عضو';
+  
+  g.warnings ||= {};
+  g.warnings[userId] ||= { count: 0, name };
+  g.warnings[userId].count += 1;
+  g.warnings[userId].name = name;
+
+  g.warningLog ||= [];
+  g.warningLog.push({
+    userId,
+    name,
+    reason,
+    date: new Date().toISOString()
+  });
+
+  const currentWarnings = g.warnings[userId].count;
+  const limit = g.warningSettings?.limit || 3;
+
+  await ctx.reply(`⚠️ العضو ${name} خالف القوانين (${reason}).\nالتحذيرات: ${currentWarnings}/${limit}`);
+
+  if (g.warningSettings?.enabled && currentWarnings >= limit) {
+    const action = g.warningSettings.action || 'mute';
+    const durationMins = Number(g.warningSettings.duration || 10);
+
+    try {
+      if (action === 'mute') {
+        const untilDate = Math.floor(Date.now() / 1000) + (durationMins * 60);
+        await ctx.api.restrictChatMember(ctx.chat.id, Number(userId), {
+          permissions: {
+            can_send_messages: false,
+            can_send_media_messages: false,
+            can_send_polls: false,
+            can_send_other_messages: false,
+            can_add_web_page_previews: false
+          },
+          until_date: untilDate
+        });
+        await ctx.reply(`⚖️ تم كتم العضو ${name} لمدة ${durationMins} دقيقة لتجاوزه الحد الأقصى للتحذيرات.`);
+      } else if (action === 'kick') {
+        await ctx.api.banChatMember(ctx.chat.id, Number(userId));
+        await ctx.api.unbanChatMember(ctx.chat.id, Number(userId));
+        await ctx.reply(`⚖️ تم طرد العضو ${name} لتجاوزه الحد الأقصى للتحذيرات.`);
+      } else if (action === 'ban') {
+        await ctx.api.banChatMember(ctx.chat.id, Number(userId));
+        await ctx.reply(`⚖️ تم حظر العضو ${name} نهائياً لتجاوزه الحد الأقصى للتحذيرات.`);
+      }
+    } catch (err) {
+      console.error('Failed to apply penalty:', err);
+      await ctx.reply('⚠️ لم أستطيع تطبيق العقوبة، تأكد من صلاحيات المشرف للبوت.');
+    }
+
+    delete g.warnings[userId];
+  }
+
+  save();
+}
+
 bot.command('help', async ctx => {
   ensureUser(ctx);
   if (!await subscriptionGate(ctx)) return;
@@ -464,7 +524,6 @@ bot.on('my_chat_member', async ctx => {
   }
 });
 
-
 bot.hears(/^تفعيل$/i, async ctx => {
   if (!isGroup(ctx)) {
     return ctx.reply('🐾 أرسل كلمة «تفعيل» داخل المجموعة المراد تفعيلها.');
@@ -476,12 +535,10 @@ bot.hears(/^تفعيل$/i, async ctx => {
 
   const g = groupFor(ctx.chat);
 
-  // إذا البوت مفعّل سابقاً، لا تعِد التفعيل
   if (g.activated) {
     return ctx.reply('🐾 نغنوغ يعمل حالياً في هذه المجموعة ❤️\n\nتگدر تتحكم بإعدادات البوت من الخاص.');
   }
 
-  // تفعيل البوت لأول مرة
   g.activated = true;
   g.activatedBy = userKey(ctx);
   g.title = ctx.chat.title || g.title;
@@ -514,14 +571,31 @@ bot.on('message:new_chat_members', async ctx => {
   save();
 });
 
-// All inline button actions are handled centrally so each button has a real destination.
 bot.on('callback_query:data', async ctx => {
   ensureUser(ctx);
   const data = ctx.callbackQuery.data;
+
+  if (!isPrivate(ctx)) {
+    await ctx.answerCallbackQuery({
+      text: '⚙️ إدارة نغنوغ متاحة من الخاص فقط ❤️'
+    });
+    return;
+  }
   if (data === 'checksubscription') {
     const result = await checkSubscription(ctx.from.id);
-    if (result.ok) { await ctx.answerCallbackQuery({ text: 'تم التحقق بنجاح ❤️' }); return showHome(ctx); }
-    await ctx.answerCallbackQuery({ text: 'بعدك مو مشترك بالقناة المطلوبة.' }); return subscriptionGate(ctx);
+
+    if (result.ok) {
+      await ctx.answerCallbackQuery({
+        text: 'تم التحقق بنجاح ❤️'
+      });
+      return showHome(ctx);
+    }
+
+    await ctx.answerCallbackQuery({
+      text: 'بعدك مو مشترك بالقناة المطلوبة.'
+    });
+
+    return subscriptionGate(ctx);
   }
   if (!await subscriptionGate(ctx)) { try { await ctx.answerCallbackQuery(); } catch {} return; }
   try { await ctx.answerCallbackQuery(); } catch {}
@@ -546,253 +620,319 @@ bot.on('callback_query:data', async ctx => {
     setSelected(ctx, id); return showGroupSettings(ctx, g);
   }
   if (data === 'groupsettings') return showGroupSettings(ctx);
-  
-if (data === 'warningsmenu') {
-  const g = selectedGroup(ctx);
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+
+  if (data === 'warningsmenu') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+
+    g.warningSettings ||= {
+      enabled: false,
+      limit: 3,
+      action: 'mute',
+      duration: 10
+    };
+
+    save();
+
+    return ctx.editMessageText(
+      `🛡️ التحذيرات والعقوبات\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+      `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+      `العقوبة: ${g.warningSettings.action}\n` +
+      `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+      { reply_markup: warningsKeyboard(g) }
+    );
   }
 
-  g.warningSettings ||= {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
+  // ===== إدارة الكلمات الممنوعة =====
+  if (data === 'badwordsmenu') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+    g.badWords ||= [];
+    
+    const kb = new InlineKeyboard();
+    kb.text('➕ إضافة كلمة ممنوعة', 'badwordadd').row();
+    
+    if (g.badWords.length > 0) {
+      g.badWords.forEach((word, index) => {
+        kb.text(`🗑️ حذف: ${word}`, `badworddel:${index}`).row();
+      });
+    }
+    kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
 
-  save();
-
-  return ctx.editMessageText(
-    `🛡️ التحذيرات والعقوبات\n\n` +
-    `المجموعة: ${g.title}\n` +
-    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
-    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
-    `العقوبة: ${g.warningSettings.action}\n` +
-    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
-    { reply_markup: warningsKeyboard(g) }
-  );
-}
-  // ===== أزرار إعدادات التحذيرات والعقوبات =====
-
-if (data === 'warningstoggle') {
-  const g = selectedGroup(ctx);
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
+    return ctx.editMessageText(
+      `🚫 إدارة الكلمات الممنوعة\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الكلمات المخالفة المرصودة حالياً:\n${wordsList}`,
+      { reply_markup: kb }
+    );
   }
 
-  g.warningSettings ||= {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
-
-  g.warningSettings.enabled = !g.warningSettings.enabled;
-  save();
-
-  await answer(ctx, g.warningSettings.enabled
-    ? '✅ تم تفعيل إعدادات التحذيرات.'
-    : '⏸️ تم إيقاف إعدادات التحذيرات.');
-
-  return ctx.editMessageText(
-    `🛡️ التحذيرات والعقوبات\n\n` +
-    `المجموعة: ${g.title}\n` +
-    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
-    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
-    `العقوبة: ${g.warningSettings.action}\n` +
-    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
-    { reply_markup: warningsKeyboard(g) }
-  );
-}
-
-if (data === 'warningslimit') {
-  const g = selectedGroup(ctx);
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  if (data === 'badwordadd') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+    pending(ctx, { action: 'badword-add', groupId: g.id });
+    return answer(ctx, '➕ أرسل الآن الكلمة أو العبارة المخالفة التي تريد أن يرصدها البوت ويحذفها تلقائياً.');
   }
 
-  g.warningSettings ||= {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
+  if (data.startsWith('badworddel:')) {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+    const index = Number(data.split(':')[1]);
+    g.badWords ||= [];
+    if (g.badWords[index]) {
+      const removed = g.badWords.splice(index, 1)[0];
+      save();
+      await answer(ctx, `✅ تم حذف الكلمة "${removed}" من قائمة الممنوعات.`);
+    }
 
-  const limits = [2, 3, 5, 10];
-  const index = limits.indexOf(Number(g.warningSettings.limit));
-  g.warningSettings.limit = limits[(index + 1) % limits.length];
+    // إعادة عرض القائمة
+    const kb = new InlineKeyboard();
+    kb.text('➕ إضافة كلمة ممنوعة', 'badwordadd').row();
+    if (g.badWords.length > 0) {
+      g.badWords.forEach((word, idx) => {
+        kb.text(`🗑️ حذف: ${word}`, `badworddel:${idx}`).row();
+      });
+    }
+    kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
+    const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
+    return ctx.editMessageText(
+      `🚫 إدارة الكلمات الممنوعة\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الكلمات المخالفة المرصودة حالياً:\n${wordsList}`,
+      { reply_markup: kb }
+    );
+  }
+  // ===================================
 
-  save();
-  await answer(ctx, `🔢 عدد التحذيرات: ${g.warningSettings.limit}`);
+  if (data === 'warningstoggle') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
 
-  return ctx.editMessageText(
-    `🛡️ التحذيرات والعقوبات\n\n` +
-    `المجموعة: ${g.title}\n` +
-    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
-    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
-    `العقوبة: ${g.warningSettings.action}\n` +
-    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
-    { reply_markup: warningsKeyboard(g) }
-  );
-}
+    g.warningSettings ||= {
+      enabled: false,
+      limit: 3,
+      action: 'mute',
+      duration: 10
+    };
 
-if (data === 'warningsaction') {
-  const g = selectedGroup(ctx);
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    g.warningSettings.enabled = !g.warningSettings.enabled;
+    save();
+
+    await answer(ctx, g.warningSettings.enabled
+      ? '✅ تم تفعيل إعدادات التحذيرات.'
+      : '⏸️ تم إيقاف إعدادات التحذيرات.');
+
+    return ctx.editMessageText(
+      `🛡️ التحذيرات والعقوبات\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+      `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+      `العقوبة: ${g.warningSettings.action}\n` +
+      `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+      { reply_markup: warningsKeyboard(g) }
+    );
   }
 
-  g.warningSettings ||= {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
+  if (data === 'warningslimit') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
 
-  const actions = ['mute', 'kick', 'ban'];
-  const index = actions.indexOf(g.warningSettings.action);
-  g.warningSettings.action = actions[(index + 1) % actions.length];
+    g.warningSettings ||= {
+      enabled: false,
+      limit: 3,
+      action: 'mute',
+      duration: 10
+    };
 
-  const names = {
-    mute: 'كتم',
-    kick: 'طرد',
-    ban: 'حظر'
-  };
+    const limits = [2, 3, 5, 10];
+    const index = limits.indexOf(Number(g.warningSettings.limit));
+    g.warningSettings.limit = limits[(index + 1) % limits.length];
 
-  save();
-  await answer(ctx, `⚖️ العقوبة المختارة: ${names[g.warningSettings.action]}`);
+    save();
+    await answer(ctx, `🔢 عدد التحذيرات: ${g.warningSettings.limit}`);
 
-  return ctx.editMessageText(
-    `🛡️ التحذيرات والعقوبات\n\n` +
-    `المجموعة: ${g.title}\n` +
-    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
-    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
-    `العقوبة: ${names[g.warningSettings.action]}\n` +
-    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
-    { reply_markup: warningsKeyboard(g) }
-  );
-}
-
-if (data === 'warningsduration') {
-  const g = selectedGroup(ctx);
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    return ctx.editMessageText(
+      `🛡️ التحذيرات والعقوبات\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+      `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+      `العقوبة: ${g.warningSettings.action}\n` +
+      `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+      { reply_markup: warningsKeyboard(g) }
+    );
   }
 
-  g.warningSettings ||= {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
+  if (data === 'warningsaction') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
 
-  const durations = [5, 10, 30, 60, 120];
-  const index = durations.indexOf(Number(g.warningSettings.duration));
-  g.warningSettings.duration = durations[(index + 1) % durations.length];
+    g.warningSettings ||= {
+      enabled: false,
+      limit: 3,
+      action: 'mute',
+      duration: 10
+    };
 
-  save();
-  await answer(ctx, `⏱️ مدة الكتم: ${g.warningSettings.duration} دقيقة`);
+    const actions = ['mute', 'kick', 'ban'];
+    const index = actions.indexOf(g.warningSettings.action);
+    g.warningSettings.action = actions[(index + 1) % actions.length];
 
-  return ctx.editMessageText(
-    `🛡️ التحذيرات والعقوبات\n\n` +
-    `المجموعة: ${g.title}\n` +
-    `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
-    `عدد التحذيرات: ${g.warningSettings.limit}\n` +
-    `العقوبة: ${g.warningSettings.action}\n` +
-    `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
-    { reply_markup: warningsKeyboard(g) }
-  );
-}
+    const names = {
+      mute: 'كتم',
+      kick: 'طرد',
+      ban: 'حظر'
+    };
 
-if (data === 'warningslog') {
-  const g = selectedGroup(ctx);
+    save();
+    await answer(ctx, `⚖️ العقوبة المختارة: ${names[g.warningSettings.action]}`);
 
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    return ctx.editMessageText(
+      `🛡️ التحذيرات والعقوبات\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+      `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+      `العقوبة: ${names[g.warningSettings.action]}\n` +
+      `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+      { reply_markup: warningsKeyboard(g) }
+    );
   }
 
-  const logs = (g.warningLog || []).slice(-15).reverse();
+  if (data === 'warningsduration') {
+    const g = selectedGroup(ctx);
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
 
-  if (!logs.length) {
-    return answer(ctx, '📋 ماكو تحذيرات مسجّلة بهذه المجموعة بعد.', {
+    g.warningSettings ||= {
+      enabled: false,
+      limit: 3,
+      action: 'mute',
+      duration: 10
+    };
+
+    const durations = [5, 10, 30, 60, 120];
+    const index = durations.indexOf(Number(g.warningSettings.duration));
+    g.warningSettings.duration = durations[(index + 1) % durations.length];
+
+    save();
+    await answer(ctx, `⏱️ مدة الكتم: ${g.warningSettings.duration} دقيقة`);
+
+    return ctx.editMessageText(
+      `🛡️ التحذيرات والعقوبات\n\n` +
+      `المجموعة: ${g.title}\n` +
+      `الحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n` +
+      `عدد التحذيرات: ${g.warningSettings.limit}\n` +
+      `العقوبة: ${g.warningSettings.action}\n` +
+      `مدة الكتم: ${g.warningSettings.duration} دقيقة`,
+      { reply_markup: warningsKeyboard(g) }
+    );
+  }
+
+  if (data === 'warningslog') {
+    const g = selectedGroup(ctx);
+
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+
+    const logs = (g.warningLog || []).slice(-15).reverse();
+
+    if (!logs.length) {
+      return answer(ctx, '📋 ماكو تحذيرات مسجّلة بهذه المجموعة بعد.', {
+        reply_markup: new InlineKeyboard()
+          .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+      });
+    }
+
+    const text = logs.map((item, i) => {
+      const date = item.date
+        ? new Date(item.date).toLocaleString('en-GB')
+        : 'غير محدد';
+
+      return `${i + 1}. 👤 ${item.name || item.userId || 'عضو'}\n` +
+        `⚠️ السبب: ${item.reason || 'غير محدد'}\n` +
+        `🕒 الوقت: ${date}`;
+    }).join('\n\n');
+
+    return answer(ctx, `📋 آخر التحذيرات في ${g.title}\n\n${text}`, {
       reply_markup: new InlineKeyboard()
         .text('🔙 رجوع للتحذيرات', 'warningsmenu')
     });
   }
 
-  const text = logs.map((item, i) => {
-    const date = item.date
-      ? new Date(item.date).toLocaleString('en-GB')
-      : 'غير محدد';
+  if (data === 'warningsclear') {
+    const g = selectedGroup(ctx);
 
-    return `${i + 1}. 👤 ${item.name || item.userId || 'عضو'}\n` +
-      `⚠️ السبب: ${item.reason || 'غير محدد'}\n` +
-      `🕒 الوقت: ${date}`;
-  }).join('\n\n');
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
 
-  return answer(ctx, `📋 آخر التحذيرات في ${g.title}\n\n${text}`, {
-    reply_markup: new InlineKeyboard()
-      .text('🔙 رجوع للتحذيرات', 'warningsmenu')
-  });
-}
+    const members = Object.entries(g.warnings || {})
+      .filter(([_, value]) => Number(value?.count || 0) > 0);
 
-if (data === 'warningsclear') {
-  const g = selectedGroup(ctx);
+    if (!members.length) {
+      return answer(ctx, '🧹 ماكو أعضاء عندهم تحذيرات حالياً.', {
+        reply_markup: new InlineKeyboard()
+          .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+      });
+    }
 
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    const kb = new InlineKeyboard();
+
+    for (const [userId, value] of members.slice(0, 30)) {
+      kb.text(
+        `🧹 ${String(value.name || userId).slice(0, 25)} (${value.count})`,
+        `warningclear:${userId}`
+      ).row();
+    }
+
+    kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
+
+    return answer(ctx, 'اختار العضو الذي تريد تصفير تحذيراته:', {
+      reply_markup: kb
+    });
   }
 
-  const members = Object.entries(g.warnings || {})
-    .filter(([_, value]) => Number(value?.count || 0) > 0);
+  if (data.startsWith('warningclear:')) {
+    const g = selectedGroup(ctx);
 
-  if (!members.length) {
-    return answer(ctx, '🧹 ماكو أعضاء عندهم تحذيرات حالياً.', {
+    if (!g || !await userCanManage(ctx, g)) {
+      return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+    }
+
+    const userId = data.slice('warningclear:'.length);
+
+    if (!g.warnings?.[userId]) {
+      return answer(ctx, 'ما لقيت تحذيرات لهذا العضو.');
+    }
+
+    const count = g.warnings[userId].count || 0;
+    delete g.warnings[userId];
+    save();
+
+    return answer(ctx, `✅ تم تصفير تحذيرات العضو.\nعدد التحذيرات التي أُزيلت: ${count}`, {
       reply_markup: new InlineKeyboard()
         .text('🔙 رجوع للتحذيرات', 'warningsmenu')
     });
   }
 
-  const kb = new InlineKeyboard();
-
-  for (const [userId, value] of members.slice(0, 30)) {
-    kb.text(
-      `🧹 ${String(value.name || userId).slice(0, 25)} (${value.count})`,
-      `warningclear:${userId}`
-    ).row();
-  }
-
-  kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
-
-  return answer(ctx, 'اختار العضو الذي تريد تصفير تحذيراته:', {
-    reply_markup: kb
-  });
-}
-
-if (data.startsWith('warningclear:')) {
-  const g = selectedGroup(ctx);
-
-  if (!g || !await userCanManage(ctx, g)) {
-    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
-  }
-
-  const userId = data.slice('warningclear:'.length);
-
-  if (!g.warnings?.[userId]) {
-    return answer(ctx, 'ما لقيت تحذيرات لهذا العضو.');
-  }
-
-  const count = g.warnings[userId].count || 0;
-  delete g.warnings[userId];
-  save();
-
-  return answer(ctx, `✅ تم تصفير تحذيرات العضو.\nعدد التحذيرات التي أُزيلت: ${count}`, {
-    reply_markup: new InlineKeyboard()
-      .text('🔙 رجوع للتحذيرات', 'warningsmenu')
-  });
-}
-
-// ===== نهاية أزرار إعدادات التحذيرات =====
   if (data === 'welcomeedit') { const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.'); pending(ctx, { action: 'welcome', groupId: g.id }); return answer(ctx, `👋 أرسل رسالة الترحيب الجديدة لمجموعة ${g.title}.\n\nتگدر تستخدم {name} لاسم العضو و{title} لاسم المجموعة.`); }
   if (data === 'togglelinks' || data === 'toggleflood' || data === 'togglereplies') {
     const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
@@ -808,21 +948,21 @@ if (data.startsWith('warningclear:')) {
   if (data.startsWith('replydel:')) { const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'ما عندك صلاحية.'); const i = Number(data.split(':')[1]); if (!Number.isInteger(i) || !g.replies[i]) return answer(ctx, 'هذا الرد غير موجود.'); const removed = g.replies.splice(i, 1)[0]; save(); return answer(ctx, `🗑️ تم حذف الرد: ${removed.trigger}`, { reply_markup: repliesKeyboard() }); }
   if (data === 'groupstats') return showGroupStats(ctx);
   if (data === 'ownerpanel') return showOwnerPanel(ctx);
-if (data === 'botstats') {
-  if (!isOwner(ctx)) {
-    return answer(ctx, 'هذا القسم خاص بمالك البوت.');
+  if (data === 'botstats') {
+    if (!isOwner(ctx)) {
+      return answer(ctx, 'هذا القسم خاص بمالك البوت.');
+    }
+
+    const totalUsers = (db.privateUsers || []).length;
+
+    return answer(
+      ctx,
+      `📊 إحصائيات البوت — نغنوغ 🐾\n\n` +
+      `👤 عدد مستخدمي البوت: ${totalUsers}\n\n` +
+      `📌 العدد يشمل المستخدمين الذين تفاعلوا مع البوت في الخاص منذ بدء تسجيلهم.`,
+      { reply_markup: ownerKeyboard() }
+    );
   }
-
-  const totalUsers = (db.privateUsers || []).length;
-
-  return answer(
-    ctx,
-    `📊 إحصائيات البوت — نغنوغ 🐾\n\n` +
-    `👤 عدد مستخدمي البوت: ${totalUsers}\n\n` +
-    `📌 العدد يشمل المستخدمين الذين تفاعلوا مع البوت في الخاص منذ بدء تسجيلهم.`,
-    { reply_markup: ownerKeyboard() }
-  );
-}
   if (data === 'activatedgroups') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); const gs = Object.values(db.groups).filter(g => g.activated); return answer(ctx, gs.length ? `👥 المجموعات المفعّلة:\n\n${gs.map((g, i) => `${i + 1}. ${g.title} (${g.id})`).join('\n')}` : 'ماكو مجموعات مفعّلة حالياً.', { reply_markup: ownerKeyboard() }); }
   if (data === 'botsettings') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); return answer(ctx, `⚙️ إعدادات البوت\n\nإصدار التطبيق: 2.1.0\nوضع التشغيل: polling\nقنوات الاشتراك الإجباري: ${db.requiredChats.length}\nالمجموعات المفعّلة: ${Object.values(db.groups).filter(g => g.activated).length}\n\nإعدادات كل مجموعة تُدار بشكل مستقل من «إدارة مجموعتي».`, { reply_markup: ownerKeyboard() }); }
   if (data === 'globalprotection') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); return answer(ctx, '🛡️ إعدادات الحماية العامة\n\nإعدادات منع الروابط والسبام حالياً مستقلة لكل مجموعة، حتى تگدر تضبطها حسب حاجة كل مجموعة. اختار «المجموعات المفعّلة» لمراجعتها.', { reply_markup: ownerKeyboard() }); }
@@ -833,7 +973,6 @@ if (data === 'botstats') {
   return answer(ctx, 'هذا الزر غير معروف. ارجع للقائمة الرئيسية وحاول مرة ثانية.');
 });
 
-// Private messages: handle owner/admin setup steps and regular users.
 bot.on('message:text', async ctx => {
   ensureUser(ctx);
   const text = ctx.message.text.trim();
@@ -842,19 +981,52 @@ bot.on('message:text', async ctx => {
     if (!g?.activated || text.startsWith('/')) return;
     g.title = ctx.chat.title || g.title;
     g.stats.messages++; db.stats.messages++;
-    if (g.links && /(https?:\/\/|www\.|t\.me\/|telegram\.me\/|@[A-Za-z0-9_]{5,})/i.test(text) && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
-      try { await ctx.deleteMessage(); g.stats.deletedLinks++; db.stats.deletedLinks++; } catch (e) { console.warn('Could not delete link; bot may need admin rights.'); }
-      save(); return;
+
+    // 1. فحص الكلمات الممنوعة المضافة يدوياً
+    if (g.badWords && g.badWords.length > 0 && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
+      const lowerText = text.toLowerCase();
+      const matchedWord = g.badWords.find(word => lowerText.includes(word.toLowerCase()));
+      if (matchedWord) {
+        try {
+          await ctx.deleteMessage();
+          await handleViolation(ctx, g, `استخدام كلمة ممنوعة (${matchedWord})`);
+        } catch (e) {
+          console.warn('Could not delete bad word message; bot may need admin rights.');
+        }
+        save();
+        return;
+      }
     }
+
+    // 2. فحص منع الروابط وتطبيق التحذير تلقائياً
+    if (g.links && /(https?:\/\/|www\.|t\.me\/|telegram\.me\/|@[A-Za-z0-9_]{5,})/i.test(text) && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
+      try { 
+        await ctx.deleteMessage(); 
+        g.stats.deletedLinks++; 
+        db.stats.deletedLinks++; 
+        await handleViolation(ctx, g, 'إرسال رابط ممنوع');
+      } catch (e) { 
+        console.warn('Could not delete link; bot may need admin rights.'); 
+      }
+      save(); 
+      return;
+    }
+
+    // 3. فحص منع السبام وتطبيق التحذير تلقائياً
     if (g.flood && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
       const now = Date.now(); const uid = userKey(ctx); const times = (g.floodUsers[uid] || []).filter(t => now - t < 5000); times.push(now); g.floodUsers[uid] = times;
       if (times.length >= 5) {
-        try { await ctx.deleteMessage(); g.stats.floodEvents++; db.stats.floodEvents++; } catch {}
-        save(); return;
+        try { 
+          await ctx.deleteMessage(); 
+          g.stats.floodEvents++; 
+          db.stats.floodEvents++; 
+          await handleViolation(ctx, g, 'إرسال رسائل متكررة (سبام)');
+        } catch {}
+        save(); 
+        return;
       }
     }
-    
-    // 🎮 لعبة تحدّي نغنوغ
+
     const gameText = text.trim().toLocaleLowerCase('ar')
       .replace(/[ًٌٍَُِّْـ]/g, '')
       .replace(/[أإآ]/g, 'ا')
@@ -890,10 +1062,10 @@ bot.on('message:text', async ctx => {
     }
 
     if (g.game?.active) {
-      const answer = normalizeGameAnswer(text);
+      const answerVal = normalizeGameAnswer(text);
       const correctAnswer = normalizeGameAnswer(g.game.answer);
 
-      if (answer === correctAnswer) {
+      if (answerVal === correctAnswer) {
         const uid = userKey(ctx);
         const name = ctx.from.first_name || 'عضو';
 
@@ -956,112 +1128,60 @@ bot.on('message:text', async ctx => {
         return;
       }
     }
-    // 📜 قوانين المجموعة
-const rulesCommand = text.trim().replace(/[؟?!.,،]/g, '');
-
-if (rulesCommand === 'القوانين' || rulesCommand === 'قوانين') {
-  const canSeeRules =
-    isOwner(ctx) ||
-    await userIsAdmin(ctx.chat.id, ctx.from.id);
-
-  if (canSeeRules) {
-    await ctx.reply(GROUP_RULES, {
-      reply_to_message_id: ctx.message.message_id
-    });
   } else {
-    await ctx.reply(NORMAL_MEMBER_RULES_REPLY, {
-      reply_to_message_id: ctx.message.message_id
-    });
+    const p = db.pending[userKey(ctx)];
+    if (p) {
+      if (p.action === 'welcome') {
+        const g = db.groups[p.groupId];
+        if (g && await userCanManage(ctx, g)) {
+          g.welcomeText = text;
+          save();
+          clearPending(ctx);
+          return answer(ctx, `✅ تم تحديث رسالة الترحيب بنجاح لمجموعة ${g.title}!`, { reply_markup: new InlineKeyboard().text('⚙️ إعدادات المجموعة', 'groupsettings') });
+        }
+      }
+      if (p.action === 'reply-trigger') {
+        clearPending(ctx);
+        pending(ctx, { action: 'reply-response', groupId: p.groupId, trigger: text });
+        return ctx.reply('➕ أرسل الآن الرد الذي تريد أن يرسله البوت عندما يكتب المستخدم هذه العبارة:');
+      }
+      if (p.action === 'reply-response') {
+        const g = db.groups[p.groupId];
+        if (g && await userCanManage(ctx, g)) {
+          g.replies.push({ trigger: p.trigger, response: text });
+          save();
+          clearPending(ctx);
+          return answer(ctx, `✅ تم إضافة الرد التلقائي بنجاح!`, { reply_markup: new InlineKeyboard().text('💬 الردود التلقائية', 'repliesmenu') });
+        }
+      }
+      // استقبال الكلمة الممنوعة الجديدة
+      if (p.action === 'badwordadd') {
+        const g = db.groups[p.groupId];
+        if (g && await userCanManage(ctx, g)) {
+          g.badWords ||= [];
+          g.badWords.push(text);
+          save();
+          clearPending(ctx);
+          return answer(ctx, `✅ تم إضافة الكلمة "${text}" إلى قائمة الكلمات الممنوعة بنجاح!`, { reply_markup: new InlineKeyboard().text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu') });
+        }
+      }
+      if (p.action === 'required-add') {
+        clearPending(ctx);
+        let username = text;
+        if (username.startsWith('https://t.me/')) username = '@' + username.split('https://t.me/')[1];
+        if (!username.startsWith('@')) username = '@' + username;
+        try {
+          const chat = await bot.api.getChat(username);
+          db.requiredChats.push({ id: chat.id, username: chat.username || username, title: chat.title || username, url: chat.username ? `https://t.me/${chat.username}` : undefined });
+          save();
+          return answer(ctx, `✅ تم إضافة القناة ${chat.title || username} بنجاح لاشتراك إجباري.`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+        } catch (e) {
+          return answer(ctx, `❌ ما قدرت أوصل للقناة. تأكد أن المعرف صحيح وأن البوت مشرف فيها.\nخطأ: ${e.message}`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+        }
+      }
+    }
+    return showHome(ctx);
   }
-
-  save();
-  return;
-}
-
-// 💬 الردود التلقائية الجديدة + الردود المضافة من لوحة البوت
-if (g.autoReply) {
-  const automaticReply = findAutoReply(text);
-
-  if (automaticReply) {
-    try {
-      await ctx.reply(automaticReply, {
-        reply_to_message_id: ctx.message.message_id
-      });
-    } catch (e) {
-      console.error('Automatic reply error:', e);
-    }
-  }
-
-  // الحفاظ على الردود التي يضيفها مشرفو المجموعة
-  const match = g.replies.find(
-    r => r.trigger.trim().toLocaleLowerCase() === text.trim().toLocaleLowerCase()
-  );
-
-  if (match) {
-    try {
-      await ctx.reply(match.response, {
-        reply_to_message_id: ctx.message.message_id
-      });
-    } catch (e) {
-      console.error('Custom auto-reply error:', e);
-    }
-  }
-}
-
-save();
-return;
-  }
-  
-  if (!isPrivate(ctx)) return;
-  if (text.startsWith('/')) return;
-  if (!isOwner(ctx) && !await subscriptionGate(ctx)) return;
-  const p = db.pending[userKey(ctx)];
-  if (p) {
-    if (p.action === 'welcome') {
-      const g = db.groups[p.groupId];
-      if (!g || !(await userCanManage(ctx, g))) { clearPending(ctx); return ctx.reply('ما عندك صلاحية تعديل هذه المجموعة.'); }
-      g.welcomeText = text; clearPending(ctx); save();
-      return ctx.reply('✅ تم حفظ رسالة الترحيب بنجاح.', { reply_markup: groupSettingsKeyboard(g) });
-    }
-    if (p.action === 'reply-trigger') {
-      if (text.length > 100) return ctx.reply('خلي العبارة أقصر من 100 حرف، وحاول مرة ثانية.');
-      pending(ctx, { action: 'reply-response', groupId: p.groupId, trigger: text });
-      return ctx.reply(`تمام، هسه أرسل الرد الذي تريد البوت يرسله عند كتابة:\n«${text}»`);
-    }
-    if (p.action === 'reply-response') {
-      const g = db.groups[p.groupId];
-      if (!g || !(await userCanManage(ctx, g))) { clearPending(ctx); return ctx.reply('ما عندك صلاحية تعديل هذه المجموعة.'); }
-      const existing = g.replies.findIndex(r => r.trigger.toLocaleLowerCase() === p.trigger.toLocaleLowerCase());
-      if (existing >= 0) g.replies[existing].response = text; else g.replies.push({ trigger: p.trigger, response: text });
-      clearPending(ctx); save(); return ctx.reply(`✅ تم حفظ الرد التلقائي\n\n«${p.trigger}» ➜ ${text}`, { reply_markup: repliesKeyboard() });
-    }
-    if (p.action === 'required-add') {
-      if (!isOwner(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بالمالك.'); }
-      let username = text;
-      const urlMatch = text.match(/(?:https?:\/\/)?(?:www\.)?t\.me\/([A-Za-z0-9_]{5,})\/?/i);
-      if (urlMatch) username = '@' + urlMatch[1];
-      if (!/^@[A-Za-z0-9_]{5,}$/.test(username)) return ctx.reply('صيغة غير صحيحة. أرسل @username أو رابط قناة عامة مثل https://t.me/channelname.');
-      try {
-        const chat = await bot.api.getChat(username);
-        if (!['channel', 'supergroup'].includes(chat.type)) return ctx.reply('هذا الحساب ليس قناة أو مجموعة عامة. أرسل قناة عامة.');
-        const me = await bot.api.getChatMember(chat.id, Number((await bot.api.getMe()).id));
-        if (!['administrator', 'creator'].includes(me.status)) return ctx.reply('لازم تضيف البوت مشرفاً بالقناة أولاً، ثم أعد إرسالها.');
-        const item = { id: String(chat.id), title: chat.title || username, username, url: chat.username ? `https://t.me/${chat.username}` : null };
-        if (!db.requiredChats.some(c => String(c.id) === item.id)) db.requiredChats.push(item);
-        clearPending(ctx); save(); return ctx.reply(`✅ تمت إضافة شرط الاشتراك: ${item.title}`, { reply_markup: new InlineKeyboard().text('📋 عرض القنوات', 'requiredlist').row().text('🔙 لوحة المالك', 'ownerpanel') });
-      } catch (e) { console.error('Required channel setup failed:', e); return ctx.reply('ما كدرت أوصل للقناة. تأكد من اسم المستخدم وأن البوت مشرف بالقناة، ثم حاول مرة ثانية.'); }
-    }
-  }
-  if (text === '👥 إدارة مجموعتي' || text === '👥 مجموعاتي') return showGroups(ctx);
-  if (text === '📖 طريقة الاستخدام') return ctx.reply('ضيف البوت للمجموعة، وخلي أحد المشرفين يرسل «تفعيل»، وبعدها افتح الخاص واختر إدارة مجموعتي.', { reply_markup: mainKeyboard(ctx) });
-  if (text === '🆘 المساعدة' || text === '📖 المساعدة') return ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard(ctx) });
-  if (isOwner(ctx) && text === '👑 لوحة المالك') return ctx.reply('👑 لوحة المالك — نغنوغ 🐾', { reply_markup: ownerKeyboard() });
-  return ctx.reply('اختار أحد الأزرار من القائمة حتى أگدر أساعدك ❤️', { reply_markup: mainKeyboard(ctx) });
 });
 
-bot.catch(err => { console.error('Bot update error:', err.error || err); });
-(async () => {
-  const me = await bot.api.getMe();
-  console.log(`🐾 Noghnogh is starting as @${me.username}`);
-  await bot.start({ onStart: () => console.log('Polling started successfully.') });
-})();
+bot.start();
