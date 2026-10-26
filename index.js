@@ -1027,6 +1027,44 @@ bot.on('message:text', async ctx => {
       }
     }
 
+    // ===== الردود التلقائية =====
+
+    const normalizedText = normalizeGameAnswer(text);
+
+    // طلب القوانين: المشرف يرى القوانين، والعضو العادي يرى الرد المحدد
+    if (['القوانين', 'قوانين'].includes(normalizedText)) {
+      const canManage = await userCanManage(ctx, g);
+
+      await ctx.reply(
+        canManage ? GROUP_RULES : NORMAL_MEMBER_RULES_REPLY
+      );
+
+      return;
+    }
+
+    // الردود التلقائية العامة والردود المخصصة للمجموعة
+    if (g.autoReply) {
+      // أولاً: الردود الموجودة في ملف autoReplies.js
+      const automaticReply = findAutoReply(text);
+
+      if (automaticReply) {
+        await ctx.reply(automaticReply);
+        return;
+      }
+
+      // ثانياً: الردود التي يضيفها المشرف من لوحة نغنوغ
+      const customReply = (g.replies || []).find(
+        reply =>
+          normalizeGameAnswer(reply.trigger) === normalizedText
+      );
+
+      if (customReply) {
+        await ctx.reply(customReply.response);
+        return;
+      }
+    }
+
+    // ===== نهاية الردود التلقائية =====
     const gameText = text.trim().toLocaleLowerCase('ar')
       .replace(/[ًٌٍَُِّْـ]/g, '')
       .replace(/[أإآ]/g, 'ا')
