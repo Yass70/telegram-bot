@@ -52,6 +52,7 @@ const freshDB = () => ({
   privateUsers: [],
   requiredChats: [],
   points: {},
+  customizations: {},
   stats: {
     messages: 0,
     deletedLinks: 0,
@@ -72,6 +73,7 @@ function load() {
     db.groups ||= {}; db.selected ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
+    db.customizations ||= {};
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
@@ -129,9 +131,92 @@ function selectedGroup(ctx) {
 }
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
+// تخصيصات خاصة بكل مستخدم في الخاص فقط؛ لا تؤثر على رسائل المجموعات.
+const DEFAULT_CUSTOMIZATION = {
+  startText: '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\nبوت لإدارة المجموعات وحمايتها وتنظيمها.\n\nاختار القسم المناسب من القائمة أدناه حتى تبدأ.',
+  descriptions: {
+    settings: '⚙️ إعدادات المجموعة: التحكم بميزات الإدارة والحماية.',
+    groups: '👥 مجموعاتي: عرض المجموعات المفعّلة وإدارتها.',
+    account: '👤 معلومات حسابي: عرض معلومات حسابك.',
+    replies: '💬 الردود التلقائية: الوصول إلى قسم الردود.'
+  },
+  replies: {
+    account: '👤 معلومات حسابك',
+    replies: '💬 الردود التلقائية',
+    nogroups: 'ما عندي مجموعة مفعّلة ظاهرة إلك حالياً.'
+  }
+};
+
+function getCustomization(ctx) {
+  const id = userKey(ctx);
+  db.customizations ||= {};
+  if (!db.customizations[id]) {
+    db.customizations[id] = JSON.parse(JSON.stringify(DEFAULT_CUSTOMIZATION));
+  } else {
+    const saved = db.customizations[id];
+    saved.descriptions ||= {};
+    saved.replies ||= {};
+    if (typeof saved.startText !== 'string') saved.startText = DEFAULT_CUSTOMIZATION.startText;
+    for (const key of Object.keys(DEFAULT_CUSTOMIZATION.descriptions)) {
+      if (typeof saved.descriptions[key] !== 'string') saved.descriptions[key] = DEFAULT_CUSTOMIZATION.descriptions[key];
+    }
+    for (const key of Object.keys(DEFAULT_CUSTOMIZATION.replies)) {
+      if (typeof saved.replies[key] !== 'string') saved.replies[key] = DEFAULT_CUSTOMIZATION.replies[key];
+    }
+  }
+  return db.customizations[id];
+}
+
+function customText(ctx, section, key) {
+  const c = getCustomization(ctx);
+  return section === 'startText' ? c.startText : c[section]?.[key];
+}
+
+function customizationMenuKeyboard() {
+  return new InlineKeyboard()
+    .text('👋 تعديل مقدمة /start', 'customstart').row()
+    .text('🔘 تعديل شرح الأزرار', 'customdescmenu').row()
+    .text('💬 تعديل ردود البوت', 'customreplymenu').row()
+    .text('♻️ استعادة النصوص الأصلية', 'customreset').row()
+    .text('🔙 رجوع للقائمة الرئيسية', 'home');
+}
+
+function customizationDescriptionsKeyboard() {
+  return new InlineKeyboard()
+    .text('⚙️ شرح إعدادات المجموعة', 'customdesc:settings').row()
+    .text('👥 شرح مجموعاتي', 'customdesc:groups').row()
+    .text('👤 شرح معلومات حسابي', 'customdesc:account').row()
+    .text('💬 شرح الردود التلقائية', 'customdesc:replies').row()
+    .text('🔙 رجوع للتخصيص', 'custommenu');
+}
+
+function customizationRepliesKeyboard() {
+  return new InlineKeyboard()
+    .text('👤 رسالة معلومات الحساب', 'customreply:account').row()
+    .text('💬 رسالة قسم الردود التلقائية', 'customreply:replies').row()
+    .text('👥 رسالة عدم وجود مجموعات', 'customreply:nogroups').row()
+    .text('🔙 رجوع للتخصيص', 'custommenu');
+}
+
+const CUSTOM_DESCRIPTION_LABELS = {
+  settings: 'شرح إعدادات المجموعة',
+  groups: 'شرح مجموعاتي',
+  account: 'شرح معلومات حسابي',
+  replies: 'شرح الردود التلقائية'
+};
+const CUSTOM_REPLY_LABELS = {
+  account: 'رسالة معلومات الحساب',
+  replies: 'رسالة قسم الردود التلقائية',
+  nogroups: 'رسالة عدم وجود مجموعات'
+};
+
 // دالة إنشاء القائمة الرئيسية مع دعم زر المالك إن وجد
 function getHomeKeyboard(ctx) {
   const kb = mainKeyboard(ctx, bot);
+  const hasCustomizationButton = (kb.inline_keyboard || []).some(row =>
+    row.some(button => button.callback_data === 'custommenu')
+  );
+  if (!hasCustomizationButton) kb.row().text('🎨 تخصيص البوت', 'custommenu');
   if (isOwner(ctx)) {
     kb.row().text('🔒 الاشتراك الإجباري', 'requiredmenu').text('👑 لوحة المالك', 'ownerpanel');
   }
@@ -205,19 +290,10 @@ async function safeEdit(ctx, text, reply_markup) {
 }
 
 async function showHome(ctx) {
+  const c = getCustomization(ctx);
   await safeEdit(
     ctx,
-    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾
-
-بوت مخصص لإدارة مجموعات تيليغرام وتنظيمها وحمايتها.
-
-اختار القسم اللي تريد تستخدمه من القائمة أدناه:
-
-⚙️ إعدادات المجموعة: التحكم بميزات الإدارة والحماية.
-👥 مجموعاتي: عرض المجموعات المفعّلة وإدارتها.
-👤 معلومات حسابي: عرض معلومات حسابك.
-💬 الردود التلقائية: الوصول إلى قسم الردود.
-📖 المساعدة: معرفة طريقة استخدام البوت.`,
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:\n\n${c.descriptions.settings}\n${c.descriptions.groups}\n${c.descriptions.account}\n${c.descriptions.replies}\n📖 المساعدة: معرفة طريقة استخدام البوت.`,
     getHomeKeyboard(ctx)
   );
 }
@@ -285,7 +361,7 @@ function selectedGroupKeyboard(ctx) {
 
 async function showGroups(ctx) {
   const { kb, entries } = selectedGroupKeyboard(ctx);
-  if (!entries.length) return answer(ctx, 'ما عندي مجموعة مفعّلة ظاهرة إلك حالياً.');
+  if (!entries.length) return answer(ctx, customText(ctx, 'replies', 'nogroups'));
   return answer(ctx, '👥 اختار المجموعة اللي تريد تديرها:', { reply_markup: kb });
 }
 
@@ -443,12 +519,9 @@ bot.command('start', async ctx => {
   ensureUser(ctx);
   if (!await subscriptionGate(ctx)) return;
 
-  await ctx.reply(
-    '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\n' +
-    'بوت لإدارة المجموعات وحمايتها وتنظيمها.\n\n' +
-    'اختار القسم المناسب من القائمة أدناه حتى تبدأ.',
-    { reply_markup: getHomeKeyboard(ctx) }
-  );
+  const c = getCustomization(ctx);
+  save();
+  await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
 });
 
 bot.command('help', async ctx => {
@@ -517,12 +590,49 @@ bot.on('callback_query:data', async ctx => {
   if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
   if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
   if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
+  if (data === 'custommenu') {
+    if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
+    clearPending(ctx);
+    return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط. تخصيصك ما يأثر على باقي المستخدمين أو رسائل المجموعات.', { reply_markup: customizationMenuKeyboard() });
+  }
+  if (data === 'customstart') {
+    pending(ctx, { action: 'custom-start' });
+    return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}\n\nتگدر تستخدم الإيموجي والأسطر الجديدة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'custommenu') });
+  }
+  if (data === 'customdescmenu') {
+    clearPending(ctx);
+    return answer(ctx, '🔘 اختار شرح الزر اللي تريد تعدّله:', { reply_markup: customizationDescriptionsKeyboard() });
+  }
+  if (data.startsWith('customdesc:')) {
+    const key = data.slice('customdesc:'.length);
+    if (!Object.hasOwn(CUSTOM_DESCRIPTION_LABELS, key)) return answer(ctx, 'هذا الخيار غير معروف.');
+    pending(ctx, { action: 'custom-description', key });
+    return answer(ctx, `✏️ أرسل الشرح الجديد لـ «${CUSTOM_DESCRIPTION_LABELS[key]}».\n\nالنص الحالي:\n${customText(ctx, 'descriptions', key)}`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customdescmenu') });
+  }
+  if (data === 'customreplymenu') {
+    clearPending(ctx);
+    return answer(ctx, '💬 اختار الرسالة الخاصة اللي تريد تعدّلها:', { reply_markup: customizationRepliesKeyboard() });
+  }
+  if (data.startsWith('customreply:')) {
+    const key = data.slice('customreply:'.length);
+    if (!Object.hasOwn(CUSTOM_REPLY_LABELS, key)) return answer(ctx, 'هذا الخيار غير معروف.');
+    pending(ctx, { action: 'custom-reply', key });
+    return answer(ctx, `✏️ أرسل النص الجديد لـ «${CUSTOM_REPLY_LABELS[key]}».\n\nالنص الحالي:\n${customText(ctx, 'replies', key)}`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customreplymenu') });
+  }
+  if (data === 'customreset') {
+    db.customizations ||= {};
+    db.customizations[userKey(ctx)] = JSON.parse(JSON.stringify(DEFAULT_CUSTOMIZATION));
+    clearPending(ctx);
+    save();
+    return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationMenuKeyboard() });
+  }
+
   if (data === 'accountinfo') {
     const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
     const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
-    return answer(ctx, `👤 معلومات حسابك\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
+    return answer(ctx, `${customText(ctx, 'replies', 'account')}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
   }
-  if (data === 'userreplies') return answer(ctx, '💬 الردود التلقائية', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
+  if (data === 'userreplies') return answer(ctx, customText(ctx, 'replies', 'replies'), { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
   if (data === 'ownerpanel') return showOwnerPanel(ctx);
   if (data === 'mygroups') { if (!isPrivate(ctx)) return answer(ctx, 'إدارة المجموعات متاحة من الخاص فقط.'); return showGroups(ctx); }
   if (data.startsWith('choosegroup:')) {
@@ -833,6 +943,25 @@ bot.on('message:text', async ctx => {
     // المحادثات الخاصة (الخاص)
     const p = db.pending[userKey(ctx)];
     if (p) {
+      if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
+        if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
+        if (text.length > 2500) return ctx.reply('❌ النص طويل جداً. الحد الأقصى 2500 حرف.');
+        const c = getCustomization(ctx);
+        if (p.action === 'custom-start') c.startText = text;
+        if (p.action === 'custom-description') {
+          if (!Object.hasOwn(CUSTOM_DESCRIPTION_LABELS, p.key)) { clearPending(ctx); return ctx.reply('❌ خيار التخصيص غير صالح.'); }
+          c.descriptions[p.key] = text;
+        }
+        if (p.action === 'custom-reply') {
+          if (!Object.hasOwn(CUSTOM_REPLY_LABELS, p.key)) { clearPending(ctx); return ctx.reply('❌ خيار التخصيص غير صالح.'); }
+          c.replies[p.key] = text;
+        }
+        save();
+        clearPending(ctx);
+        return ctx.reply('✅ تم حفظ النص الخاص بيك بنجاح ❤️', {
+          reply_markup: new InlineKeyboard().text('🎨 قائمة التخصيص', 'custommenu').row().text('🏠 القائمة الرئيسية', 'home')
+        });
+      }
       if (p.action === 'welcome') {
         const g = db.groups[p.groupId];
         if (g && await userCanManage(ctx, g)) {
