@@ -1035,34 +1035,41 @@ bot.on('message:text', async ctx => {
     if (['القوانين', 'قوانين'].includes(normalizedText)) {
       const canManage = await userCanManage(ctx, g);
 
-      await ctx.reply(
-        canManage ? GROUP_RULES : NORMAL_MEMBER_RULES_REPLY
-      );
+await ctx.reply(
+  canManage ? GROUP_RULES : NORMAL_MEMBER_RULES_REPLY,
+  {
+    reply_to_message_id: ctx.message.message_id
+  }
+);
 
       return;
     }
 
     // الردود التلقائية العامة والردود المخصصة للمجموعة
-    if (g.autoReply) {
-      // أولاً: الردود الموجودة في ملف autoReplies.js
-      const automaticReply = findAutoReply(text);
+ if (g.autoReply) {
+  // أولاً: الردود الموجودة في ملف autoReplies.js
+  const automaticReply = findAutoReply(text);
 
-      if (automaticReply) {
-        await ctx.reply(automaticReply);
-        return;
-      }
+  if (automaticReply) {
+    await ctx.reply(automaticReply, {
+      reply_to_message_id: ctx.message.message_id
+    });
+    return;
+  }
 
-      // ثانياً: الردود التي يضيفها المشرف من لوحة نغنوغ
-      const customReply = (g.replies || []).find(
-        reply =>
-          normalizeGameAnswer(reply.trigger) === normalizedText
-      );
+  // ثانياً: الردود التي يضيفها المشرف من لوحة نغنوغ
+  const customReply = (g.replies || []).find(
+    reply =>
+      normalizeGameAnswer(reply.trigger) === normalizedText
+  );
 
-      if (customReply) {
-        await ctx.reply(customReply.response);
-        return;
-      }
-    }
+  if (customReply) {
+    await ctx.reply(customReply.response, {
+      reply_to_message_id: ctx.message.message_id
+    });
+    return;
+  }
+}
 
     // ===== نهاية الردود التلقائية =====
     const gameText = text.trim().toLocaleLowerCase('ar')
