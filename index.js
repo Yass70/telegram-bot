@@ -431,20 +431,28 @@ async function showRequiredList(ctx) {
   return answer(ctx, `📋 قنوات الاشتراك الإجباري\n\n${db.requiredChats.map((c, i) => `${i + 1}. ${c.title || c.username || c.id}`).join('\n')}`, { reply_markup: kb });
 }
 
-bot.command('start', async ctx => {
-  ensureUser(ctx);
-  if (!await subscriptionGate(ctx)) return;
-  await ctx.reply('أهلاً بك في بوت نغنوغ 🐈‍⬛\n\nوظيفتي حماية وإدارة المجموعات من الروابط والكلمات الممنوعة والسبام، وتوفير أدوات إدارية قابلة للتخصيص. 🐾\n\nاختَر من القائمة أدناه ⬇️', { reply_markup: mainKeyboard(ctx) });
-});
 bot.command('help', async ctx => {
   ensureUser(ctx);
   if (!await subscriptionGate(ctx)) return;
   await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard(ctx) });
 });
-bot.command('panel', async ctx => {
-  if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت.');
-  if (!isPrivate(ctx)) return ctx.reply('افتح البوت بالخاص لإدارة الإعدادات.');
-  await ctx.reply('👑 لوحة المالك — نغنوغ 🐾', { reply_markup: ownerKeyboard() });
+bot.command('start', async ctx => {
+  ensureUser(ctx);
+
+  if (!isPrivate(ctx)) {
+    return ctx.reply(
+      '🐾 حتى تدير نغنوغ، افتح البوت بالخاص واضغط Start ❤️'
+    );
+  }
+
+  if (!await subscriptionGate(ctx)) return;
+
+  await ctx.reply(
+    'أهلاً بك في بوت نغنوغ 🐈‍⬛\n\n' +
+    'وظيفتي حماية وإدارة المجموعات من الروابط والسبام وتوفير أدوات إدارية. 🐾\n\n' +
+    'اختَر من القائمة أدناه ⬇️',
+    { reply_markup: mainKeyboard(ctx) }
+  );
 });
 
 bot.on('my_chat_member', async ctx => {
