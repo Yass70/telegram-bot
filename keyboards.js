@@ -1,4 +1,3 @@
-
 import { InlineKeyboard } from 'grammy';
 
 export function mainKeyboard(ctx, bot) {
