@@ -9,6 +9,15 @@ import {
 
 import { startNewGame, handleGameMessage, normalizeGameAnswer } from './game.js';
 
+import {
+  mainKeyboard,
+  helpKeyboard,
+  ownerKeyboard,
+  warningsKeyboard,
+  groupSettingsKeyboard,
+  repliesKeyboard
+} from './keyboards.js';
+
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
 const DATA_FILE = './bot_data.json';
@@ -120,18 +129,14 @@ function selectedGroup(ctx) {
 }
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
-function mainKeyboard(ctx) {
-  const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
-  const kb = new InlineKeyboard()
-    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
-    .text('⚙️ إعدادات المجموعة', 'groupsettings').text('👥 مجموعاتي', 'mygroups').row()
-    .text('👤 معلومات حسابي', 'accountinfo').text('💬 الردود التلقائية', 'userreplies').row()
-    .text('📖 المساعدة', 'help');
-  if (isOwner(ctx)) kb.row().text('🔒 الاشتراك الإجباري', 'requiredmenu').text('👑 لوحة المالك', 'ownerpanel');
+// دالة إنشاء القائمة الرئيسية مع دعم زر المالك إن وجد
+function getHomeKeyboard(ctx) {
+  const kb = mainKeyboard(ctx, bot);
+  if (isOwner(ctx)) {
+    kb.row().text('🔒 الاشتراك الإجباري', 'requiredmenu').text('👑 لوحة المالك', 'ownerpanel');
+  }
   return kb;
 }
-
-
 
 const HELP_TEXT = `🐈‍⬛ أهلاً بيك بعالم نغنوغ! 🐾❤️
 
@@ -194,47 +199,6 @@ const HELP_TEXT = `🐈‍⬛ أهلاً بيك بعالم نغنوغ! 🐾❤�
 
 🐈‍⬛ نغنوغ… مو بس حماية، نغنوغ تفاعل ومتعة! 🐾`;
 
-function helpKeyboard(ctx) {
-  return new InlineKeyboard()
-    .text('👥 إدارة المجموعات', 'mygroups').row()
-    .text('🏠 القائمة الرئيسية', 'home')
-    .url('👤 حساب المطوّر', 'https://t.me/llll6llll6');
-}
-
-function warningsKeyboard(g) {
-  const w = g.warningSettings || { enabled: false, limit: 3, action: 'mute', duration: 10 };
-  const actionNames = { none: 'بدون إجراء', mute: 'كتم', kick: 'طرد', ban: 'حظر' };
-
-  return new InlineKeyboard()
-    .text(`${w.enabled ? '🟢' : '⚪'} نظام التحذيرات: ${w.enabled ? 'مفعّل' : 'متوقف'}`, 'warningstoggle').row()
-    .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit').row()
-    .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction').row()
-    .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration').row()
-    .text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu').row()
-    .text('📋 سجل التحذيرات', 'warningslog').row()
-    .text('🧹 تصفير تحذيرات عضو', 'warningsclear').row()
-    .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
-}
-
-function groupSettingsKeyboard(g) {
-  return new InlineKeyboard()
-    .text('👋 تعديل رسالة الترحيب', 'welcomeedit').row()
-    .text(`${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`, 'togglelinks').row()
-    .text(`${g.flood ? '🟢' : '⚪'} منع السبام: ${g.flood ? 'مفعّل' : 'متوقف'}`, 'toggleflood').row()
-    .text(`${g.autoReply ? '🟢' : '⚪'} الردود التلقائية: ${g.autoReply ? 'مفعّلة' : 'متوقفة'}`, 'togglereplies').row()
-    .text('🛡️ التحذيرات والعقوبات', 'warningsmenu').row()
-    .text('💬 إدارة الردود التلقائية', 'repliesmenu').row()
-    .text('📊 إحصائيات المجموعة', 'groupstats').row()
-    .text('🔙 رجوع', 'home');
-}
-
-function repliesKeyboard() {
-  return new InlineKeyboard().text('➕ إضافة رد', 'replyadd').row()
-    .text('📋 عرض الردود', 'replylist').row()
-    .text('🗑️ حذف رد', 'replydelete').row()
-    .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
-}
-
 async function safeEdit(ctx, text, reply_markup) {
   try { await ctx.editMessageText(text, { reply_markup }); }
   catch { await ctx.reply(text, { reply_markup }); }
@@ -254,13 +218,15 @@ async function showHome(ctx) {
 👤 معلومات حسابي: عرض معلومات حسابك.
 💬 الردود التلقائية: الوصول إلى قسم الردود.
 📖 المساعدة: معرفة طريقة استخدام البوت.`,
-    mainKeyboard(ctx)
+    getHomeKeyboard(ctx)
   );
 }
+
 async function showOwnerPanel(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
   await safeEdit(ctx, '👑 لوحة المالك — نغنوغ 🐾', ownerKeyboard());
 }
+
 async function answer(ctx, text, extra = {}) {
   if (ctx.callbackQuery) {
     try { await ctx.answerCallbackQuery({ text: text.length < 190 ? text : undefined }); } catch {}
@@ -269,17 +235,20 @@ async function answer(ctx, text, extra = {}) {
   }
   return ctx.reply(text, extra);
 }
+
 async function userIsAdmin(chatId, userId) {
   try {
     const m = await bot.api.getChatMember(chatId, userId);
     return ['administrator', 'creator'].includes(m.status);
   } catch { return false; }
 }
+
 async function userCanManage(ctx, g) {
   if (isOwner(ctx)) return true;
   if (String(g.activatedBy) === userKey(ctx) || (g.admins || []).includes(userKey(ctx))) return true;
   return await userIsAdmin(g.id, ctx.from.id);
 }
+
 async function checkSubscription(userId) {
   for (const ch of db.requiredChats) {
     try {
@@ -292,6 +261,7 @@ async function checkSubscription(userId) {
   }
   return { ok: true };
 }
+
 async function subscriptionGate(ctx) {
   if (isOwner(ctx) || !isPrivate(ctx) || db.requiredChats.length === 0) return true;
   const result = await checkSubscription(ctx.from.id);
@@ -304,6 +274,7 @@ async function subscriptionGate(ctx) {
   if (ctx.callbackQuery) await safeEdit(ctx, text, kb); else await ctx.reply(text, { reply_markup: kb });
   return false;
 }
+
 function selectedGroupKeyboard(ctx) {
   const kb = new InlineKeyboard();
   const entries = Object.values(db.groups).filter(g => g.activated && (isOwner(ctx) || String(g.activatedBy) === userKey(ctx) || (g.admins || []).includes(userKey(ctx))));
@@ -311,17 +282,20 @@ function selectedGroupKeyboard(ctx) {
   kb.text('🔙 رجوع', 'home');
   return { kb, entries };
 }
+
 async function showGroups(ctx) {
   const { kb, entries } = selectedGroupKeyboard(ctx);
   if (!entries.length) return answer(ctx, 'ما عندي مجموعة مفعّلة ظاهرة إلك حالياً.');
   return answer(ctx, '👥 اختار المجموعة اللي تريد تديرها:', { reply_markup: kb });
 }
+
 async function showGroupSettings(ctx, g = selectedGroup(ctx)) {
   if (!g) return answer(ctx, 'اختار مجموعتك أولاً.');
   if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة لمشرفيها فقط.');
   setSelected(ctx, g.id);
   return answer(ctx, `⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
 }
+
 async function showGroupStats(ctx, g = selectedGroup(ctx)) {
   if (!g) return answer(ctx, 'اختار المجموعة أولاً.');
   if (!await userCanManage(ctx, g)) return answer(ctx, 'الإحصائيات متاحة لمشرفيها فقط.');
@@ -331,6 +305,7 @@ async function showGroupStats(ctx, g = selectedGroup(ctx)) {
   const text = `📊 إحصائيات ${g.title}\n\n👥 الأعضاء: ${members}\n💬 الرسائل: ${s.messages}\n🔗 الروابط المحذوفة: ${s.deletedLinks}\n🚫 السبام: ${s.floodEvents}`;
   return answer(ctx, text, { reply_markup: new InlineKeyboard().text('🔄 تحديث', 'groupstats').row().text('🔙 إعدادات المجموعة', 'groupsettings') });
 }
+
 async function showReplyList(ctx, g = selectedGroup(ctx)) {
   if (!g) return answer(ctx, 'اختار مجموعة أولاً.');
   if (!await userCanManage(ctx, g)) return answer(ctx, 'ما عندك صلاحية.');
@@ -338,13 +313,16 @@ async function showReplyList(ctx, g = selectedGroup(ctx)) {
   const body = g.replies.map((r, i) => `${i + 1}. «${r.trigger}» ➜ ${r.response}`).join('\n\n');
   return answer(ctx, `💬 الردود التلقائية:\n\n${body}`, { reply_markup: repliesKeyboard() });
 }
+
 function pending(ctx, value) { db.pending[userKey(ctx)] = value; save(); }
 function clearPending(ctx) { delete db.pending[userKey(ctx)]; save(); }
+
 async function ownerRequiredMenu(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
   const kb = new InlineKeyboard().text('➕ إضافة قناة اشتراك', 'requiredadd').row().text('📋 عرض القنوات', 'requiredlist').row().text('🔙 لوحة المالك', 'ownerpanel');
   return answer(ctx, `📢 إدارة الاشتراك الإجباري\n\nالقنوات: ${db.requiredChats.length}`, { reply_markup: kb });
 }
+
 async function showRequiredList(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
   if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu') });
@@ -380,18 +358,11 @@ const PROFILE_PHRASES = [
 async function showProfileCard(ctx, g) {
   const user = ctx.from;
   const id = String(user.id);
-  const name = [user.first_name, user.last_name]
-    .filter(Boolean)
-    .join(' ') || 'عضو';
-
-  const username = user.username
-    ? `@${user.username}`
-    : 'ما عندك اسم مستخدم';
-
+  const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'عضو';
+  const username = user.username ? `@${user.username}` : 'ما عندك اسم مستخدم';
   const points = Number(db.points[id] || 0);
   const warnings = Number(g.warnings?.[id]?.count || 0);
-  const phrase =
-    PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
+  const phrase = PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
 
   const caption =
     `🐾 بطاقة عضو — نغنوغ\n\n` +
@@ -403,10 +374,7 @@ async function showProfileCard(ctx, g) {
     `💬 ${phrase}`;
 
   try {
-    const photos = await ctx.api.getUserProfilePhotos(user.id, {
-      limit: 1
-    });
-
+    const photos = await ctx.api.getUserProfilePhotos(user.id, { limit: 1 });
     if (photos.total_count > 0 && photos.photos[0]?.length) {
       const photo = photos.photos[0][photos.photos[0].length - 1];
       await ctx.replyWithPhoto(photo.file_id, {
@@ -419,10 +387,9 @@ async function showProfileCard(ctx, g) {
     console.error('Could not fetch profile photo:', err.message);
   }
 
-  await ctx.reply(caption, {
-    reply_to_message_id: ctx.message.message_id
-  });
+  await ctx.reply(caption, { reply_to_message_id: ctx.message.message_id });
 }
+
 async function handleViolation(ctx, g, reason) {
   const userId = userKey(ctx);
   const name = ctx.from.first_name || 'عضو';
@@ -439,10 +406,10 @@ async function handleViolation(ctx, g, reason) {
   const limit = g.warningSettings?.limit || 3;
 
   await ctx.reply(
-  `⚠️ تم تسجيل مخالفة على العضو ${name}.\n` +
-  `📋 السبب: ${reason}\n` +
-  `🔢 عدد التحذيرات: ${currentWarnings}/${limit}`
-);
+    `⚠️ تم تسجيل مخالفة على العضو ${name}.\n` +
+    `📋 السبب: ${reason}\n` +
+    `🔢 عدد التحذيرات: ${currentWarnings}/${limit}`
+  );
 
   if (g.warningSettings?.enabled && currentWarnings >= limit) {
     const action = g.warningSettings.action || 'mute';
@@ -480,14 +447,14 @@ bot.command('start', async ctx => {
     '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\n' +
     'بوت لإدارة المجموعات وحمايتها وتنظيمها.\n\n' +
     'اختار القسم المناسب من القائمة أدناه حتى تبدأ.',
-    { reply_markup: mainKeyboard(ctx) }
+    { reply_markup: getHomeKeyboard(ctx) }
   );
 });
 
 bot.command('help', async ctx => {
   ensureUser(ctx);
   if (!await subscriptionGate(ctx)) return;
-  await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard(ctx) });
+  await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
 });
 
 bot.on('my_chat_member', async ctx => {
@@ -549,7 +516,7 @@ bot.on('callback_query:data', async ctx => {
   if (data === 'home') return showHome(ctx);
   if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
   if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
-  if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard(ctx) });
+  if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
   if (data === 'accountinfo') {
     const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
     const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
@@ -565,40 +532,40 @@ bot.on('callback_query:data', async ctx => {
     setSelected(ctx, id); return showGroupSettings(ctx, g);
   }
   
+  if (data === 'groupsettings') {
+    const { entries } = selectedGroupKeyboard(ctx);
 
-if (data === 'groupsettings') {
-  const { entries } = selectedGroupKeyboard(ctx);
+    if (!selectedGroup(ctx)) {
+      if (entries.length) {
+        return showGroups(ctx);
+      }
 
-  if (!selectedGroup(ctx)) {
-    if (entries.length) {
-      return showGroups(ctx);
+      return answer(
+        ctx,
+        '⚙️ إعدادات نغنوغ 🐾\n\n' +
+        'من هذا القسم تگدر تتحكم بميزات البوت داخل مجموعتك.\n\n' +
+        '👋 الترحيب: تخصيص رسالة استقبال الأعضاء الجدد.\n' +
+        '🔗 منع الروابط: حذف الروابط وفق قواعد الحماية.\n' +
+        '🚫 منع السبام: الحد من الرسائل المتكررة.\n' +
+        '🛡️ التحذيرات والعقوبات: تنظيم التعامل مع المخالفات.\n' +
+        '💬 الردود التلقائية: إضافة ردود مخصصة لعبارات محددة.\n' +
+        '📊 الإحصائيات: الاطلاع على نشاط المجموعة.\n\n' +
+        '📌 للبدء، أضف نغنوغ إلى مجموعتك، وامنحه الصلاحيات اللازمة، ثم أرسل «تفعيل» داخل المجموعة.',
+        {
+          reply_markup: new InlineKeyboard()
+            .url(
+              '➕ أضف نغنوغ لمجموعتك',
+              `https://t.me/${bot.botInfo?.username || 'YZ_VIDbot'}?startgroup=true`
+            )
+            .row()
+            .text('🔙 القائمة الرئيسية', 'home')
+        }
+      );
     }
 
-    return answer(
-      ctx,
-      '⚙️ إعدادات نغنوغ 🐾\n\n' +
-      'من هذا القسم تگدر تتحكم بميزات البوت داخل مجموعتك.\n\n' +
-      '👋 الترحيب: تخصيص رسالة استقبال الأعضاء الجدد.\n' +
-      '🔗 منع الروابط: حذف الروابط وفق قواعد الحماية.\n' +
-      '🚫 منع السبام: الحد من الرسائل المتكررة.\n' +
-      '🛡️ التحذيرات والعقوبات: تنظيم التعامل مع المخالفات.\n' +
-      '💬 الردود التلقائية: إضافة ردود مخصصة لعبارات محددة.\n' +
-      '📊 الإحصائيات: الاطلاع على نشاط المجموعة.\n\n' +
-      '📌 للبدء، أضف نغنوغ إلى مجموعتك، وامنحه الصلاحيات اللازمة، ثم أرسل «تفعيل» داخل المجموعة.',
-      {
-        reply_markup: new InlineKeyboard()
-          .url(
-            '➕ أضف نغنوغ لمجموعتك',
-            `https://t.me/${bot.botInfo?.username || 'YZ_VIDbot'}?startgroup=true`
-          )
-          .row()
-          .text('🔙 القائمة الرئيسية', 'home')
-      }
-    );
+    return showGroupSettings(ctx);
   }
 
-  return showGroupSettings(ctx);
-}
   if (data === 'warningsmenu') {
     const g = selectedGroup(ctx);
     if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
@@ -771,15 +738,14 @@ bot.on('message:text', async ctx => {
     const g = db.groups[String(ctx.chat.id)];
     if (!g?.activated || text.startsWith('/')) return;
 
-// 🐾 بطاقة حساب العضو عند إرسال حرف ا وحده
-if (text === 'ا') {
-  await showProfileCard(ctx, g);
-  return;
-}
+    if (text === 'ا') {
+      await showProfileCard(ctx, g);
+      return;
+    }
 
-g.title = ctx.chat.title || g.title;
-g.stats.messages++;
-db.stats.messages++;
+    g.title = ctx.chat.title || g.title;
+    g.stats.messages++;
+    db.stats.messages++;
 
     // 1. الكلمات الممنوعة
     if (g.badWords && g.badWords.length > 0 && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
@@ -848,7 +814,7 @@ db.stats.messages++;
       }
     }
 
-    // 6. تشغيل أو تفاعل مع اللعبة (مستورد بالكامل من game.js)
+    // 6. تشغيل أو تفاعل مع اللعبة
     if (['العاب', 'لعبه', 'لعبة'].includes(normalizedText)) {
       if (g.game?.active) {
         await ctx.reply('🎮 اللعبة شغّالة بالفعل!');
