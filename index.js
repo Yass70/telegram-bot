@@ -232,13 +232,8 @@ const HELP_TEXT = `📖 مساعدة نغنوغ 🐈‍⬛
 🧑‍💻 تحتاج مساعدة أو عندك اقتراح لإضافة ميزة جديدة؟ تواصل ويا المطوّر وشارك فكرتك. ❤️`;
 function helpKeyboard(ctx) {
   return new InlineKeyboard()
-    .text('🛡️ الحماية والإدارة', 'protection').row()
-    .text('⚖️ التحذيرات والعقوبات', 'protection').row()
-    .text('💬 الردود التلقائية', 'userreplies').row()
-    .text('👤 معلومات الحساب', 'accountinfo').row()
-    .text('⚙️ إعداد المجموعة', 'groupsettings').row()
-    .url('👨‍💻 المطوّر', 'https://t.me/llll6llll6').row()
-    .text('🔙 القائمة الرئيسية', 'home');
+    .text('🔙 القائمة الرئيسية', 'home')
+    .url('👤 حسابي', 'https://t.me/llll6llll6');
 }
 function ownerKeyboard() {
   return new InlineKeyboard()
