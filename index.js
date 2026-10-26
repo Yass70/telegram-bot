@@ -737,11 +737,21 @@ if (data.startsWith('warningclear:')) {
   if (data.startsWith('replydel:')) { const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'ما عندك صلاحية.'); const i = Number(data.split(':')[1]); if (!Number.isInteger(i) || !g.replies[i]) return answer(ctx, 'هذا الرد غير موجود.'); const removed = g.replies.splice(i, 1)[0]; save(); return answer(ctx, `🗑️ تم حذف الرد: ${removed.trigger}`, { reply_markup: repliesKeyboard() }); }
   if (data === 'groupstats') return showGroupStats(ctx);
   if (data === 'ownerpanel') return showOwnerPanel(ctx);
-  if (data === 'botstats') {
-    if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
-    const groups = Object.values(db.groups); const active = groups.filter(g => g.activated).length;
-    return answer(ctx, `📊 إحصائيات البوت — نغنوغ 🐾\n\n👥 المجموعات المسجلة: ${groups.length}\n🟢 المجموعات المفعّلة: ${active}\n🙋 المستخدمون الذين تفاعلوا: ${db.users.length}\n💬 الرسائل النصية المرصودة: ${db.stats.messages}\n🔗 الروابط المحذوفة: ${db.stats.deletedLinks}\n🚫 حالات السبام: ${db.stats.floodEvents}\n👋 الترحيبات: ${db.stats.welcomed}\n\nالأرقام تبدأ من وقت تشغيل التتبع بهذا الإصدار.`, { reply_markup: ownerKeyboard() });
+if (data === 'botstats') {
+  if (!isOwner(ctx)) {
+    return answer(ctx, 'هذا القسم خاص بمالك البوت.');
   }
+
+  const totalUsers = (db.privateUsers || []).length;
+
+  return answer(
+    ctx,
+    `📊 إحصائيات البوت — نغنوغ 🐾\n\n` +
+    `👤 عدد مستخدمي البوت: ${totalUsers}\n\n` +
+    `📌 العدد يشمل المستخدمين الذين تفاعلوا مع البوت في الخاص منذ بدء تسجيلهم.`,
+    { reply_markup: ownerKeyboard() }
+  );
+}
   if (data === 'activatedgroups') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); const gs = Object.values(db.groups).filter(g => g.activated); return answer(ctx, gs.length ? `👥 المجموعات المفعّلة:\n\n${gs.map((g, i) => `${i + 1}. ${g.title} (${g.id})`).join('\n')}` : 'ماكو مجموعات مفعّلة حالياً.', { reply_markup: ownerKeyboard() }); }
   if (data === 'botsettings') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); return answer(ctx, `⚙️ إعدادات البوت\n\nإصدار التطبيق: 2.1.0\nوضع التشغيل: polling\nقنوات الاشتراك الإجباري: ${db.requiredChats.length}\nالمجموعات المفعّلة: ${Object.values(db.groups).filter(g => g.activated).length}\n\nإعدادات كل مجموعة تُدار بشكل مستقل من «إدارة مجموعتي».`, { reply_markup: ownerKeyboard() }); }
   if (data === 'globalprotection') { if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.'); return answer(ctx, '🛡️ إعدادات الحماية العامة\n\nإعدادات منع الروابط والسبام حالياً مستقلة لكل مجموعة، حتى تگدر تضبطها حسب حاجة كل مجموعة. اختار «المجموعات المفعّلة» لمراجعتها.', { reply_markup: ownerKeyboard() }); }
