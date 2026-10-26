@@ -19,7 +19,7 @@ const bot = new Bot(TOKEN);
 const freshGroup = () => ({
   id: '', title: '', activated: false, activatedBy: '', admins: [], activatedAt: null,
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
-  welcomeText: 'أهلاً بيك {name} ❤️ نورت مجموعة {title}', replies: [],
+  welcomeText: '🐾 أهلاً وسهلاً بـ {name} ❤️ نورت مجموعة {title}، نتمنى لك وقتاً ممتعاً ويانه!',
   badWords: [],
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
 
@@ -131,19 +131,39 @@ function mainKeyboard(ctx) {
   return kb;
 }
 
-const HELP_TEXT = `🐈‍⬛ أهلاً بيك بعالم نغنوغ! 🖤✨\n\nوظيفتي حماية وإدارة المجموعات 🐾`;
+
+const HELP_TEXT = `🐈‍⬛ أهلاً بيك بعالم نغنوغ!
+
+نغنوغ بوت لإدارة المجموعات وحمايتها، ومساعدتك على تنظيمها وتوفير تجربة أفضل للأعضاء.
+
+🛡️ الحماية والإدارة:
+• منع الروابط المخالفة.
+• الحد من الرسائل المتكررة والسبام.
+• إدارة التحذيرات والعقوبات.
+• التحكم بالكلمات الممنوعة.
+
+👋 التفاعل والترحيب:
+• تخصيص رسالة ترحيب للأعضاء الجدد.
+• إعداد ردود تلقائية مخصصة.
+• الاستمتاع بالألعاب وجمع النقاط.
+
+📊 المتابعة:
+• الاطلاع على إحصائيات المجموعة.
+• إدارة الإعدادات من الخاص.
+
+📌 طريقة البدء:
+1. أضف نغنوغ إلى مجموعتك.
+2. امنحه صلاحيات الإشراف اللازمة للميزات التي تريد استخدامها.
+3. أرسل كلمة «تفعيل» داخل المجموعة.
+4. افتح البوت بالخاص واختر إعدادات المجموعة.
+
+⚠️ ملاحظة: بعض الميزات تحتاج إلى صلاحيات إدارية مناسبة من تيليغرام.`;
 
 function helpKeyboard(ctx) {
-  return new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home').url('👤 حسابي', 'https://t.me/llll6llll6');
-}
-function ownerKeyboard() {
   return new InlineKeyboard()
-    .text('📊 إحصائيات البوت', 'botstats').row()
-    .text('👥 المجموعات المفعّلة', 'activatedgroups').row()
-    .text('⚙️ إعدادات البوت', 'botsettings').row()
-    .text('🛡️ إعدادات الحماية العامة', 'globalprotection').row()
-    .text('📢 إدارة الاشتراك الإجباري', 'requiredmenu').row()
-    .text('🔙 القائمة الرئيسية', 'home');
+    .text('👥 إدارة المجموعات', 'mygroups').row()
+    .text('🏠 القائمة الرئيسية', 'home')
+    .url('👤 حساب المطوّر', 'https://t.me/llll6llll6');
 }
 
 function warningsKeyboard(g) {
@@ -184,8 +204,23 @@ async function safeEdit(ctx, text, reply_markup) {
   try { await ctx.editMessageText(text, { reply_markup }); }
   catch { await ctx.reply(text, { reply_markup }); }
 }
+
 async function showHome(ctx) {
-  await safeEdit(ctx, 'أهلاً بك في بوت نغنوغ 🐈‍⬛\n\nوظيفتي حماية وإدارة المجموعات 🐾', mainKeyboard(ctx));
+  await safeEdit(
+    ctx,
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾
+
+بوت مخصص لإدارة مجموعات تيليغرام وتنظيمها وحمايتها.
+
+اختار القسم اللي تريد تستخدمه من القائمة أدناه:
+
+⚙️ إعدادات المجموعة: التحكم بميزات الإدارة والحماية.
+👥 مجموعاتي: عرض المجموعات المفعّلة وإدارتها.
+👤 معلومات حسابي: عرض معلومات حسابك.
+💬 الردود التلقائية: الوصول إلى قسم الردود.
+📖 المساعدة: معرفة طريقة استخدام البوت.`,
+    mainKeyboard(ctx)
+  );
 }
 async function showOwnerPanel(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
@@ -368,7 +403,11 @@ async function handleViolation(ctx, g, reason) {
   const currentWarnings = g.warnings[userId].count;
   const limit = g.warningSettings?.limit || 3;
 
-  await ctx.reply(`⚠️ العضو ${name} خالف القوانين (${reason}).\nالتحذيرات: ${currentWarnings}/${limit}`);
+  await ctx.reply(
+  `⚠️ تم تسجيل مخالفة على العضو ${name}.\n` +
+  `📋 السبب: ${reason}\n` +
+  `🔢 عدد التحذيرات: ${currentWarnings}/${limit}`
+);
 
   if (g.warningSettings?.enabled && currentWarnings >= limit) {
     const action = g.warningSettings.action || 'mute';
@@ -381,14 +420,14 @@ async function handleViolation(ctx, g, reason) {
           permissions: { can_send_messages: false, can_send_media_messages: false, can_send_polls: false, can_send_other_messages: false, can_add_web_page_previews: false },
           until_date: untilDate
         });
-        await ctx.reply(`⚖️ تم كتم العضو ${name} لمدة ${durationMins} دقيقة.`);
+        await ctx.reply(`🔇 تم كتم العضو ${name} لمدة ${durationMins} دقيقة بسبب تكرار المخالفات.`);
       } else if (action === 'kick') {
         await ctx.api.banChatMember(ctx.chat.id, Number(userId));
         await ctx.api.unbanChatMember(ctx.chat.id, Number(userId));
-        await ctx.reply(`⚖️ تم طرد العضو ${name}.`);
+        await ctx.reply(`🚪 تم طرد العضو ${name} بسبب تكرار المخالفات.`);
       } else if (action === 'ban') {
         await ctx.api.banChatMember(ctx.chat.id, Number(userId));
-        await ctx.reply(`⚖️ تم حظر العضو ${name} نهائياً.`);
+        await ctx.reply(`⛔ تم حظر العضو ${name} بسبب تكرار المخالفات.`);
       }
     } catch (err) {
       console.error('Failed to apply penalty:', err);
@@ -398,16 +437,22 @@ async function handleViolation(ctx, g, reason) {
   save();
 }
 
+bot.command('start', async ctx => {
+  ensureUser(ctx);
+  if (!await subscriptionGate(ctx)) return;
+
+  await ctx.reply(
+    '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\n' +
+    'بوت لإدارة المجموعات وحمايتها وتنظيمها.\n\n' +
+    'اختار القسم المناسب من القائمة أدناه حتى تبدأ.',
+    { reply_markup: mainKeyboard(ctx) }
+  );
+});
+
 bot.command('help', async ctx => {
   ensureUser(ctx);
   if (!await subscriptionGate(ctx)) return;
   await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard(ctx) });
-});
-bot.command('start', async ctx => {
-  ensureUser(ctx);
-  if (!isPrivate(ctx)) return ctx.reply('🐾 افتح البوت بالخاص واضغط Start ❤️');
-  if (!await subscriptionGate(ctx)) return;
-  await ctx.reply('أهلاً بك في بوت نغنوغ 🐈‍⬛', { reply_markup: mainKeyboard(ctx) });
 });
 
 bot.on('my_chat_member', async ctx => {
@@ -484,7 +529,9 @@ bot.on('callback_query:data', async ctx => {
     if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة للمشرفين فقط.');
     setSelected(ctx, id); return showGroupSettings(ctx, g);
   }
-  if (data === 'groupsettings') {
+  
+
+if (data === 'groupsettings') {
   const { entries } = selectedGroupKeyboard(ctx);
 
   if (!selectedGroup(ctx)) {
@@ -495,16 +542,14 @@ bot.on('callback_query:data', async ctx => {
     return answer(
       ctx,
       '⚙️ إعدادات نغنوغ 🐾\n\n' +
-      'تگدر تستعرض ميزاتي قبل إضافة البوت لمجموعتك ❤️\n\n' +
-      '👋 ترحيب بالأعضاء الجدد\n' +
-      '🔗 منع الروابط\n' +
-      '🚫 منع السبام\n' +
-      '🛡️ التحذيرات والعقوبات\n' +
-      '💬 الردود التلقائية\n' +
-      '🎮 الألعاب والنقاط\n' +
-      '📊 إحصائيات المجموعة\n\n' +
-      '📌 حتى تستخدم الإعدادات الفعلية، أضفني لمجموعتك، ' +
-      'خلّيني مشرفاً بالصلاحيات المطلوبة، وبعدها أرسل «تفعيل» داخل المجموعة.',
+      'من هذا القسم تگدر تتحكم بميزات البوت داخل مجموعتك.\n\n' +
+      '👋 الترحيب: تخصيص رسالة استقبال الأعضاء الجدد.\n' +
+      '🔗 منع الروابط: حذف الروابط وفق قواعد الحماية.\n' +
+      '🚫 منع السبام: الحد من الرسائل المتكررة.\n' +
+      '🛡️ التحذيرات والعقوبات: تنظيم التعامل مع المخالفات.\n' +
+      '💬 الردود التلقائية: إضافة ردود مخصصة لعبارات محددة.\n' +
+      '📊 الإحصائيات: الاطلاع على نشاط المجموعة.\n\n' +
+      '📌 للبدء، أضف نغنوغ إلى مجموعتك، وامنحه الصلاحيات اللازمة، ثم أرسل «تفعيل» داخل المجموعة.',
       {
         reply_markup: new InlineKeyboard()
           .url(
@@ -519,7 +564,6 @@ bot.on('callback_query:data', async ctx => {
 
   return showGroupSettings(ctx);
 }
-
   if (data === 'warningsmenu') {
     const g = selectedGroup(ctx);
     if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
