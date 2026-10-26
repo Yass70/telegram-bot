@@ -1109,7 +1109,49 @@ await ctx.reply(
       return;
     }
 
+
     if (g.game?.active) {
+      const skipText = normalizeGameAnswer(text);
+
+      // تخطي السؤال عند كتابة التالي
+      if (['التالي', 'تالي'].includes(skipText)) {
+        const skippedAnswer = g.game.answer;
+
+        if (g.game.round >= g.game.totalRounds) {
+          g.game = null;
+          save();
+
+          await ctx.reply(
+            `🏁 انتهى تحدّي نغنوغ!\n` +
+            `💡 جواب السؤال الأخير كان: ${skippedAnswer}\n` +
+            `🎮 انتهت الأسئلة العشرة!`
+          );
+          return;
+        }
+
+        let nextIndex;
+        do {
+          nextIndex = Math.floor(Math.random() * gameQuestions.length);
+        } while (g.game.usedQuestions.includes(nextIndex));
+
+        const nextRound = g.game.round + 1;
+
+        g.game.usedQuestions.push(nextIndex);
+        g.game.round = nextRound;
+        g.game.questionIndex = nextIndex;
+        g.game.answer = gameQuestions[nextIndex].a;
+
+        save();
+
+        await ctx.reply(
+          `⏭️ تم تخطي السؤال!\n` +
+          `💡 الإجابة الصحيحة: ${skippedAnswer}\n\n` +
+          `❓ السؤال ${nextRound}/${g.game.totalRounds}:\n` +
+          `${gameQuestions[nextIndex].q}`
+        );
+        return;
+      }
+
       const answerVal = normalizeGameAnswer(text);
       const correctAnswer = normalizeGameAnswer(g.game.answer);
 
