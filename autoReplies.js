@@ -440,7 +440,6 @@ export const AUTO_REPLIES = [
     ]
   },
   {
-    {
   triggers: ['🗿🗿'],
   replies: [
     'تمثالين؟ نغنوغ يحتاج مترجم 😂🐈‍⬛'
