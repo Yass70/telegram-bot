@@ -208,7 +208,10 @@ function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); 
 function mainKeyboard(ctx) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
   const kb = new InlineKeyboard()
-    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true`).text('📊 الإحصائيات', 'groupstats').row()
+    .url(
+  '➕ أضفني للمجموعة',
+  `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`
+)
     .text('⚙️ إعدادات المجموعة', 'groupsettings').text('👥 مجموعاتي', 'mygroups').row()
     .text('👤 معلومات حسابي', 'accountinfo').text('💬 الردود التلقائية', 'userreplies').row()
     .text('📖 المساعدة', 'help');
