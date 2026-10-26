@@ -249,11 +249,12 @@ async function safeEdit(ctx, text, reply_markup) {
   catch { await ctx.reply(text, { reply_markup }); }
 }
 
+// حل مشكلة تكرار السطر الأخير في القائمة الرئيسية
 async function showHome(ctx) {
   const c = getCustomization(ctx);
   await safeEdit(
     ctx,
-    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:`,
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}`,
     getHomeKeyboard(ctx)
   );
 }
@@ -496,7 +497,7 @@ bot.command('start', async ctx => {
   const c = getCustomization(ctx);
   save();
   await ctx.reply(
-    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:`,
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}`,
     { reply_markup: getHomeKeyboard(ctx) }
   );
 });
@@ -604,10 +605,12 @@ bot.on('callback_query:data', async ctx => {
     return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationMenuKeyboard() });
   }
 
+  // إضافة الأيدي (ID) إلى زر معلومات الحساب
   if (data === 'accountinfo') {
     const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
     const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
-    return answer(ctx, `${customText(ctx, 'replies', 'account')}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
+    const userId = ctx.from.id;
+    return answer(ctx, `${customText(ctx, 'replies', 'account')}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
   }
   if (data === 'userreplies') return answer(ctx, customText(ctx, 'replies', 'replies'), { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
   if (data === 'ownerpanel') return showOwnerPanel(ctx);
@@ -905,7 +908,7 @@ bot.on('message:text', async ctx => {
     }
 
     // 6. الردود التلقائية
-    if (g.autoReply && !['العاب', 'لعبه', 'لعبة'].includes(normalizedText)) {
+    if (g.autoReply && !['العاب', 'لعبه', 'لعبة', 'لعبة جديدة'].includes(normalizedText)) {
       const automaticReply = findAutoReply(text);
       if (automaticReply) {
         await ctx.reply(automaticReply, { reply_to_message_id: ctx.message.message_id });
@@ -922,11 +925,7 @@ bot.on('message:text', async ctx => {
     }
 
     // 7. تشغيل أو تفاعل مع اللعبة
-    if (['العاب', 'لعبه', 'لعبة'].includes(normalizedText)) {
-      if (g.game?.active) {
-        await ctx.reply('🎮 اللعبة شغّالة بالفعل!');
-        return;
-      }
+    if (['العاب', 'لعبه', 'لعبة', 'لعبة جديدة'].includes(normalizedText)) {
       await startNewGame(ctx, g, save);
       return;
     }
