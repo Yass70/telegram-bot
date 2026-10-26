@@ -284,6 +284,75 @@ async function showRequiredList(ctx) {
   return answer(ctx, `📋 قنوات الاشتراك الإجباري`, { reply_markup: kb });
 }
 
+const PROFILE_PHRASES = [
+  'الحلو مالتنا وصل 😻❤️',
+  'يا بعد عيون نغنوغ إنت 🐾💕',
+  'ولك شهلطلة هاي، منوّر الدنيا 😂❤️',
+  'فديت هالوجه وصاحبه 😹💗',
+  'نورتنا يبعد روحي ✨',
+  'هااا الحبيب، شخبارك؟ 😼',
+  'هذا مو عضو، هذا عسل مصفّى 🍯😂',
+  'عيني إنت، شهلحلاوة هاي؟ 🥹❤️',
+  'نغنوغ يحبك بس لا تصير مغرور 😹',
+  'هلا بالغالي، وين هالغيبة؟ 🐾',
+  'حبيبي انته، خلي ضحكتك دوم 🫶',
+  'وصل الزين وأهله 😎❤️',
+  'شكو هالجمال كله؟ 😂🔥',
+  'حبيب الگلب، أخذ راحتك ويانه 🥰',
+  'ولك نغنوغ عيونه إلك 😹🐾',
+  'شهلحلو هذا، منين طالع؟ 😻😂',
+  'فدوة لهالطلة الحلوة ❤️✨',
+  'ولك إنت غير شكل، مو طبيعي 😎💕',
+  'تعال يمّه، نغنوغ يريد يسولف وياك 🐱',
+  'يا معوّد، لا تصير حلو لهالدرجة خلي مجال للباقين 😂❤️'
+];
+
+async function showProfileCard(ctx, g) {
+  const user = ctx.from;
+  const id = String(user.id);
+  const name = [user.first_name, user.last_name]
+    .filter(Boolean)
+    .join(' ') || 'عضو';
+
+  const username = user.username
+    ? `@${user.username}`
+    : 'ما عندك اسم مستخدم';
+
+  const points = Number(db.points[id] || 0);
+  const warnings = Number(g.warnings?.[id]?.count || 0);
+  const phrase =
+    PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
+
+  const caption =
+    `🐾 بطاقة عضو — نغنوغ\n\n` +
+    `👤 الاسم: ${name}\n` +
+    `🔗 المستخدم: ${username}\n` +
+    `🆔 المعرف: ${id}\n` +
+    `⭐ النقاط: ${points}\n` +
+    `⚠️ التحذيرات الحالية: ${warnings}\n\n` +
+    `💬 ${phrase}`;
+
+  try {
+    const photos = await ctx.api.getUserProfilePhotos(user.id, {
+      limit: 1
+    });
+
+    if (photos.total_count > 0 && photos.photos[0]?.length) {
+      const photo = photos.photos[0][photos.photos[0].length - 1];
+      await ctx.replyWithPhoto(photo.file_id, {
+        caption,
+        reply_to_message_id: ctx.message.message_id
+      });
+      return;
+    }
+  } catch (err) {
+    console.error('Could not fetch profile photo:', err.message);
+  }
+
+  await ctx.reply(caption, {
+    reply_to_message_id: ctx.message.message_id
+  });
+}
 async function handleViolation(ctx, g, reason) {
   const userId = userKey(ctx);
   const name = ctx.from.first_name || 'عضو';
@@ -622,8 +691,16 @@ bot.on('message:text', async ctx => {
   if (isGroup(ctx)) {
     const g = db.groups[String(ctx.chat.id)];
     if (!g?.activated || text.startsWith('/')) return;
-    g.title = ctx.chat.title || g.title;
-    g.stats.messages++; db.stats.messages++;
+
+// 🐾 بطاقة حساب العضو عند إرسال حرف ا وحده
+if (text === 'ا') {
+  await showProfileCard(ctx, g);
+  return;
+}
+
+g.title = ctx.chat.title || g.title;
+g.stats.messages++;
+db.stats.messages++;
 
     // 1. الكلمات الممنوعة
     if (g.badWords && g.badWords.length > 0 && !await userIsAdmin(ctx.chat.id, ctx.from.id)) {
