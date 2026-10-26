@@ -456,14 +456,42 @@ bot.on('my_chat_member', async ctx => {
   }
 });
 
+
 bot.hears(/^تفعيل$/i, async ctx => {
-  if (!isGroup(ctx)) return ctx.reply('🐾 أرسل كلمة «تفعيل» داخل المجموعة المراد تفعيلها.');
-  if (!await userIsAdmin(ctx.chat.id, ctx.from.id)) return ctx.reply('⚠️ لازم تكون مشرفاً بالمجموعة حتى تفعّل البوت.');
+  if (!isGroup(ctx)) {
+    return ctx.reply('🐾 أرسل كلمة «تفعيل» داخل المجموعة المراد تفعيلها.');
+  }
+
+  if (!await userIsAdmin(ctx.chat.id, ctx.from.id)) {
+    return ctx.reply('⚠️ لازم تكون مشرفاً بالمجموعة حتى تفعّل البوت.');
+  }
+
   const g = groupFor(ctx.chat);
-  g.activated = true; g.activatedBy = userKey(ctx); g.title = ctx.chat.title || g.title;
-  if (!g.admins.includes(userKey(ctx))) g.admins.push(userKey(ctx));
-  g.activatedAt ||= new Date().toISOString(); save();
-  return ctx.reply('🐾 نغنوغ — تم التفعيل\n\nتم تفعيل بوت الحماية نغنوغ بنجاح! 😎❤️\n\nهسه تگدر تدير مجموعتك وتتحكم بإعدادات الحماية والترحيب من الخاص.\n\nخلي مجموعتك بأمان وياية 🛡️');
+
+  // إذا البوت مفعّل سابقاً، لا تعِد التفعيل
+  if (g.activated) {
+    return ctx.reply('🐾 نغنوغ يعمل حالياً في هذه المجموعة ❤️\n\nتگدر تتحكم بإعدادات البوت من الخاص.');
+  }
+
+  // تفعيل البوت لأول مرة
+  g.activated = true;
+  g.activatedBy = userKey(ctx);
+  g.title = ctx.chat.title || g.title;
+
+  if (!g.admins.includes(userKey(ctx))) {
+    g.admins.push(userKey(ctx));
+  }
+
+  g.activatedAt ||= new Date().toISOString();
+
+  save();
+
+  return ctx.reply(
+    '🐾 نغنوغ — تم التفعيل بنجاح!\n\n' +
+    '🛡️ بوت الحماية صار فعّال بمجموعتك.\n\n' +
+    '⚙️ إعدادات البوت وإدارته تكون من الخاص، مو داخل المجموعة.\n\n' +
+    '❤️ خلي مجموعتك بأمان ويا نغنوغ!'
+  );
 });
 
 bot.on('message:new_chat_members', async ctx => {
