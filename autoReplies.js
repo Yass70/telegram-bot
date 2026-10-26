@@ -458,8 +458,6 @@ export const AUTO_REPLIES = [
   ]
 },
 {
-
-{
   triggers: ['يمعود لتلح نغنوغ اسمي'],
   replies: [
     'ولك اسميي نغنوغ 😾🔫'
