@@ -1,5 +1,13 @@
+
 import fs from 'node:fs';
 import { Bot, InlineKeyboard } from 'grammy';
+
+import {
+  GROUP_RULES,
+  NORMAL_MEMBER_RULES_REPLY,
+  findAutoReply
+} from './autoReplies.js';
+
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
