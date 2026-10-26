@@ -893,20 +893,62 @@ bot.on('message:text', async ctx => {
         return;
       }
     }
-    if (g.autoReply) {
-      const match = g.replies.find(r => r.trigger.toLocaleLowerCase() === text.toLocaleLowerCase());
-      if (match) {
-  try {
-    await ctx.reply(match.response, {
+    // 📜 قوانين المجموعة
+const rulesCommand = text.trim().replace(/[؟?!.,،]/g, '');
+
+if (rulesCommand === 'القوانين' || rulesCommand === 'قوانين') {
+  const canSeeRules =
+    isOwner(ctx) ||
+    await userIsAdmin(ctx.chat.id, ctx.from.id);
+
+  if (canSeeRules) {
+    await ctx.reply(GROUP_RULES, {
       reply_to_message_id: ctx.message.message_id
     });
-  } catch (e) {
-    console.error('Auto-reply error:', e);
+  } else {
+    await ctx.reply(NORMAL_MEMBER_RULES_REPLY, {
+      reply_to_message_id: ctx.message.message_id
+    });
+  }
+
+  save();
+  return;
+}
+
+// 💬 الردود التلقائية الجديدة + الردود المضافة من لوحة البوت
+if (g.autoReply) {
+  const automaticReply = findAutoReply(text);
+
+  if (automaticReply) {
+    try {
+      await ctx.reply(automaticReply, {
+        reply_to_message_id: ctx.message.message_id
+      });
+    } catch (e) {
+      console.error('Automatic reply error:', e);
+    }
+  }
+
+  // الحفاظ على الردود التي يضيفها مشرفو المجموعة
+  const match = g.replies.find(
+    r => r.trigger.trim().toLocaleLowerCase() === text.trim().toLocaleLowerCase()
+  );
+
+  if (match) {
+    try {
+      await ctx.reply(match.response, {
+        reply_to_message_id: ctx.message.message_id
+      });
+    } catch (e) {
+      console.error('Custom auto-reply error:', e);
+    }
   }
 }
-    }
-    save(); return;
+
+save();
+return;
   }
+  
   if (!isPrivate(ctx)) return;
   if (text.startsWith('/')) return;
   if (!isOwner(ctx) && !await subscriptionGate(ctx)) return;
