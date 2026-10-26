@@ -640,26 +640,90 @@ if (data === 'warningsduration') {
 
 if (data === 'warningslog') {
   const g = selectedGroup(ctx);
+
   if (!g || !await userCanManage(ctx, g)) {
     return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
   }
 
-  return answer(
-    ctx,
-    '📋 سجل التحذيرات غير متوفر بعد؛ نحتاج إضافة نظام لحفظ تحذيرات الأعضاء.'
-  );
+  const logs = (g.warningLog || []).slice(-15).reverse();
+
+  if (!logs.length) {
+    return answer(ctx, '📋 ماكو تحذيرات مسجّلة بهذه المجموعة بعد.', {
+      reply_markup: new InlineKeyboard()
+        .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+    });
+  }
+
+  const text = logs.map((item, i) => {
+    const date = item.date
+      ? new Date(item.date).toLocaleString('en-GB')
+      : 'غير محدد';
+
+    return `${i + 1}. 👤 ${item.name || item.userId || 'عضو'}\n` +
+      `⚠️ السبب: ${item.reason || 'غير محدد'}\n` +
+      `🕒 الوقت: ${date}`;
+  }).join('\n\n');
+
+  return answer(ctx, `📋 آخر التحذيرات في ${g.title}\n\n${text}`, {
+    reply_markup: new InlineKeyboard()
+      .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+  });
 }
 
 if (data === 'warningsclear') {
   const g = selectedGroup(ctx);
+
   if (!g || !await userCanManage(ctx, g)) {
     return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
   }
 
-  return answer(
-    ctx,
-    '🧹 مسح التحذيرات غير متوفر بعد؛ نحتاج إضافة تخزين لتحذيرات كل عضو.'
-  );
+  const members = Object.entries(g.warnings || {})
+    .filter(([_, value]) => Number(value?.count || 0) > 0);
+
+  if (!members.length) {
+    return answer(ctx, '🧹 ماكو أعضاء عندهم تحذيرات حالياً.', {
+      reply_markup: new InlineKeyboard()
+        .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+    });
+  }
+
+  const kb = new InlineKeyboard();
+
+  for (const [userId, value] of members.slice(0, 30)) {
+    kb.text(
+      `🧹 ${String(value.name || userId).slice(0, 25)} (${value.count})`,
+      `warningclear:${userId}`
+    ).row();
+  }
+
+  kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
+
+  return answer(ctx, 'اختار العضو الذي تريد تصفير تحذيراته:', {
+    reply_markup: kb
+  });
+}
+
+if (data.startsWith('warningclear:')) {
+  const g = selectedGroup(ctx);
+
+  if (!g || !await userCanManage(ctx, g)) {
+    return answer(ctx, 'اختار مجموعة تملك صلاحية إدارتها.');
+  }
+
+  const userId = data.slice('warningclear:'.length);
+
+  if (!g.warnings?.[userId]) {
+    return answer(ctx, 'ما لقيت تحذيرات لهذا العضو.');
+  }
+
+  const count = g.warnings[userId].count || 0;
+  delete g.warnings[userId];
+  save();
+
+  return answer(ctx, `✅ تم تصفير تحذيرات العضو.\nعدد التحذيرات التي أُزيلت: ${count}`, {
+    reply_markup: new InlineKeyboard()
+      .text('🔙 رجوع للتحذيرات', 'warningsmenu')
+  });
 }
 
 // ===== نهاية أزرار إعدادات التحذيرات =====
