@@ -440,13 +440,31 @@ export const AUTO_REPLIES = [
     ]
   },
   {
-    triggers: ['🗿🗿'],
-    replies: [
-      'تمثالين؟ نغنوغ يحتاج مترجم 😂🐈‍⬛'
-    ]
-  }
+    {
+  triggers: ['🗿🗿'],
+  replies: [
+    'تمثالين؟ نغنوغ يحتاج مترجم 😂🐈‍⬛'
+  ]
+},
+{
+  triggers: ['بوت'],
+  replies: [
+    'شُبيك لُبيك نغنوغ بين اديكك 🫶🏻🌚'
+  ]
+},
+{
+  triggers: ['ولك اسميي نغنوغ'],
+  replies: [
+    'يمعود لتلح نغنوغ اسمي 🗿🚬'
+  ]
+},
+{
+  triggers: ['يمعود لتلح نغنوغ اسمي'],
+  replies: [
+    'ولك اسميي نغنوغ 😾🔫'
+  ]
+}
 ];
-
 export function normalizeText(text = '') {
   return String(text)
     .normalize('NFC')
