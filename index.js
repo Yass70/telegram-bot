@@ -415,7 +415,41 @@ bot.on('callback_query:data', async ctx => {
     if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة للمشرفين فقط.');
     setSelected(ctx, id); return showGroupSettings(ctx, g);
   }
-  if (data === 'groupsettings') return showGroupSettings(ctx);
+  if (data === 'groupsettings') {
+  const { entries } = selectedGroupKeyboard(ctx);
+
+  if (!selectedGroup(ctx)) {
+    if (entries.length) {
+      return showGroups(ctx);
+    }
+
+    return answer(
+      ctx,
+      '⚙️ إعدادات نغنوغ 🐾\n\n' +
+      'تگدر تستعرض ميزاتي قبل إضافة البوت لمجموعتك ❤️\n\n' +
+      '👋 ترحيب بالأعضاء الجدد\n' +
+      '🔗 منع الروابط\n' +
+      '🚫 منع السبام\n' +
+      '🛡️ التحذيرات والعقوبات\n' +
+      '💬 الردود التلقائية\n' +
+      '🎮 الألعاب والنقاط\n' +
+      '📊 إحصائيات المجموعة\n\n' +
+      '📌 حتى تستخدم الإعدادات الفعلية، أضفني لمجموعتك، ' +
+      'خلّيني مشرفاً بالصلاحيات المطلوبة، وبعدها أرسل «تفعيل» داخل المجموعة.',
+      {
+        reply_markup: new InlineKeyboard()
+          .url(
+            '➕ أضف نغنوغ لمجموعتك',
+            `https://t.me/${bot.botInfo?.username || 'YZ_VIDbot'}?startgroup=true`
+          )
+          .row()
+          .text('🔙 القائمة الرئيسية', 'home')
+      }
+    );
+  }
+
+  return showGroupSettings(ctx);
+}
 
   if (data === 'warningsmenu') {
     const g = selectedGroup(ctx);
