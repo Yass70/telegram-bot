@@ -131,7 +131,6 @@ function selectedGroup(ctx) {
 }
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
-// تخصيصات خاصة بكل مستخدم في الخاص فقط؛ لا تؤثر على رسائل المجموعات.
 const DEFAULT_CUSTOMIZATION = {
   startText: '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\nبوت لإدارة المجموعات وحمايتها وتنظيمها.\n\nاختار القسم المناسب من القائمة أدناه حتى تبدأ.',
   descriptions: {
@@ -172,45 +171,6 @@ function customText(ctx, section, key) {
   return section === 'startText' ? c.startText : c[section]?.[key];
 }
 
-function customizationMenuKeyboard() {
-  return new InlineKeyboard()
-    .text('👋 تعديل مقدمة /start', 'customstart').row()
-    .text('🔘 تعديل شرح الأزرار', 'customdescmenu').row()
-    .text('💬 تعديل ردود البوت', 'customreplymenu').row()
-    .text('♻️ استعادة النصوص الأصلية', 'customreset').row()
-    .text('🔙 رجوع للقائمة الرئيسية', 'home');
-}
-
-function customizationDescriptionsKeyboard() {
-  return new InlineKeyboard()
-    .text('⚙️ شرح إعدادات المجموعة', 'customdesc:settings').row()
-    .text('👥 شرح مجموعاتي', 'customdesc:groups').row()
-    .text('👤 شرح معلومات حسابي', 'customdesc:account').row()
-    .text('💬 شرح الردود التلقائية', 'customdesc:replies').row()
-    .text('🔙 رجوع للتخصيص', 'custommenu');
-}
-
-function customizationRepliesKeyboard() {
-  return new InlineKeyboard()
-    .text('👤 رسالة معلومات الحساب', 'customreply:account').row()
-    .text('💬 رسالة قسم الردود التلقائية', 'customreply:replies').row()
-    .text('👥 رسالة عدم وجود مجموعات', 'customreply:nogroups').row()
-    .text('🔙 رجوع للتخصيص', 'custommenu');
-}
-
-const CUSTOM_DESCRIPTION_LABELS = {
-  settings: 'شرح إعدادات المجموعة',
-  groups: 'شرح مجموعاتي',
-  account: 'شرح معلومات حسابي',
-  replies: 'شرح الردود التلقائية'
-};
-const CUSTOM_REPLY_LABELS = {
-  account: 'رسالة معلومات الحساب',
-  replies: 'رسالة قسم الردود التلقائية',
-  nogroups: 'رسالة عدم وجود مجموعات'
-};
-
-// دالة إنشاء القائمة الرئيسية مع دعم زر المالك إن وجد
 function getHomeKeyboard(ctx) {
   const kb = mainKeyboard(ctx, bot);
   const hasCustomizationButton = (kb.inline_keyboard || []).some(row =>
@@ -293,7 +253,7 @@ async function showHome(ctx) {
   const c = getCustomization(ctx);
   await safeEdit(
     ctx,
-    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:\n\n${c.descriptions.settings}\n${c.descriptions.groups}\n${c.descriptions.account}\n${c.descriptions.replies}\n📖 المساعدة: معرفة طريقة استخدام البوت.`,
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:`,
     getHomeKeyboard(ctx)
   );
 }
@@ -326,28 +286,42 @@ async function userCanManage(ctx, g) {
 }
 
 async function checkSubscription(userId) {
+  const missingChannels = [];
   for (const ch of db.requiredChats) {
     try {
       const m = await bot.api.getChatMember(ch.id, Number(userId));
       const ok = ['member', 'administrator', 'creator'].includes(m.status) || (m.status === 'restricted' && m.is_member);
-      if (!ok) return { ok: false, channel: ch };
+      if (!ok) {
+        missingChannels.push(ch);
+      }
     } catch (e) {
-      return { ok: false, channel: ch, inaccessible: true };
+      missingChannels.push(ch);
     }
   }
-  return { ok: true };
+  return { ok: missingChannels.length === 0, missingChannels };
 }
 
 async function subscriptionGate(ctx) {
   if (isOwner(ctx) || !isPrivate(ctx) || db.requiredChats.length === 0) return true;
+  
   const result = await checkSubscription(ctx.from.id);
   if (result.ok) return true;
-  const ch = result.channel;
+
   const kb = new InlineKeyboard();
-  if (ch?.url) kb.url('🔗 اشترك بالقناة', ch.url).row();
-  kb.text('✅ تحققت من الاشتراك', 'checksubscription');
-  const text = `🔒 حتى تستخدم نغنوغ، اشترك بالقناة المطلوبة أولاً.`;
-  if (ctx.callbackQuery) await safeEdit(ctx, text, kb); else await ctx.reply(text, { reply_markup: kb });
+  for (const ch of result.missingChannels) {
+    if (ch?.url) {
+      kb.url(`🔗 اشترك في: ${ch.title || 'قناة/مجموعة'}`, ch.url).row();
+    }
+  }
+  kb.text('✅ تحققت من الاشتراكات', 'checksubscription');
+
+  const text = `🔒 عذراً، لاستخدام بوت (نغنوغ)، يجب عليك الاشتراك في القنوات والمجموعات المطلوبة أولاً:\n\nاشتراكك يدعمنا ويساعدنا على الاستمرار ❤️`;
+  
+  if (ctx.callbackQuery) {
+    await safeEdit(ctx, text, kb);
+  } else {
+    await ctx.reply(text, { reply_markup: kb });
+  }
   return false;
 }
 
@@ -395,17 +369,17 @@ function clearPending(ctx) { delete db.pending[userKey(ctx)]; save(); }
 
 async function ownerRequiredMenu(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
-  const kb = new InlineKeyboard().text('➕ إضافة قناة اشتراك', 'requiredadd').row().text('📋 عرض القنوات', 'requiredlist').row().text('🔙 لوحة المالك', 'ownerpanel');
-  return answer(ctx, `📢 إدارة الاشتراك الإجباري\n\nالقنوات: ${db.requiredChats.length}`, { reply_markup: kb });
+  const kb = new InlineKeyboard().text('➕ إضافة قناة أو مجموعة', 'requiredadd').row().text('📋 عرض القنوات والمجموعات', 'requiredlist').row().text('🔙 لوحة المالك', 'ownerpanel');
+  return answer(ctx, `📢 إدارة الاشتراك الإجباري\n\nالقنوات والمجموعات المضافة: ${db.requiredChats.length}`, { reply_markup: kb });
 }
 
 async function showRequiredList(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
-  if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu') });
+  if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات أو مجموعات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu') });
   const kb = new InlineKeyboard();
   db.requiredChats.forEach((ch, i) => kb.text(`🗑️ حذف ${ch.title || ch.username || ch.id}`, `reqdel:${i}`).row());
-  kb.text('➕ إضافة قناة', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu');
-  return answer(ctx, `📋 قنوات الاشتراك الإجباري`, { reply_markup: kb });
+  kb.text('➕ إضافة قناة أخرى', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu');
+  return answer(ctx, `📋 قنوات ومجموعات الاشتراك الإجباري`, { reply_markup: kb });
 }
 
 const PROFILE_PHRASES = [
@@ -521,7 +495,10 @@ bot.command('start', async ctx => {
 
   const c = getCustomization(ctx);
   save();
-  await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
+  await ctx.reply(
+    `🐈‍⬛ أهلاً بيك بعالم نغنوغ 🐾\n\n${c.startText}\n\nاختار القسم اللي تريد تستخدمه من القائمة أدناه:`,
+    { reply_markup: getHomeKeyboard(ctx) }
+  );
 });
 
 bot.command('help', async ctx => {
@@ -580,7 +557,7 @@ bot.on('callback_query:data', async ctx => {
       await ctx.answerCallbackQuery({ text: 'تم التحقق بنجاح ❤️' });
       return showHome(ctx);
     }
-    await ctx.answerCallbackQuery({ text: 'بعدك مو مشترك بالقناة المطلوبة.' });
+    await ctx.answerCallbackQuery({ text: 'بعدك مو مشترك في بعض القنوات المطلوبة.' });
     return subscriptionGate(ctx);
   }
   if (!await subscriptionGate(ctx)) { try { await ctx.answerCallbackQuery(); } catch {} return; }
@@ -829,7 +806,7 @@ bot.on('callback_query:data', async ctx => {
   if (data === 'botsettings') { if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.'); return answer(ctx, '⚙️ إعدادات البوت تعمل بنجاح.', { reply_markup: ownerKeyboard() }); }
   if (data === 'globalprotection') { if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.'); return answer(ctx, '🛡️ الحماية العامة.', { reply_markup: ownerKeyboard() }); }
   if (data === 'requiredmenu') return ownerRequiredMenu(ctx);
-  if (data === 'requiredadd') { if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.'); pending(ctx, { action: 'required-add' }); return answer(ctx, 'أرسل معرف القناة @username'); }
+  if (data === 'requiredadd') { if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.'); pending(ctx, { action: 'required-add' }); return answer(ctx, 'أرسل معرف القناة أو المجموعة @username أو الرابط'); }
   if (data === 'requiredlist') return showRequiredList(ctx);
   if (data.startsWith('reqdel:')) {
     if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
@@ -907,7 +884,27 @@ bot.on('message:text', async ctx => {
       return;
     }
 
-    // 5. الردود التلقائية
+    // 5. أوامر ومعلومات المجموعة
+    if (['الاوامر', 'أوامر', 'اوامر', 'المعلومات', 'معلومات'].includes(normalizedText)) {
+      const commandsList = 
+        `🐈‍⬛ قائمة أوامر وميزات نغنوغ داخل المجموعة 🐾\n\n` +
+        `⚙️ الأوامر العادية:\n` +
+        `• اكتب «تفعيل» ➜ لتفعيل البوت (للمشرفين فقط).\n` +
+        `• اكتب «ا» ➜ لعرض بطاقة معلوماتك ونقاطك وتحذيراتك.\n` +
+        `• اكتب «القوانين» ➜ لعرض قوانين المجموعة.\n` +
+        `• اكتب «ألعاب» ➜ لبدء تحدي الأسئلة والمسابقات.\n\n` +
+        `🛡️ الميزات المفعّلة تلقائياً:\n` +
+        `• 🔗 منع الروابط المخالفة تلقائياً.\n` +
+        `• 🚫 منع السبام والرسائل المتكررة.\n` +
+        `• 🔤 رصد وحذف الكلمات الممنوعة.\n` +
+        `• 👋 الترحيب بالأعضاء الجدد والردود التلقائية.\n\n` +
+        `📌 للتحكم الكامل بالإعدادات والتحذيرات، افتح البوت بالخاص! ❤️`;
+
+      await ctx.reply(commandsList, { reply_to_message_id: ctx.message.message_id });
+      return;
+    }
+
+    // 6. الردود التلقائية
     if (g.autoReply && !['العاب', 'لعبه', 'لعبة'].includes(normalizedText)) {
       const automaticReply = findAutoReply(text);
       if (automaticReply) {
@@ -924,7 +921,7 @@ bot.on('message:text', async ctx => {
       }
     }
 
-    // 6. تشغيل أو تفاعل مع اللعبة
+    // 7. تشغيل أو تفاعل مع اللعبة
     if (['العاب', 'لعبه', 'لعبة'].includes(normalizedText)) {
       if (g.game?.active) {
         await ctx.reply('🎮 اللعبة شغّالة بالفعل!');
@@ -997,16 +994,27 @@ bot.on('message:text', async ctx => {
       }
       if (p.action === 'required-add') {
         clearPending(ctx);
-        let username = text;
-        if (username.startsWith('https://t.me/')) username = '@' + username.split('https://t.me/')[1];
+        let username = text.trim();
+        if (username.startsWith('https://t.me/')) username = '@' + username.split('https://t.me/')[1].split('/')[0];
         if (!username.startsWith('@')) username = '@' + username;
         try {
           const chat = await bot.api.getChat(username);
-          db.requiredChats.push({ id: chat.id, username: chat.username || username, title: chat.title || username, url: chat.username ? `https://t.me/${chat.username}` : undefined });
+          
+          const exists = db.requiredChats.some(c => c.id === chat.id);
+          if (exists) {
+            return answer(ctx, `⚠️ هذه القناة أو المجموعة مضافة مسبقاً في القائمة!`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          }
+
+          db.requiredChats.push({ 
+            id: chat.id, 
+            username: chat.username || username, 
+            title: chat.title || username, 
+            url: chat.username ? `https://t.me/${chat.username}` : undefined 
+          });
           save();
-          return answer(ctx, `✅ تم إضافة القناة بنجاح.`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          return answer(ctx, `✅ تم إضافة (${chat.title || username}) بنجاح إلى الاشتراك الإجباري.\n\nإجمالي القنوات والمجموعات المطلوبة: ${db.requiredChats.length}`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
         } catch (e) {
-          return answer(ctx, `❌ خطأ في الوصول للقناة: ${e.message}`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          return answer(ctx, `❌ خطأ في الوصول للقناة أو المجموعة: ${e.message}\nتأكد أن البوت مشرف (Admin) فيها.`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
         }
       }
     }
