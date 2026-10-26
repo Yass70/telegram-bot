@@ -85,7 +85,6 @@ export function normalizeGameAnswer(value) {
     .replace(/\s+/g, ' ');
 }
 
-// دالة بدء اللعبة الجديدة
 export async function startNewGame(ctx, g, save) {
   const firstIndex = Math.floor(Math.random() * gameQuestions.length);
   g.game = {
@@ -107,13 +106,11 @@ export async function startNewGame(ctx, g, save) {
   );
 }
 
-// دالة معالجة تفاعل العضو أثناء اللعبة (التخطي أو الإجابة الصحيحة واحتساب النقاط والفوز)
 export async function handleGameMessage(ctx, text, g, db, save, userKey) {
   if (!g.game?.active) return false;
 
   const normalizedText = normalizeGameAnswer(text);
 
-  // 1. التعامل مع التخطي (التالي)
   if (['التالي', 'تالي'].includes(normalizedText)) {
     const skippedAnswer = g.game.answer;
     if (g.game.round >= g.game.totalRounds) {
@@ -146,7 +143,6 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
     return true;
   }
 
-  // 2. التحقق من صحة الإجابة
   const correctAnswer = normalizeGameAnswer(g.game.answer);
   if (normalizedText === correctAnswer) {
     const uid = userKey(ctx);
@@ -163,7 +159,6 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
       `⭐ نقاطه بهالجولة: ${g.game.scores[uid]}\n` +
       `💎 نقاطه الدائمة: ${db.points[uid]}`;
 
-    // التحقق إذا انتهت جميع الجولات (إعلان الفائز النهائي)
     if (wonRound >= g.game.totalRounds) {
       const scores = Object.entries(g.game.scores);
       const maxScore = Math.max(...scores.map(([, score]) => score));
@@ -191,7 +186,6 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
       return true;
     }
 
-    // الانتقال للسؤال التالي
     const nextRound = wonRound + 1;
     let nextIndex;
     do {
