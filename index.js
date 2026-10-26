@@ -1046,7 +1046,10 @@ await ctx.reply(
     }
 
     // الردود التلقائية العامة والردود المخصصة للمجموعة
- if (g.autoReply) {
+ if (
+  g.autoReply &&
+  !['العاب', 'لعبه', 'لعبة'].includes(normalizedText)
+) {
   // أولاً: الردود الموجودة في ملف autoReplies.js
   const automaticReply = findAutoReply(text);
 
