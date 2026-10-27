@@ -1,29 +1,48 @@
 import { InlineKeyboard } from 'grammy';
 
-export function mainKeyboard(ctx, bot) {
+export function mainKeyboard(ctx, bot, ui = {}) {
+  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
   // واجهة الخاص الأساسية موحّدة للمالك والمستخدم، مع أزرار المالك الإضافية من index.js.
   const kb = new InlineKeyboard()
-    .text('👥 مجموعاتي', 'mygroups')
-    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
-    .text('⚙️ الإدارة', 'managementmenu').row()
-    .text('👤 ملفي الشخصي', 'accountinfo').row()
-    .text('🎨 تخصيص نغنوغ', 'custommenu')
-    .text('📖 المساعدة', 'help');
+    .text(label('groups', '👥 مجموعاتي'), 'mygroups')
+    .url(label('addBot', '➕ أضفني للمجموعة'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
+    .text(label('management', '⚙️ الإدارة'), 'managementmenu').row()
+    .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
+    .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
+    .text(label('help', '📖 المساعدة'), 'help');
   return kb;
 }
 
-export function customizationKeyboard() {
+export function customizationKeyboard(ui = {}) {
+  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   return new InlineKeyboard()
     .text('👋 تعديل رسالة البداية', 'customstart')
     .row()
-    .text('📝 تعديل شروحات الأزرار', 'customdescmenu')
+    .text('📝 تعديل شروحات الأقسام', 'customdescmenu')
     .row()
-    .text('💬 تخصيص ردود نغنوغ', 'customreplymenu')
+    .text('🔘 تعديل أسماء أزرار القوائم', 'customuimenu')
+    .row()
+    .text('📖 تعديل نص المساعدة', 'customhelp')
     .row()
     .text('♻️ استعادة النصوص الافتراضية', 'customreset')
     .row()
-    .text('↩️ العودة إلى القائمة الرئيسية', 'home');
+    .text(label('home', '↩️ العودة إلى القائمة الرئيسية'), 'home');
+}
+
+export function customizationUILabelsKeyboard(ui = {}) {
+  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
+  return new InlineKeyboard()
+    .text('👥 زر مجموعاتي', 'customlabel:groups').row()
+    .text('➕ زر إضافة البوت', 'customlabel:addBot').row()
+    .text('⚙️ زر الإدارة', 'customlabel:management').row()
+    .text('👤 زر الملف الشخصي', 'customlabel:profile').row()
+    .text('🎨 زر التخصيص', 'customlabel:customize').row()
+    .text('📖 زر المساعدة', 'customlabel:help').row()
+    .text('↩️ زر الرجوع', 'customlabel:back').row()
+    .text('🏠 زر الرئيسية', 'customlabel:home').row()
+    .text('❌ زر الإلغاء', 'customlabel:cancel').row()
+    .text(label('back', '↩️ العودة إلى التخصيص'), 'custommenu');
 }
 
 export function customizationDescriptionsKeyboard() {
@@ -50,11 +69,12 @@ export function customizationRepliesKeyboard() {
     .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
-export function helpKeyboard() {
+export function helpKeyboard(ui = {}) {
+  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   return new InlineKeyboard()
-    .text('👥 مجموعاتي', 'mygroups')
+    .text(label('groups', '👥 مجموعاتي'), 'mygroups')
     .row()
-    .text('🏠 الرئيسية', 'home').row()
+    .text(label('home', '🏠 الرئيسية'), 'home').row()
     .url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
 }
 
@@ -83,12 +103,7 @@ export function warningsKeyboard(g) {
     duration: 10
   };
 
-  const actionNames = {
-    none: 'بدون إجراء',
-    mute: 'كتم',
-    kick: 'طرد',
-    ban: 'حظر'
-  };
+  const actionNames = { none: 'بدون إجراء', mute: 'كتم', kick: 'طرد', ban: 'حظر' };
 
   return new InlineKeyboard()
     .text(
@@ -98,7 +113,7 @@ export function warningsKeyboard(g) {
     .row()
     .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit')
     .row()
-    .text(`⚖️ العقوبة: ${actionNamesw.action || 'كتم'}`, 'warningsaction')
+    .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction')
     .row()
     .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration')
     .row()
@@ -106,7 +121,7 @@ export function warningsKeyboard(g) {
     .row()
     .text('📋 سجل التحذيرات', 'warningslog')
     .row()
-    .text('🧹 تصفير تحذيرات عضو', 'warningsclear')
+    .text('🧹 تصفير جميع التحذيرات', 'warningsclear')
     .row()
     .text('↩️ العودة إلى إعدادات المجموعة', 'groupsettings');
 }
