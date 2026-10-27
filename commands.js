@@ -515,7 +515,18 @@ if (data === 'publiccommands') {
     { reply_markup: publicCommandsKeyboard() }
   );
 }
-
+if (data === 'public_games') {
+  return answer(
+    ctx,
+    '🎮「 سَاحَة أَلْعَاب نَغْنُوغ 」\n\n' +
+    'اختار اللعبة اللي تريد تعرف طريقة استخدامها ❤️\n\n' +
+    '🐾 معرفة الحيوان — ح\n' +
+    '💡 أسئلة عامة — س\n' +
+    '🔢 مرّن عقلك — ر\n' +
+    '🧩 اختيار الجواب الصحيح — خ',
+    { reply_markup: publicGamesKeyboard() }
+  );
+}
     if (data === 'public_interactive') {
       const keyboard = new InlineKeyboard()
         .text('👤 بطاقة العضو — ا', 'public_profile_info')
