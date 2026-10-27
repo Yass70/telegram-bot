@@ -99,10 +99,10 @@ export async function startNewGame(ctx, g, save) {
   };
   save();
   await ctx.reply(
-    `🐈‍⬛🔥 تحدّي نغنوغ بدأ!\n\n` +
+    `╭━━━〔 🐈‍⬛ تحدّي نغنوغ بدأ 〕━━━╮\n\n` +
     `📋 10 أسئلة، وأول واحد يجاوب صح ياخذ نقطة!\n` +
-    `🏆 النقاط تنحفظ بحسابه.\n\n` +
-    `❓ السؤال 1/10:\n${gameQuestions[firstIndex].q}`
+    `🏆 تُضاف النقاط إلى رصيد الفائز.\n\n` +
+    `❓ 〔 السؤال 1 من 10 〕\n${gameQuestions[firstIndex].q}\n\n╰━━━━━━━━━━━━━━━━━━╯`
   );
 }
 
@@ -124,9 +124,9 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
       g.game = null;
       save();
       await ctx.reply(
-        `🏁 انتهى تحدّي نغنوغ!\n` +
-        `💡 جواب السؤال الأخير كان: ${skippedAnswer}\n` +
-        `🎮 انتهت الأسئلة العشرة!`
+        `╭━━━〔 🏁 انتهى تحدّي نغنوغ 〕━━━╮\n` +
+        `💡 إجابة السؤال الأخير: ${skippedAnswer}\n` +
+        `🎮 اكتملت الأسئلة العشرة. شكراً لمشاركتكم!\n╰━━━━━━━━━━━━━━━━━━╯`
       );
       return true;
     }
@@ -142,9 +142,9 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
     save();
 
     await ctx.reply(
-      `⏭️ تم تخطي السؤال!\n` +
+      `╭─〔 ⏭️ تم تخطي السؤال 〕─╮\n` +
       `💡 الإجابة الصحيحة: ${skippedAnswer}\n\n` +
-      `❓ السؤال ${g.game.round}/${g.game.totalRounds}:\n` +
+      `❓ 〔 السؤال ${g.game.round} من ${g.game.totalRounds} 〕\n` +
       `${gameQuestions[nextIndex].q}`
     );
     return true;
@@ -163,7 +163,7 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
     const wonRound = g.game.round;
     const winnerMessage =
       `✅ إجابة صحيحة!\n` +
-      `🏅 الفائز بالسؤال: ${name}\n` +
+      `🏅 الفائز بالسؤال: «${name}»\n` +
       `⭐ نقاطه بهالجولة: ${g.game.scores[uid]}\n` +
       `💎 نقاطه الدائمة: ${db.points[uid]}`;
 
@@ -183,7 +183,7 @@ export async function handleGameMessage(ctx, text, g, db, save, userKey) {
         finalMessage += winners.map(([id]) => `• ${g.game.names[id]}`).join('\n') + '\n';
       }
 
-      finalMessage += `🏆 النتيجة النهائية:\n`;
+      finalMessage += `🏆 〔 النتيجة النهائية 〕\n`;
       finalMessage += scores
         .sort((a, b) => b[1] - a[1])
         .map(([id, score]) => `• ${g.game.names[id]}: ${score} نقطة`)
