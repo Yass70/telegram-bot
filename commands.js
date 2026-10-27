@@ -31,7 +31,7 @@ export function setupCommands(bot, db, helpers) {
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
   });
 
-  // أمر الإذاعة المباشر (Broadcast) للمالك
+  // أمر الإذاعة المباشر (Broadcast) للمالك مع إشعار وتقرير دقيق
   bot.command('broadcast', async ctx => {
     if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت فقط.');
     
@@ -48,19 +48,33 @@ export function setupCommands(bot, db, helpers) {
     let successCount = 0;
     let failCount = 0;
 
-    await ctx.reply(`📢 جاري إرسال الرسالة إلى ${users.length} مستخدم... انتظر قليلاً.`);
+    const statusMsg = await ctx.reply(`📢 **جاري بدء الإذاعة...**\n👥 إجمالي المستخدمين: ${users.length}\n⏳ يتم الإرسال الآن مع إشعار للمستخدمين...`, { parse_mode: 'Markdown' });
 
     for (const userId of users) {
       try {
-        await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${textToSend}`, { parse_mode: 'Markdown' });
+        await bot.api.sendMessage(Number(userId), `📢 **إشعار هام من الإدارة:**\n\n${textToSend}`, {
+          parse_mode: 'Markdown',
+          disable_notification: false // تضمن ظهور الإشعار وصوت الرسالة للمستخدم
+        });
         successCount++;
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 40));
       } catch (e) {
         failCount++;
       }
     }
 
-    await ctx.reply(`✅ **تمت الإذاعة بنجاح!**\n\n📤 تم الإرسال إلى: ${successCount}\n❌ فشل الإرسال (حظروا البوت): ${failCount}`, { parse_mode: 'Markdown' });
+    const reportText = 
+      `✅ **تمت عملية الإذاعة بنجاح تام!**\n\n` +
+      `📊 **تقرير الإحصائيات الشامل:**\n` +
+      `👥 إجمالي المستهدفين: ${users.length} عضو\n` +
+      `📤 تم إرسالها بنجاح: ${successCount} عضو\n` +
+      `❌ فشل الإرسال (حظروا البوت): ${failCount} عضو`;
+
+    try {
+      await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, reportText, { parse_mode: 'Markdown' });
+    } catch (err) {
+      await ctx.reply(reportText, { parse_mode: 'Markdown' });
+    }
   });
 
   bot.on('my_chat_member', async ctx => {
@@ -117,7 +131,26 @@ export function setupCommands(bot, db, helpers) {
       await ctx.answerCallbackQuery({ text: 'بعدك مو مشترك في بعض القنوات المطلوبة.' });
       return subscriptionGate(ctx);
     }
-    if (!await subscriptionGate(ctx)) { try { await ctx.answerCallbackQuery(); } catch {} return; }
+
+    // التحقق الذكي للصلاحيات وإظهار التنبيه الشريطي المؤقت للأزرار غير المخصصة
+    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu'];
+    const adminActions = ['groupsettings', 'warningsmenu', 'badwordsmenu', 'badwordadd', 'welcomeedit', 'togglelinks', 'toggleflood', 'togglereplies', 'repliesmenu', 'replyadd', 'replylist', 'replydelete'];
+
+    if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:') || data === 'broadcastmenu') {
+      if (!isOwner(ctx)) {
+        await ctx.answerCallbackQuery({ text: '❌ عذراً، هذا الزر غير مخصص لك!', show_alert: false });
+        return;
+      }
+    }
+
+    if (adminActions.includes(data) || data.startsWith('badworddel:') || data.startsWith('warning') || data.startsWith('replydel:')) {
+      const g = selectedGroup(ctx);
+      if (g && !await userCanManage(ctx, g)) {
+        await ctx.answerCallbackQuery({ text: '❌ عذراً، هذا الزر غير مخصص لك!', show_alert: false });
+        return;
+      }
+    }
+
     try { await ctx.answerCallbackQuery(); } catch {}
 
     const showHomeFunc = async (cCtx) => {
@@ -462,7 +495,7 @@ export function setupCommands(bot, db, helpers) {
       // المحادثات الخاصة (الخاص)
       const p = db.pending[userKey(ctx)];
       if (p) {
-        // استقبال نص الإذاعة عبر الزر
+        // استقبال نص الإذاعة عبر الزر مع تقرير احترافي وإشعار
         if (p.action === 'broadcast-message') {
           clearPending(ctx);
           const users = db.privateUsers || [];
@@ -472,18 +505,30 @@ export function setupCommands(bot, db, helpers) {
 
           let successCount = 0;
           let failCount = 0;
-          await ctx.reply(`📢 جاري إرسال الإذاعة إلى ${users.length} مستخدم... انتظر قليلاً.`);
+          const statusMsg = await ctx.reply(`📢 جاري إرسال الإذاعة إلى ${users.length} مستخدم مع إشعار... انتظر قليلاً.`);
 
           for (const userId of users) {
             try {
-              await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${text}`, { parse_mode: 'Markdown' });
+              await bot.api.sendMessage(Number(userId), `📢 **إشعار هام من الإدارة:**\n\n${text}`, {
+                parse_mode: 'Markdown',
+                disable_notification: false
+              });
               successCount++;
-              await new Promise(resolve => setTimeout(resolve, 50));
+              await new Promise(resolve => setTimeout(resolve, 40));
             } catch (e) {
               failCount++;
             }
           }
-          return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n\n📤 تم الإرسال إلى: ${successCount}\n❌ فشل الإرسال (حظروا البوت): ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+
+          return answer(
+            ctx, 
+            `✅ **تمت الإذاعة بنجاح!**\n\n` +
+            `📊 **التقرير الاحترافي:**\n` +
+            `👥 إجمالي المستهدفين: ${users.length}\n` +
+            `📤 تم الإرسال بنجاح: ${successCount}\n` +
+            `❌ فشل الإرسال (حظروا البوت): ${failCount}`, 
+            { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') }
+          );
         }
 
         if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
