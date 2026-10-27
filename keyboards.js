@@ -2,16 +2,23 @@ import { InlineKeyboard } from 'grammy';
 
 export function mainKeyboard(ctx, bot) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
+  const isOwnerPrivate = ctx?.chat?.type === 'private'
+    && !!String(process.env.BOT_OWNER_ID || '').trim()
+    && String(ctx?.from?.id || '') === String(process.env.BOT_OWNER_ID || '').trim();
 
-  return new InlineKeyboard()
+  const kb = new InlineKeyboard()
     .url('➕ إضافة نغنوغ للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
-    .text('👥 〔 مجموعاتي 〕', 'mygroups').row()
-    .text('📚 〔 مركز الأوامر 〕', 'publiccommands')
-    .text('🛡️ 〔 الإدارة والحماية 〕', 'managementmenu').row()
-    .text('🏆 〔 النقاط والإحصائيات 〕', 'statsmenu')
-    .text('👤 〔 ملفّي الشخصي 〕', 'accountinfo').row()
+    .text('👥 〔 مجموعاتي 〕', 'mygroups').row();
+
+  // واجهة المالك الرئيسية أخف: نخفي مركز الأوامر والنقاط والإحصائيات فقط،
+  // مع إبقاء الوظائف متاحة من القوائم المناسبة وبقية المستخدمين كما هم.
+  if (!isOwnerPrivate) kb.text('📚 〔 مركز الأوامر 〕', 'publiccommands');
+  kb.text('🛡️ 〔 الإدارة والحماية 〕', 'managementmenu').row();
+  if (!isOwnerPrivate) kb.text('🏆 〔 النقاط والإحصائيات 〕', 'statsmenu');
+  kb.text('👤 〔 ملفّي الشخصي 〕', 'accountinfo').row()
     .text('🎨 〔 تخصيص نغنوغ 〕', 'custommenu')
     .text('📖 〔 دليل الاستخدام 〕', 'help');
+  return kb;
 }
 
 export function customizationKeyboard() {
@@ -69,7 +76,7 @@ export function ownerKeyboard() {
     .row()
     .text('⚙️ 〔 إعدادات البوت العامة 〕', 'botsettings')
     .row()
-    .text('🛡️ 〔 الحماية العامة 〕', 'globalprotection')
+    .text('🛡️ 〔 حماية المجموعة المحددة 〕', 'globalprotection')
     .row()
     .text('🔐 〔 الاشتراك الإجباري 〕', 'requiredmenu')
     .row()
@@ -116,24 +123,11 @@ export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
     .text('👋 تخصيص رسالة الترحيب', 'welcomeedit')
     .row()
-    .text(
-      `${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`,
-      'togglelinks'
-    )
-    .row()
-    .text(
-      `${g.flood ? '🟢' : '⚪'} منع السبام: ${g.flood ? 'مفعّل' : 'متوقف'}`,
-      'toggleflood'
-    )
-    .row()
-    .text(
-      `${g.autoReply ? '🟢' : '⚪'} الردود التلقائية: ${g.autoReply ? 'مفعّلة' : 'متوقفة'}`,
-      'togglereplies'
-    )
+    .text('🛡️ إدارة الحماية الموحدة', 'protectionmenu')
     .row()
     .text('🛡️ التحذيرات والعقوبات', 'warningsmenu')
     .row()
-    .text('╭─〔 💬 إدارة الردود التلقائية 〕─╮', 'repliesmenu')
+    .text('💬 إدارة الردود التلقائية', 'repliesmenu')
     .row()
     .text('📊 إحصائيات المجموعة', 'groupstats')
     .row()
