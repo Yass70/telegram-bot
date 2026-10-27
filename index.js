@@ -29,13 +29,14 @@ const freshGroup = () => ({
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
   linksLock: false, mediaLock: false, badWordsLock: false, audioLock: false, audioClipsLock: false, forwardLock: false, contactsLock: false,
   closedMessages: false,
-  welcomeText: '🐾 أهلاً وسهلاً بـ {name} ❤️ نورت مجموعة {title}، نتمنى لك وقتاً ممتعاً ويانه!',
+  welcomeText: '╭━━━〔 🐈‍⬛ نغنوغ يرحّب بيك 〕━━━╮\nأهلاً وسهلاً بـ {name} ❤️\nنورت مجموعة «{title}» بوجودك، وإن شاء الله تقضي ويانه أحلى الأوقات.\nاعتبر نفسك بين أهلك وناسك 🐾\n╰━━━━━━━━━━━━━━━━━━╯',
   badWords: [],
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
   warningSettings: { enabled: false, limit: 3, action: 'mute', duration: 10 },
   warnings: {},
   userStats: {},
   knownMembers: {},
+  recentMessages: [],
   warningLog: [],
   floodUsers: {},
   game: null
@@ -78,6 +79,7 @@ function load() {
       if (oldGroup.linksLock === undefined) g.linksLock = !!g.links;
       g.userStats ||= {};
       g.knownMembers ||= {};
+      g.recentMessages ||= [];
       g.badWords ||= [];
       g.stats = { ...freshGroup().stats, ...(g.stats || {}) };
       g.floodUsers ||= {};
@@ -122,17 +124,17 @@ function selectedGroup(ctx) {
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
 const DEFAULT_CUSTOMIZATION = {
-  startText: '🐈‍⬛ هلا بيك بعالم نغنوغ! 🐾❤️\n\nبوت لإدارة المجموعات وحمايتها وتنظيمها.\n\nاختار القسم المناسب من القائمة أدناه حتى تبدأ.',
+  startText: '╭━━━〔 🐈‍⬛ نَغْنُوغ 🐾 〕━━━╮\n\nأهلاً وسهلاً بيك بعالم نغنوغ ❤️\nمساعدك الذكي لإدارة المجموعة وتنظيمها وحمايتها.\n\n✦ اختَر القسم المناسب من القائمة أدناه للبدء.\n\n╰━━━━━━━━━━━━━━━━━━╯',
   descriptions: {
-    settings: '⚙️ إعدادات المجموعة: التحكم بميزات الإدارة والحماية.',
-    groups: '👥 مجموعاتي: عرض المجموعات المفعّلة وإدارتها.',
-    account: '👤 معلومات حسابي: عرض معلومات حسابك.',
-    replies: '💬 الردود التلقائية: الوصول إلى قسم الردود.'
+    settings: '⚙️ 〔 إعدادات المجموعة 〕\nإدارة خيارات المجموعة والتحكم بميزات الحماية والتنظيم.',
+    groups: '👥 〔 مجموعاتي 〕\nعرض المجموعات المفعّلة والوصول إلى إعداداتها.',
+    account: '👤 〔 ملفّي الشخصي 〕\nعرض معلومات حسابك والبيانات المتاحة عنك.',
+    replies: '💬 〔 الردود التلقائية 〕\nإدارة الردود التي يتفاعل بها نغنوغ مع رسائل المجموعة.'
   },
   replies: {
-    account: '👤 معلومات حسابك',
-    replies: '💬 الردود التلقائية',
-    nogroups: 'ما عندي مجموعة مفعّلة ظاهرة إلك حالياً.'
+    account: '╭─〔 👤 ملفّك الشخصي 〕─╮',
+    replies: '╭─〔 💬 الردود التلقائية 〕─╮',
+    nogroups: '╭─〔 👥 مجموعاتك 〕─╮\nماكو مجموعة مفعّلة مرتبطة بحسابك حالياً. أضف نغنوغ إلى مجموعتك وفعّله حتى تظهر هنا.'
   }
 };
 
@@ -167,7 +169,7 @@ function getHomeKeyboard(ctx) {
   return kb;
 }
 
-const HELP_TEXT = `🐈‍⬛ أهلاً بيك بعالم نغنوغ! 🐾❤️\n\nنغنوغ بوت لإدارة المجموعات وحمايتها...`;
+const HELP_TEXT = `╭━━━〔 📖 دليل نغنوغ 〕━━━╮\n\n🐈‍⬛ أهلاً وسهلاً بيك!\nنغنوغ مساعد لإدارة المجموعات، وتنظيم المحادثات، وتوفير أدوات تفاعلية للأعضاء والمشرفين.\n\n✦ اختَر القسم من الأزرار أدناه حتى تتعرّف على الخدمات المتاحة.\n\n╰━━━━━━━━━━━━━━━━━━╯`;
 
 async function safeEdit(ctx, text, reply_markup) {
   try { await ctx.editMessageText(text, { reply_markup }); }
@@ -176,7 +178,7 @@ async function safeEdit(ctx, text, reply_markup) {
 
 async function showOwnerPanel(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
-  await safeEdit(ctx, '👑 لوحة المالك — نغنوغ 🐾', ownerKeyboard());
+  await safeEdit(ctx, '╭━━━〔 👑 لوحة مالك نغنوغ 〕━━━╮\n\nأهلاً بك في مركز إدارة البوت.', ownerKeyboard());
 }
 
 async function answer(ctx, text, extra = {}) {
