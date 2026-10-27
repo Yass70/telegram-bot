@@ -208,6 +208,39 @@ export function setupCommands(bot, db, helpers) {
   const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel } = helpers;
 
   db.activeGames ||= {};
+  db.groupPoints ||= {};
+  db.customizations ||= {};
+  const normalizeAnswer = value => String(value ?? '').trim().toLocaleLowerCase('ar')
+    .replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه').replace(/\s+/g, ' ');
+  const groupScores = chatId => {
+    db.groupPoints ||= {};
+    db.groupPoints[String(chatId)] ||= {};
+    return db.groupPoints[String(chatId)];
+  };
+  const leaderboardText = chatId => {
+    const scores = groupScores(chatId);
+    const sorted = Object.entries(scores).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3);
+    if (!sorted.length) {
+      const legacy = Object.entries(db.points || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3);
+      if (!legacy.length) return '🏆 ماكو نقاط مسجلة بهذه المجموعة لحد الآن. ابدؤوا اللعب!';
+      const medals = ['🥇', '🥈', '🥉'];
+      return '🏆 **النقاط القديمة المحفوظة**\\n' + legacy.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\\n') + '\\n(النقاط القديمة لم تكن مفصولة حسب المجموعة.)';
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    return '🏆 **أبطال نغنوغ — أعلى 3 بهذه المجموعة**\\n\\n' +
+      sorted.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\\n');
+  };
+  const protectionKeyboard = g => new InlineKeyboard()
+    .text(`${g.linksLock ? '🟢 مفعّل' : '⚪ متوقف'} الروابط`, 'prot_links').row()
+    .text(`${g.mediaLock ? '🟢 مفعّل' : '⚪ متوقف'} الصور والوسائط والملفات`, 'prot_media').row()
+    .text(`${g.badWordsLock ? '🟢 مفعّل' : '⚪ متوقف'} الكلمات الممنوعة`, 'prot_badwords').row()
+    .text(`${g.audioLock ? '🟢 مفعّل' : '⚪ متوقف'} الصوتيات المسجلة`, 'prot_audio').row()
+    .text(`${g.audioClipsLock ? '🟢 مفعّل' : '⚪ متوقف'} الموسيقى والملفات الصوتية`, 'prot_audioclips').row()
+    .text(`${g.forwardLock ? '🟢 مفعّل' : '⚪ متوقف'} توجيه الرسائل`, 'prot_forward').row()
+    .text(`${g.contactsLock ? '🟢 مفعّل' : '⚪ متوقف'} المعرفات وأرقام الهواتف`, 'prot_contacts').row()
+    .text('⚡ تفعيل الحماية الشاملة', 'prot_all').row()
+    .text('🔙 رجوع', 'home');
 
   // أمر البداية /start[cite: 4]
   bot.command('start', async ctx => {
@@ -223,6 +256,46 @@ export function setupCommands(bot, db, helpers) {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
+  });
+
+  bot.command('id', async ctx => {
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const lines = [`🆔 Chat ID: ${ctx.chat.id}`, `👤 User ID: ${target?.id ?? 'غير متاح'}`];
+    if (target?.username) lines.push(`🔗 Username: @${target.username}`);
+    await ctx.reply(lines.join('\\n'), { reply_to_message_id: ctx.message.message_id });
+  });
+
+  bot.command('panel', async ctx => {
+    ensureUser(ctx);
+    if (!await subscriptionGate(ctx)) return;
+    const c = getCustomization(ctx);
+    await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
+  });
+
+  bot.command('setwelcome', async ctx => {
+    if (!isGroup(ctx)) return ctx.reply('استخدم /setwelcome داخل المجموعة.');
+    if (!await userIsAdmin(ctx.chat.id, ctx.from.id) && !isOwner(ctx)) return ctx.reply('الأمر غير مخصص إلك');
+    const g = groupFor(ctx.chat);
+    const value = ctx.message.text.replace(/^\/setwelcome(?:@\w+)?\s*/i, '').trim();
+    if (!value) return ctx.reply('أرسل نص الترحيب بعد الأمر. المتغيرات المتاحة: {name} و{title}.\nمثال: /setwelcome أهلاً {name} في {title}');
+    g.welcomeText = value;
+    g.welcomeEnabled = true;
+    save();
+    return ctx.reply('✅ تم حفظ رسالة الترحيب وتفعيلها.');
+  });
+
+  bot.on('message:new_chat_members', async ctx => {
+    if (!isGroup(ctx)) return;
+    const g = groupFor(ctx.chat);
+    if (!g.activated || !g.welcomeEnabled) return;
+    for (const member of ctx.message.new_chat_members || []) {
+      if (member.is_bot) continue;
+      const name = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'صديقنا';
+      const text = String(g.welcomeText || '🐾 أهلاً {name} في {title}')
+        .replaceAll('{name}', name).replaceAll('{title}', ctx.chat.title || 'المجموعة');
+      try { await ctx.reply(text); g.stats.welcomed = Number(g.stats.welcomed || 0) + 1; } catch {}
+    }
+    save();
   });
 
   // أمر عرض الأوامر علناً في المجموعة للجميع (/commands أو الأوامر)
@@ -329,6 +402,49 @@ export function setupCommands(bot, db, helpers) {
     ensureUser(ctx);
     const data = ctx.callbackQuery.data;
 
+    if (data.startsWith('gans:')) {
+      const [, roundId, rawIndex] = data.split(':');
+      const chatId = String(ctx.chat?.id || '');
+      const round = db.activeGames?.[chatId];
+      if (!round?.active || round.roundId !== roundId || round.type !== 'choose') {
+        try { await ctx.answerCallbackQuery({ text: 'انتهى هذا السؤال أو تمت الإجابة عنه.' }); } catch {}
+        return;
+      }
+      const index = Number(rawIndex);
+      if (!Number.isInteger(index) || !Array.isArray(round.options) || index < 0 || index >= round.options.length) {
+        try { await ctx.answerCallbackQuery({ text: 'اختيار غير صالح.' }); } catch {}
+        return;
+      }
+      if (normalizeAnswer(round.options[index]) !== normalizeAnswer(round.answer)) {
+        try { await ctx.answerCallbackQuery({ text: 'إجابة غير صحيحة، حاولوا!' }); } catch {}
+        return;
+      }
+      db.activeGames[chatId] = null;
+      const uid = String(ctx.from.id);
+      const scores = groupScores(chatId);
+      scores[uid] = Number(scores[uid] || 0) + 1;
+      db.points ||= {}; db.points[uid] = Number(db.points[uid] || 0) + 1;
+      db.pointNames ||= {}; db.pointNames[uid] = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `عضو ${uid}`;
+      save();
+      try { await ctx.answerCallbackQuery({ text: 'إجابة صحيحة! ربحت نقطة 🎉' }); } catch {}
+      try { await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }); } catch {}
+      try { await ctx.reply(`🎉 مبروك ${ctx.from.first_name || 'بطل'}! فزت بالسؤال وربحت نقطة 🏆\\nرصيدك بهذه المجموعة: ${scores[uid]}`); } catch {}
+      return;
+    }
+
+    if (data === 'game_stop') {
+      const chatId = String(ctx.chat?.id || '');
+      const round = db.activeGames?.[chatId];
+      if (!round?.active) { try { await ctx.answerCallbackQuery({ text: 'ماكو سؤال نشط.' }); } catch {} return; }
+      const allowed = String(round.starterId) === String(ctx.from.id) || isOwner(ctx) || await userIsAdmin(chatId, ctx.from.id);
+      if (!allowed) { try { await ctx.answerCallbackQuery({ text: 'الأمر غير مخصص إلك', show_alert: true }); } catch {} return; }
+      db.activeGames[chatId] = null; save();
+      try { await ctx.answerCallbackQuery({ text: 'تم إنهاء السؤال.' }); } catch {}
+      try { await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }); } catch {}
+      try { await ctx.reply(`🛑 انتهى السؤال. الإجابة الصحيحة كانت: ${round.answer}`); } catch {}
+      return;
+    }
+
     const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu'];
     if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:')) {
       if (!isOwner(ctx)) {
@@ -340,13 +456,13 @@ export function setupCommands(bot, db, helpers) {
     const restrictedActions = [
       'protectionmenu', 'adminpanel', 'groupsettings', 'warningsmenu', 'badwordsmenu', 
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
-      'toggleforward', 'togglecontacts', 'enableallprotection', 'gamesmenu', 'mygroups', 
-      'accountinfo', 'custommenu', 'groupstats', 'userreplies', 'repliesmenu',
-      'customdescmenu', 'customreplymenu', 'welcomeedit', 'toggleflood', 'togglereplies',
+      'toggleforward', 'togglecontacts', 'enableallprotection', 'mygroups', 
+      'groupstats', 'userreplies', 'repliesmenu',
+      'welcomeedit', 'toggleflood', 'togglereplies',
       'warningslimit', 'warningsaction', 'warningsduration', 'warningslog', 'warningsclear'
     ];
 
-    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_') || data.startsWith('choosegroup:') || data.startsWith('warning') || data.startsWith('badword') || data.startsWith('reply') || data.startsWith('customdesc') || data.startsWith('customreply')) {
+    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_') || data.startsWith('choosegroup:') || data.startsWith('warning') || data.startsWith('badword') || data.startsWith('reply')) {
       if (isGroup(ctx)) {
         const g = groupFor(ctx.chat);
         const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
@@ -373,18 +489,29 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'home') return showHomeFunc(ctx);
     if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
-    if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
+    if (data === 'interactive_menu') {
+      const kb = new InlineKeyboard().text('👤 بطاقة العضو (ا)', 'interactive_profile').row()
+        .text('🧠 كت', 'interactive_ket').text('📜 شعر (ش)', 'interactive_poem').row()
+        .text('🐈‍⬛ نغنوغ (ن)', 'interactive_n').row().text('🏆 توب النقاط', 'game_top').row()
+        .text('🔙 الرئيسية', 'home');
+      return answer(ctx, '💬 الأوامر التفاعلية المتاحة للجميع داخل المجموعة:\\nا — بطاقة العضو (بالرد على رسالة لعرض بطاقته)\\nكت — سؤال عشوائي\\nش — شعر قصير\\nن — رد عراقي من نغنوغ\\nتوب — أفضل ثلاثة أعضاء بالنقاط.', { reply_markup: kb });
+    }
+    if (data === 'interactive_profile') return answer(ctx, 'اكتب «ا» داخل المجموعة، أو ردّ بها على رسالة عضو لعرض بطاقته.');
+    if (data === 'interactive_ket') return answer(ctx, 'اكتب «كت» داخل المجموعة حتى يظهر سؤال عشوائي.');
+    if (data === 'interactive_poem') return answer(ctx, 'اكتب «ش» داخل المجموعة حتى يظهر شعر قصير.');
+    if (data === 'interactive_n') return answer(ctx, 'اكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
+        if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
     // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
       const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
       const userId = ctx.from.id;
-      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
+      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n${customText(ctx, 'descriptions', 'account') || ''}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
     }
     
     if (data === 'userreplies') {
-      return answer(ctx, customText(ctx, 'replies', 'replies'), { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
+      return answer(ctx, `${customText(ctx, 'replies', 'replies')}\n${customText(ctx, 'descriptions', 'replies') || ''}`, { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
     }
 
     if (data === 'mygroups') {
@@ -430,21 +557,27 @@ export function setupCommands(bot, db, helpers) {
     }
 
     if (data.startsWith('customdesc:')) {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       const key = data.split(':')[1];
-      return answer(ctx, `📝 الشرح الحالي للقسم (${key}):\n${customText(ctx, 'descriptions', key) || 'غير محدد'}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'customdescmenu') });
+      pending(ctx, { action: 'custom-description', key });
+      return answer(ctx, `📝 الشرح الحالي للقسم (${key}):\n${customText(ctx, 'descriptions', key) || 'غير محدد'}\n\nأرسل الشرح الجديد برسالة واحدة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customdescmenu') });
     }
 
     if (data.startsWith('customreply:')) {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       const key = data.split(':')[1];
-      return answer(ctx, `💬 الرد الحالي للقسم (${key}):\n${customText(ctx, 'replies', key) || 'غير محدد'}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'customreplymenu') });
+      pending(ctx, { action: 'custom-reply', key });
+      return answer(ctx, `💬 الرد الحالي للقسم (${key}):\n${customText(ctx, 'replies', key) || 'غير محدد'}\n\nأرسل الرد الجديد برسالة واحدة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customreplymenu') });
     }
 
     if (data === 'customstart') {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       pending(ctx, { action: 'custom-start' });
       return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'custommenu') });
     }
 
     if (data === 'customreset') {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       db.customizations ||= {};
       delete db.customizations[userKey(ctx)];
       clearPending(ctx);
@@ -560,6 +693,7 @@ export function setupCommands(bot, db, helpers) {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.links = !g.links;
+      g.linksLock = g.links;
       save();
       return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
     }
@@ -644,60 +778,31 @@ export function setupCommands(bot, db, helpers) {
     // لوحة الحماية[cite: 4]
     if (data === 'protectionmenu') {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
-      if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً أو افتح الزر داخل المجموعة.');
-      
-      const kb = new InlineKeyboard()
-        .text(`${g.linksLock ? '🟢' : '⚪'} إرسال الروابط`, 'prot_links').row()
-        .text(`${g.mediaLock ? '🟢' : '⚪'} الوسائط والملفات`, 'prot_media').row()
-        .text(`${g.badWordsLock ? '🟢' : '⚪'} كلمات الفشار`, 'prot_badwords').row()
-        .text(`${g.audioLock ? '🟢' : '⚪'} الصوتيات`, 'prot_audio').row()
-        .text(`${g.audioClipsLock ? '🟢' : '⚪'} الملفات الصوتية`, 'prot_audioclips').row()
-        .text(`${g.forwardLock ? '🟢' : '⚪'} توجيه الرسائل`, 'prot_forward').row()
-        .text(`${g.contactsLock ? '🟢' : '⚪'} المعرفات وأرقام الهواتف`, 'prot_contacts').row()
-        .text('⚡ تفعيل الحماية الشاملة', 'prot_all').row()
-        .text('🔙 رجوع', 'home');
-
-      return answer(ctx, `🛡️ **لوحة أوامر الحماية:**\nتحكم بتشغيل أو إيقاف ميزات الحماية بضغطة زر:`, { reply_markup: kb });
+      if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً من «مجموعاتي».');
+      if (!await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
+      return answer(ctx, `🛡️ إعدادات الحماية — ${g.title}\\nالحالة الحالية موضحة على كل زر:`, { reply_markup: protectionKeyboard(g) });
     }
 
     if (data.startsWith('prot_')) {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
-      if (!g) return;
-      const type = data.replace('prot_', '');
-      
-      if (type === 'links') g.linksLock = !g.linksLock;
-      if (type === 'media') g.mediaLock = !g.mediaLock;
-      if (type === 'badwords') g.badWordsLock = !g.badWordsLock;
-      if (type === 'audio') g.audioLock = !g.audioLock;
-      if (type === 'audioclips') g.audioClipsLock = !g.audioClipsLock;
-      if (type === 'forward') g.forwardLock = !g.forwardLock;
-      if (type === 'contacts') g.contactsLock = !g.contactsLock;
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
+      const type = data.slice(5);
+      const fieldByType = { links: 'linksLock', media: 'mediaLock', badwords: 'badWordsLock', audio: 'audioLock', audioclips: 'audioClipsLock', forward: 'forwardLock', contacts: 'contactsLock' };
       if (type === 'all') {
-        g.linksLock = true; g.mediaLock = true; g.badWordsLock = true; 
-        g.audioLock = true; g.audioClipsLock = true; g.forwardLock = true; g.contactsLock = true;
-      }
+        for (const field of Object.values(fieldByType)) g[field] = true;
+      } else if (fieldByType[type]) {
+        g[fieldByType[type]] = !g[fieldByType[type]];
+      } else return answer(ctx, 'خيار حماية غير معروف.');
       save();
-      
-      const kb = new InlineKeyboard()
-        .text(`${g.linksLock ? '🟢' : '⚪'} إرسال الروابط`, 'prot_links').row()
-        .text(`${g.mediaLock ? '🟢' : '⚪'} الوسائط والملفات`, 'prot_media').row()
-        .text(`${g.badWordsLock ? '🟢' : '⚪'} كلمات الفشار`, 'prot_badwords').row()
-        .text(`${g.audioLock ? '🟢' : '⚪'} الصوتيات`, 'prot_audio').row()
-        .text(`${g.audioClipsLock ? '🟢' : '⚪'} الملفات الصوتية`, 'prot_audioclips').row()
-        .text(`${g.forwardLock ? '🟢' : '⚪'} توجيه الرسائل`, 'prot_forward').row()
-        .text(`${g.contactsLock ? '🟢' : '⚪'} المعرفات وأرقام الهواتف`, 'prot_contacts').row()
-        .text('⚡ تفعيل الحماية الشاملة', 'prot_all').row()
-        .text('🔙 رجوع', 'home');
-
-      try { await ctx.editMessageText(`🛡️ **لوحة أوامر الحماية:**\nتم التحديث بنجاح!`, { reply_markup: kb }); } catch {}
-      return;
+      const status = type === 'all' ? 'تم تفعيل جميع خيارات الحماية المحفوظة.' : `الحالة الجديدة: ${g[fieldByType[type]] ? 'مفعّل ✅' : 'متوقف ❌'}`;
+      return answer(ctx, `🛡️ تم تحديث إعداد الحماية.\\n${status}`, { reply_markup: protectionKeyboard(g) });
     }
 
     // لوحة المشرفين[cite: 4]
     if (data === 'adminpanel') {
       const adminText = `👑 **قائمة أوامر المشرفين السريعة:**\n\n` +
         `• **الكتم:** الرد بكلمة (كتم + عدد الدقائق) مثل: \`كتم 10\`\n` +
-        `• **فتح الكتم:** كتابة \`فتح الكتم + اليوزر\`\n` +
+        `• **فتح الكتم:** الرد على رسالة العضو وكتابة \`فتح الكتم\`\n` +
         `• **الطرد:** الرد بكلمة \`طرد\` على رسالة الشخص\n` +
         `• **قفل الدردشة:** كتابة \`قفل الرسائل\`\n` +
         `• **فتح الدردشة:** كتابة \`افتح الرسائل\`\n` +
@@ -736,18 +841,51 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'game_ge') return ctx.reply("💡 لبدء لعبة الأسئلة العامة، اكتب حرف (س) في المجموعة!");
     
     if (data === 'game_top') {
-      const pointsObj = db.points || {};
-      const sorted = Object.entries(pointsObj).sort((a, b) => b[1] - a[1]).slice(0, 3);
-      let topText = `🏆 **قائمة أفضل 3 أشخاص جمعوا نقاط:**\n\n`;
-      if (sorted.length === 0) {
-        topText += `لا توجد نقاط مسجلة حتى الآن. ابدأوا اللعب!`;
-      } else {
-        sorted.forEach(([uid, pts], idx) => {
-          const medals = ['🥇', '🥈', '🥉'];
-          topText += `${medals[idx]} الآيدي \`${uid}\` ── **${pts} نقطة**\n`;
-        });
+      const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
+      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 الألعاب', 'gamesmenu').row().text('🏠 الرئيسية', 'home') });
+    }
+
+    if (data === 'clearall_confirm') {
+      const chatId = String(ctx.chat?.id || '');
+      const g = db.groups[chatId];
+      const job = db.pending?.[`clearall:${chatId}`];
+      if (!g || !job || Date.now() - job.createdAt > 60000 || !await userCanManage(ctx, g)) {
+        try { await ctx.answerCallbackQuery({ text: 'انتهت صلاحية التأكيد أو الأمر غير مخصص إلك.', show_alert: true }); } catch {}
+        return;
       }
-      return ctx.reply(topText, { parse_mode: 'Markdown' });
+      delete db.pending[`clearall:${chatId}`]; save();
+      let deleted = 0, failed = 0;
+      for (let mid = job.fromMessageId; mid >= Math.max(1, job.fromMessageId - 99); mid--) {
+        try { await ctx.api.deleteMessage(ctx.chat.id, mid); deleted++; } catch { failed++; }
+      }
+      try { await ctx.reply(`🧹 انتهت محاولة المسح. حذف: ${deleted}، تعذر حذف: ${failed}. قد يمنع تيليگرام حذف بعض الرسائل القديمة.`); } catch {}
+      return;
+    }
+    if (data === 'clearall_cancel') {
+      const chatId = String(ctx.chat?.id || '');
+      delete db.pending?.[`clearall:${chatId}`]; save();
+      return answer(ctx, 'تم إلغاء عملية الحذف.', { reply_markup: new InlineKeyboard().text('🏠 الرئيسية', 'home') });
+    }
+
+    if (data === 'statsmenu' || data === 'stats_points') {
+      const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
+      if (!g && !isGroup(ctx)) return showGroups(ctx);
+      const chatId = String(g?.id || ctx.chat?.id || '');
+      const scores = groupScores(chatId);
+      const mine = Number(scores[userKey(ctx)] || 0);
+      const total = Object.values(scores).reduce((sum, n) => sum + Number(n || 0), 0);
+      const kb = new InlineKeyboard().text('🏆 أفضل 3 أعضاء', 'stats_top').row()
+        .text('⭐ نقاطي في هذه المجموعة', 'stats_mine').row()
+        .text('🎮 تعليمات الألعاب', 'gamesmenu').row().text('🏠 الرئيسية', 'home');
+      return answer(ctx, `📊 النقاط والإحصائيات${g ? ` — ${g.title}` : ''}\\n\\n👥 أعضاء لديهم نقاط: ${Object.keys(scores).length}\\n⭐ مجموع النقاط الممنوحة: ${total}\\n⭐ نقاطك: ${mine}`, { reply_markup: kb });
+    }
+    if (data === 'stats_top') {
+      const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
+      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 الرئيسية', 'home') });
+    }
+    if (data === 'stats_mine') {
+      const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
+      return answer(ctx, `⭐ نقاطك في هذه المجموعة: ${Number(groupScores(chatId)[userKey(ctx)] || 0)}`, { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 الرئيسية', 'home') });
     }
 
     if (data === 'broadcastmenu') {
@@ -771,18 +909,41 @@ export function setupCommands(bot, db, helpers) {
 
       const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
       const uid = userKey(ctx);
+      g.userStats ||= {};
+      g.userStats[uid] ||= { messages: 0 };
+      g.userStats[uid].messages = Number(g.userStats[uid].messages || 0) + 1;
+      g.stats ||= { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 };
+      g.stats.messages = Number(g.stats.messages || 0) + 1;
+      db.stats ||= { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 };
+      db.stats.messages = Number(db.stats.messages || 0) + 1;
+      db.pointNames ||= {};
+      db.pointNames[uid] = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || `عضو ${uid}`;
+      save();
+
+      // حماية السبام: أكثر من 6 رسائل خلال 8 ثوانٍ من العضو نفسه تُعامل كإغراق.
+      if (g.flood && !isAdmin && !isOwner(ctx)) {
+        g.floodUsers ||= {};
+        const now = Date.now();
+        const recent = (g.floodUsers[uid] || []).filter(ts => now - ts < 8000);
+        recent.push(now);
+        g.floodUsers[uid] = recent;
+        if (recent.length > 6) {
+          try { await ctx.deleteMessage(); g.stats.floodEvents = Number(g.stats.floodEvents || 0) + 1; save(); } catch {}
+          return;
+        }
+      }
 
       // الحماية التلقائية[cite: 4]
       if (!isAdmin && !isOwner(ctx)) {
-        if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(text)) {
+        if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(protectionText)) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
-        if (g.mediaLock && (msg.photo || msg.video || msg.document || msg.sticker)) {
+        if (g.mediaLock && (msg.photo || msg.video || msg.document || msg.sticker || msg.animation || msg.video_note)) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
-        if (g.badWordsLock && /(فشار|كلمة_سيئة)/i.test(text)) {
+        if (g.badWordsLock && (g.badWords || []).some(word => word && protectionText.toLocaleLowerCase('ar').includes(String(word).toLocaleLowerCase('ar')))) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
@@ -794,14 +955,20 @@ export function setupCommands(bot, db, helpers) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
-        if (g.forwardLock && (msg.forward_from || msg.forward_from_chat)) {
+        if (g.forwardLock && (msg.forward_from || msg.forward_from_chat || msg.forward_origin)) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
-        if (g.contactsLock && (/@[A-Za-z0-9_]{4,}/i.test(text) || /\+?[0-9]{10,}/.test(text))) {
+        if (g.contactsLock && (msg.contact || /@[A-Za-z0-9_]{4,}/i.test(protectionText) || /\+?[0-9]{10,}/.test(protectionText))) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
+      }
+
+      const isAdminCommand = /^(كتم(?:\s+\d+)?|فتح\s+الكتم|طرد|قفل\s+الرسائل|افتح\s+الرسائل|امسح(?:\s+\d+)?|المسح\s+جميع\s+الرسائل|تفعيل\s+الحماية|تثبيت|الغاء\s+التثبيت|إلغاء\s+التثبيت|فك\s+التثبيت)$/.test(text);
+      if (isAdminCommand && !isAdmin && !isOwner(ctx)) {
+        await ctx.reply('الأمر غير مخصص إلك', { reply_to_message_id: msg.message_id });
+        return;
       }
 
       // أوامر المشرفين السريعة بالرد[cite: 4]
@@ -812,8 +979,12 @@ export function setupCommands(bot, db, helpers) {
 
         if (/^كتم\s+(\d+)$/i.test(text)) {
           const match = text.match(/^كتم\s+(\d+)$/i);
-          const mins = parseInt(match[1]);
-          if (targetId && !await userIsAdmin(ctx.chat.id, targetId)) {
+          const mins = Number(match[1]);
+          if (!Number.isInteger(mins) || mins < 1 || mins > 10080) {
+            await ctx.reply('حدد مدة صحيحة من دقيقة إلى 10080 دقيقة.');
+            return;
+          }
+          if (targetId && !await userIsAdmin(ctx.chat.id, targetId) && !target.is_bot) {
             const until = Math.floor(Date.now() / 1000) + (mins * 60);
             try {
               await ctx.api.restrictChatMember(ctx.chat.id, targetId, {
@@ -838,8 +1009,23 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      if (/^فتح\s+الكتم\s+@?[a-zA-Z0-9_]+$/i.test(text) && (isAdmin || isOwner(ctx))) {
-        await ctx.reply(`🔊 تم فك الكتم ورفع القيود عن المستخدم بنجاح.`);
+      if (/^فتح\s+الكتم$/i.test(text)) {
+        const target = msg.reply_to_message?.from;
+        if (!target) {
+          await ctx.reply('ردّ على رسالة العضو واكتب «فتح الكتم».');
+          return;
+        }
+        try {
+          const targetMember = await ctx.api.getChatMember(ctx.chat.id, target.id);
+          if (['administrator', 'creator'].includes(targetMember.status)) {
+            await ctx.reply('لا يمكن فك قيود مشرف بهذه الطريقة.');
+            return;
+          }
+          await ctx.api.restrictChatMember(ctx.chat.id, target.id, {
+            permissions: { can_send_messages: true, can_send_audios: true, can_send_documents: true, can_send_photos: true, can_send_videos: true, can_send_video_notes: true, can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true, can_add_web_page_previews: true }
+          });
+          await ctx.reply(`🔊 تم فك الكتم عن ${target.first_name || 'العضو'}.`);
+        } catch { await ctx.reply('❌ تعذر فك الكتم. تحقق من صلاحيات البوت.'); }
         return;
       }
 
@@ -861,34 +1047,58 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      if (/^امسح\s+(\d+)$/i.test(text) && (isAdmin || isOwner(ctx))) {
-        const match = text.match(/^امسح\s+(\d+)$/i);
-        const count = parseInt(match[1]);
-        let deleted = 0;
-        for (let i = 0; i < Math.min(count, 50); i++) {
-          try {
-            await ctx.api.deleteMessage(ctx.chat.id, msg.message_id - i);
-            deleted++;
-          } catch {}
+      if (/^تثبيت$/i.test(text)) {
+        if (!msg.reply_to_message) { await ctx.reply('ردّ على الرسالة التي تريد تثبيتها ثم اكتب «تثبيت».'); return; }
+        try { await ctx.api.pinChatMessage(ctx.chat.id, msg.reply_to_message.message_id); await ctx.reply('📌 تم تثبيت الرسالة.'); }
+        catch { await ctx.reply('❌ تعذر تثبيت الرسالة. تحقق من صلاحيات البوت.'); }
+        return;
+      }
+      if (/^(?:الغاء التثبيت|إلغاء التثبيت|فك التثبيت)$/i.test(text)) {
+        if (!msg.reply_to_message) { await ctx.reply('ردّ على الرسالة المثبتة ثم اكتب «إلغاء التثبيت».'); return; }
+        try { await ctx.api.unpinChatMessage(ctx.chat.id, msg.reply_to_message.message_id); await ctx.reply('📌 تم إلغاء تثبيت الرسالة.'); }
+        catch { await ctx.reply('❌ تعذر إلغاء التثبيت. تحقق من صلاحيات البوت.'); }
+        return;
+      }
+
+      if (/^امسح\s+(\d+)$/i.test(text)) {
+        const count = Number(text.match(/^امسح\s+(\d+)$/i)[1]);
+        if (!Number.isInteger(count) || count < 1 || count > 100) {
+          await ctx.reply('حدد عدداً من 1 إلى 100 رسالة.');
+          return;
         }
-        const rep = await ctx.reply(`🗑️ تم مسح ${deleted} رسالة بنجاح.`);
-        setTimeout(() => { try { ctx.api.deleteMessage(ctx.chat.id, rep.message_id); } catch {} }, 3000);
+        let deleted = 0, failed = 0;
+        // النطاق محدد: آخر N رسائل حتى رسالة الأمر نفسها.
+        for (let i = 0; i < count; i++) {
+          try { await ctx.api.deleteMessage(ctx.chat.id, msg.message_id - i); deleted++; }
+          catch { failed++; }
+        }
+        try { await ctx.reply(`🗑️ انتهت عملية المسح: حذف ${deleted} رسالة، وتعذر حذف ${failed}.`); } catch {}
         return;
       }
 
-      if (/^المسح\s+جميع\s+الرسائل$/i.test(text) && (isAdmin || isOwner(ctx))) {
-        await ctx.reply(`🧹 جارٍ تنظيف ومسح الرسائل المتاحة في المجموعة...`);
-        return;
-      }
-
-      if (/^تفعيل\s+الحماية$/i.test(text) && (isAdmin || isOwner(ctx))) {
-        g.linksLock = true;
-        g.mediaLock = true;
-        g.badWordsLock = true;
-        g.audioLock = true;
-        g.contactsLock = true;
+      if (/^المسح\s+جميع\s+الرسائل$/i.test(text)) {
+        db.pending ||= {};
+        db.pending[`clearall:${String(ctx.chat.id)}`] = { createdAt: Date.now(), fromMessageId: msg.message_id - 1 };
         save();
-        await ctx.reply(`🛡️ **تم تفعيل الحماية الشاملة بنجاح!**\nتم منع الروابط، الصور، الوسائط، الصوتيات والمعرفات تلقائياً في المجموعة.`, { parse_mode: 'Markdown' });
+        const kb = new InlineKeyboard().text('🗑️ تأكيد الحذف (آخر 100 رسالة)', 'clearall_confirm')
+          .row().text('❌ إلغاء', 'clearall_cancel');
+        await ctx.reply('⚠️ تأكيد عملية الحذف\\nسيحاول البوت حذف آخر 100 رسالة فقط قبل أمر التأكيد. قد تمنع قيود تيليگرام حذف بعض الرسائل القديمة. هل تريد المتابعة؟', { reply_markup: kb });
+        return;
+      }
+
+      if (/^تفعيل\s+الحماية$/i.test(text)) {
+        for (const field of ['linksLock', 'mediaLock', 'badWordsLock', 'audioLock', 'audioClipsLock', 'forwardLock', 'contactsLock']) g[field] = true;
+        g.links = true;
+        save();
+        let canDelete = false;
+        try {
+          const me = await ctx.api.getChatMember(ctx.chat.id, bot.botInfo.id);
+          canDelete = me.status === 'creator' || (me.status === 'administrator' && me.can_delete_messages === true);
+        } catch {}
+        const status = canDelete
+          ? 'تم حفظ وتفعيل جميع إعدادات الحماية. البوت يملك صلاحية حذف الرسائل المخالفة.'
+          : 'تم حفظ إعدادات الحماية، لكن البوت لا يملك حالياً صلاحية حذف الرسائل. امنحه صلاحية حذف الرسائل من إعدادات المشرفين حتى تعمل الحماية تلقائياً.';
+        await ctx.reply(`🛡️ ${status}`);
         return;
       }
 
@@ -904,18 +1114,7 @@ export function setupCommands(bot, db, helpers) {
       }
 
       if (text === 'توب') {
-        const pointsObj = db.points || {};
-        const sorted = Object.entries(pointsObj).sort((a, b) => b[1] - a[1]).slice(0, 3);
-        let topText = `🏆 **قائمة أبطال نغنوغ (أعلى 3 نقاط):**\n\n`;
-        if (sorted.length === 0) {
-          topText += `لا توجد نقاط مسجلة حالياً. العبوا واجمعوا النقاط!`;
-        } else {
-          sorted.forEach(([id, pts], idx) => {
-            const medals = ['🥇', '🥈', '🥉'];
-            topText += `${medals[idx]} الآيدي \`${id}\` ── **${pts} نقطة**\n`;
-          });
-        }
-        await ctx.reply(topText, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
+        await ctx.reply(leaderboardText(ctx.chat.id), { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
         return;
       }
 
@@ -931,43 +1130,94 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // ألعاب الأسئلة ونظام النقاط[cite: 4]
+      // الألعاب الأربع — سؤال واحد نشط لكل مجموعة.
       const chatId = String(ctx.chat.id);
-      db.activeGames[chatId] ||= null;
-      const activeGame = db.activeGames[chatId];
+      db.activeGames ||= {};
+      let activeGame = db.activeGames[chatId];
+      const gameAliases = {
+        'خ': { key: 'choose', title: '🧩 اختر الخيار الصحيح', pool: QUESTIONS_DB.choose },
+        'ر': { key: 'math', title: '🔢 الرياضيات السريعة', pool: QUESTIONS_DB.math },
+        'ح': { key: 'animals', title: '🐾 معرفة الحيوان من أول حرف', pool: QUESTIONS_DB.animals },
+        'س': { key: 'general', title: '💡 أسئلة عامة', pool: QUESTIONS_DB.general }
+      };
 
-      if (activeGame && activeGame.active) {
-        if (text.trim() === activeGame.answer) {
+      if (text === 'انهاء اللعبة' || text === 'إنهاء اللعبة') {
+        if (activeGame && (String(activeGame.starterId) === uid || isAdmin || isOwner(ctx))) {
+          db.activeGames[chatId] = null; save();
+          await ctx.reply('🛑 تم إنهاء اللعبة الحالية.');
+        } else if (activeGame) await ctx.reply('الأمر غير مخصص إلك');
+        return;
+      }
+
+      if (activeGame?.active && activeGame.expiresAt && Date.now() > activeGame.expiresAt) {
+        db.activeGames[chatId] = null; save();
+        await ctx.reply(`⏰ انتهى وقت السؤال. الإجابة الصحيحة: ${activeGame.answer}`);
+        activeGame = null;
+      }
+
+      if (activeGame?.active && !['خ', 'ر', 'ح', 'س'].includes(text)) {
+        const normalized = normalizeAnswer(text);
+        const accepted = (activeGame.acceptedAnswers || [activeGame.answer]).some(a => normalizeAnswer(a) === normalized);
+        if (accepted) {
+          // تبديل حالة السؤال قبل أي إرسال يمنع احتساب أكثر من فائز.
           db.activeGames[chatId] = null;
+          const scores = groupScores(chatId);
+          scores[uid] = Number(scores[uid] || 0) + 1;
           db.points ||= {};
-          db.points[uid] = (db.points[uid] || 0) + 1;
+          db.points[uid] = Number(db.points[uid] || 0) + 1; // توافق مع بيانات النقاط القديمة
+          db.pointNames ||= {};
+          db.pointNames[uid] = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || `عضو ${uid}`;
           save();
-
-          await ctx.reply(`🎉 مبروك يا مبدع (${msg.from.first_name})!\n🏆 ربحت **نقطة واحدة** وأصبح رصيدك (${db.points[uid]} نقطة).`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
+          await ctx.reply(`🎉 مبروك ${msg.from.first_name || 'بطل'}! ربحت نقطة واحدة 🏆\\nرصيدك في هذه المجموعة: ${scores[uid]} نقطة.`, { reply_to_message_id: msg.message_id });
           return;
         }
       }
 
-      if (['خ', 'ر', 'ح', 'س'].includes(text)) {
-        let gameType = '';
-        let chosen = null;
-
-        if (text === 'خ') { gameType = '🧩 اختر الخيار الصحيح'; chosen = QUESTIONS_DB.choose[Math.floor(Math.random() * QUESTIONS_DB.choose.length)]; }
-        if (text === 'ر') { gameType = '🔢 لعبة الرياضيات السريعة'; chosen = QUESTIONS_DB.math[Math.floor(Math.random() * QUESTIONS_DB.math.length)]; }
-        if (text === 'ح') { gameType = '🐅 لعبة معرفة الحيوان'; chosen = QUESTIONS_DB.animals[Math.floor(Math.random() * QUESTIONS_DB.animals.length)]; }
-        if (text === 'س') { gameType = '💡 أسئلة عامة وثقافية'; chosen = QUESTIONS_DB.general[Math.floor(Math.random() * QUESTIONS_DB.general.length)]; }
-
-        if (chosen) {
-          db.activeGames[chatId] = { active: true, answer: chosen.answer };
-          
-          let questionText = `🎮 **${gameType}**\n\n❓ ${chosen.q || chosen.hint}\n\n⏱️ أسرع واحد يجاوب يربح نقطة!`;
-          if (chosen.options) {
-            questionText += `\n\nالخيارات: ` + chosen.options.join(' | ');
-          }
-          
-          await ctx.reply(questionText, { parse_mode: 'Markdown' });
+      if (gameAliases[text]) {
+        if (activeGame?.active) {
+          await ctx.reply('🎮 أكو سؤال شغال حالياً بهذه المجموعة. جاوبوا عليه أولاً أو اكتبوا «انهاء اللعبة».');
           return;
         }
+        const game = gameAliases[text];
+        const chosen = game.pool[Math.floor(Math.random() * game.pool.length)];
+        const answerText = chosen.answer;
+        const roundId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+        const round = {
+          active: true, roundId, type: game.key, starterId: uid,
+          answer: answerText, acceptedAnswers: [answerText],
+          expiresAt: Date.now() + 60000
+        };
+        db.activeGames[chatId] = round;
+        save();
+        setTimeout(async () => {
+          const current = db.activeGames?.[chatId];
+          if (current?.active && current.roundId === roundId) {
+            db.activeGames[chatId] = null;
+            save();
+            try { await bot.api.sendMessage(Number(chatId), `⏰ انتهى وقت السؤال. الإجابة الصحيحة: ${answerText}`); } catch {}
+          }
+        }, 60000).unref?.();
+
+        const stopKb = new InlineKeyboard().text('🛑 إنهاء السؤال', 'game_stop');
+        let questionText = `🎮 ${game.title}\\n\\n❓ ${chosen.q || `حيوان يبدأ بحرف (${String(answerText).trim()[0] || '?'})` }\\n\\n⏱️ أول إجابة صحيحة خلال 60 ثانية تحصل على نقطة!`;
+        if (game.key === 'animals') {
+          questionText = `🐾 خمن اسم الحيوان الذي يبدأ بهذا الحرف:\\n\\n🔤 الحرف: ${Array.from(answerText)[0]}\\n⏱️ أول إجابة صحيحة خلال 60 ثانية تربح نقطة!`;
+        }
+        if (game.key === 'choose' && Array.isArray(chosen.options)) {
+          const options = chosen.options.slice(0, 8);
+          const kb = new InlineKeyboard();
+          options.forEach((option, i) => {
+            if (i) kb.row();
+            kb.text(option, `gans:${roundId}:${i}`);
+          });
+          kb.row().text('🛑 إنهاء السؤال', 'game_stop');
+          round.options = options;
+          db.activeGames[chatId] = round; save();
+          await ctx.reply(questionText + '\\n\\nاختار الإجابة من الأزرار:', { reply_markup: kb });
+        } else {
+          await ctx.reply(questionText, { reply_markup: stopKb });
+        }
+        return;
       }
 
       if (g.autoReply) {
@@ -1024,6 +1274,16 @@ export function setupCommands(bot, db, helpers) {
           if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
           const c = getCustomization(ctx);
           if (p.action === 'custom-start') c.startText = text;
+          if (p.action === 'custom-description') {
+            c.descriptions ||= {};
+            if (!['settings', 'groups', 'account', 'replies'].includes(p.key)) { clearPending(ctx); return ctx.reply('القسم غير معروف.'); }
+            c.descriptions[p.key] = text;
+          }
+          if (p.action === 'custom-reply') {
+            c.replies ||= {};
+            if (!['account', 'replies', 'nogroups'].includes(p.key)) { clearPending(ctx); return ctx.reply('القسم غير معروف.'); }
+            c.replies[p.key] = text;
+          }
           save();
           clearPending(ctx);
           return ctx.reply('✅ تم حفظ النص الخاص بيك بنجاح ❤️', {
@@ -1044,7 +1304,7 @@ export function setupCommands(bot, db, helpers) {
 
       const showHomeFunc = async (cCtx) => {
         const c = getCustomization(cCtx);
-        await safeEdit(cCtx, c.startTest, getHomeKeyboard(cCtx));
+        await safeEdit(cCtx, c.startText, getHomeKeyboard(cCtx));
       };
       return showHomeFunc(ctx);
     }
