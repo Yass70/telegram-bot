@@ -299,7 +299,7 @@ async function showProfileCard(ctx, g) {
   const warnings = Number(g?.warnings?.[id]?.count || 0);
   const messages = Number(g?.userStats?.[id]?.messages || 0);
   const phrase = PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
-  const caption = `🐾 بطاقة عضو — نغنوغ\\n\\n👤 الاسم: ${name}\\n🔗 المستخدم: ${username}\\n🆔 Telegram ID: ${id}\\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\\n💬 الرسائل التي رصدها البوت: ${messages}\\n⚠️ التحذيرات المسجلة: ${warnings}\\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\\n\\n💬 ${phrase}`;
+  const caption = `🐾 بطاقة عضو — نغنوغ\n\n👤 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 Telegram ID: ${id}\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\n💬 الرسائل التي رصدها البوت: ${messages}\n⚠️ التحذيرات المسجلة: ${warnings}\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\n\n💬 ${phrase}`;
   try {
     const photos = await bot.api.getUserProfilePhotos(user.id, { limit: 1 });
     const fileId = photos.photos?.[0]?.[0]?.file_id;
