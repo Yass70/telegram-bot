@@ -95,27 +95,37 @@ export function ownerKeyboard() {
     .text('🔙 القائمة الرئيسية', 'home');
 }
 
-export function warningsKeyboard(g) {
-  const w = g.warningSettings || {
-    enabled: false,
-    limit: 3,
-    action: 'mute',
-    duration: 10
-  };
+const WARNING_ACTION_NAMES = Object.freeze({
+  none: 'بدون إجراء',
+  mute: 'كتم',
+  kick: 'طرد',
+  ban: 'حظر'
+});
 
-  const actionNames = { none: 'بدون إجراء', mute: 'كتم', kick: 'طرد', ban: 'حظر' };
+export function warningsKeyboard(g = {}) {
+  const settings = g?.warningSettings || {};
+  const enabled = settings.enabled === true;
+  const limit = Number.isInteger(Number(settings.limit)) && Number(settings.limit) > 0
+    ? Number(settings.limit)
+    : 3;
+  const action = Object.hasOwn(WARNING_ACTION_NAMES, settings.action)
+    ? settings.action
+    : 'mute';
+  const duration = Number.isInteger(Number(settings.duration)) && Number(settings.duration) > 0
+    ? Number(settings.duration)
+    : 10;
 
   return new InlineKeyboard()
     .text(
-      `${w.enabled ? '🟢' : '⚪'} نظام التحذيرات: ${w.enabled ? 'مفعّل' : 'متوقف'}`,
+      `${enabled ? '🟢' : '⚪'} نظام التحذيرات: ${enabled ? 'مفعّل' : 'متوقف'}`,
       'warningstoggle'
     )
     .row()
-    .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit')
+    .text(`🔢 عدد التحذيرات: ${limit}`, 'warningslimit')
     .row()
-    .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction')
+    .text(`⚖️ العقوبة: ${WARNING_ACTION_NAMES[action]}`, 'warningsaction')
     .row()
-    .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration')
+    .text(`⏱️ مدة الكتم: ${duration} دقيقة`, 'warningsduration')
     .row()
     .text('🚫 الكلمات الممنوعة', 'badwordsmenu')
     .row()
