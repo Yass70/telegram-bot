@@ -7,10 +7,12 @@ import {
   warningsKeyboard,
   groupSettingsKeyboard,
   repliesKeyboard,
-  customizationKeyboard
+  customizationKeyboard,
+  customizationDescriptionsKeyboard,
+  customizationRepliesKeyboard
 } from './keyboards.js';
 
-// قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)
+// قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)[cite: 4]
 const QUESTIONS_DB = {
   choose: [
     { q: "ما هي عاصمة اليابان؟", options: ["طوكيو", "أوساكا", "كيوتو"], answer: "طوكيو" },
@@ -207,7 +209,7 @@ export function setupCommands(bot, db, helpers) {
 
   db.activeGames ||= {};
 
-  // أمر البداية /start
+  // أمر البداية /start[cite: 4]
   bot.command('start', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
@@ -216,14 +218,14 @@ export function setupCommands(bot, db, helpers) {
     await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
   });
 
-  // أمر المساعدة /help
+  // أمر المساعدة /help[cite: 4]
   bot.command('help', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
   });
 
-  // أمر الإذاعة للمالك
+  // أمر الإذاعة للمالك[cite: 4]
   bot.command('broadcast', async ctx => {
     if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت فقط.');
     const textToSend = ctx.message.text.replace(/^\/broadcast\s*/, '').trim();
@@ -274,7 +276,7 @@ export function setupCommands(bot, db, helpers) {
     return ctx.reply('🐾 نغنوغ — تم التفعيل بنجاح!');
   });
 
-  // معالجة جميع الأزرار واللوحات (القديمة والجديدة) بدون تعارض
+  // معالجة كافة الأزرار واللوحات بشمولية تامة لتجنب أي أخطاء أو أزرار لا تستجيب[cite: 3, 4, 5]
   bot.on('callback_query:data', async ctx => {
     ensureUser(ctx);
     const data = ctx.callbackQuery.data;
@@ -291,10 +293,12 @@ export function setupCommands(bot, db, helpers) {
       'protectionmenu', 'adminpanel', 'groupsettings', 'warningsmenu', 'badwordsmenu', 
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
       'toggleforward', 'togglecontacts', 'enableallprotection', 'gamesmenu', 'mygroups', 
-      'accountinfo', 'custommenu', 'groupstats', 'userreplies', 'repliesmenu'
+      'accountinfo', 'custommenu', 'groupstats', 'userreplies', 'repliesmenu',
+      'customdescmenu', 'customreplymenu', 'welcomeedit', 'toggleflood', 'togglereplies',
+      'warningslimit', 'warningsaction', 'warningsduration', 'warningslog', 'warningsclear'
     ];
 
-    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_') || data.startsWith('choosegroup:') || data.startsWith('warning') || data.startsWith('badword') || data.startsWith('reply')) {
+    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_') || data.startsWith('choosegroup:') || data.startsWith('warning') || data.startsWith('badword') || data.startsWith('reply') || data.startsWith('customdesc') || data.startsWith('customreply')) {
       if (isGroup(ctx)) {
         const g = groupFor(ctx.chat);
         const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
@@ -323,7 +327,7 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
-    // الأزرار القديمة الأساسية
+    // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
       const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
@@ -362,10 +366,29 @@ export function setupCommands(bot, db, helpers) {
       return showGroupSettings(ctx);
     }
 
+    // قوائم التخصيص[cite: 3, 4]
     if (data === 'custommenu') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       clearPending(ctx);
       return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط.', { reply_markup: customizationKeyboard() });
+    }
+
+    if (data === 'customdescmenu') {
+      return answer(ctx, '🔘 تخصيص شرح الأزرار:', { reply_markup: customizationDescriptionsKeyboard() });
+    }
+
+    if (data === 'customreplymenu') {
+      return answer(ctx, '💬 تخصيص ردود البوت:', { reply_markup: customizationRepliesKeyboard() });
+    }
+
+    if (data.startsWith('customdesc:')) {
+      const key = data.split(':')[1];
+      return answer(ctx, `📝 الشرح الحالي للقسم (${key}):\n${customText(ctx, 'descriptions', key) || 'غير محدد'}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'customdescmenu') });
+    }
+
+    if (data.startsWith('customreply:')) {
+      const key = data.split(':')[1];
+      return answer(ctx, `💬 الرد الحالي للقسم (${key}):\n${customText(ctx, 'replies', key) || 'غير محدد'}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'customreplymenu') });
     }
 
     if (data === 'customstart') {
@@ -383,7 +406,41 @@ export function setupCommands(bot, db, helpers) {
 
     if (data === 'groupstats') return showGroupStats(ctx);
 
-    // التحذيرات وإدارة الكلمات والردود التلقائية
+    // لوحة المالك والاشتراك الإجباري[cite: 4, 5]
+    if (data === 'ownerpanel') return showOwnerPanel(ctx);
+    if (data === 'botstats') {
+      const totalUsers = db.users?.length || 0;
+      const privateUsers = db.privateUsers?.length || 0;
+      const groupsCount = Object.keys(db.groups || {}).length;
+      return answer(ctx, `📊 إحصائيات البوت الشاملة:\n\n👥 إجمالي المستخدمين: ${totalUsers}\n💬 مستخدمو الخاص: ${privateUsers}\n🏘️ المجموعات المسجلة: ${groupsCount}`, { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    }
+    if (data === 'activatedgroups') {
+      const activeGroups = Object.values(db.groups || {}).filter(g => g.activated);
+      let text = `👥 المجموعات المفعّلة حالياً (${activeGroups.length}):\n\n`;
+      activeGroups.forEach((g, i) => { text += `${i + 1}. ${g.title} (\`${g.id}\`)\n`; });
+      return answer(ctx, text, { parse_mode: 'Markdown', reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    }
+    if (data === 'botsettings') return answer(ctx, '⚙️ إعدادات البوت العامة تعمل بشكل جيد.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'globalprotection') return answer(ctx, '🛡️ إعدادات الحماية العامة مفعلة تلقائياً.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'requiredmenu') return ownerRequiredMenu(ctx);
+    if (data === 'requiredlist') return showRequiredList(ctx);
+    if (data === 'requiredadd') {
+      pending(ctx, { action: 'add-required-chat' });
+      return answer(ctx, '➕ أرسل الآن آيدي أو معرف القناة/المجموعة للاشتراك الإجباري (مثال: \`-100xxxxxxxxxx\` أو \`@channel\`).', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredmenu') });
+    }
+    if (data.startsWith('reqdel:')) {
+      const index = Number(data.split(':')[1]);
+      if (db.requiredChats && db.requiredChats[index]) {
+        db.requiredChats.splice(index, 1);
+        save();
+        return showRequiredList(ctx);
+      }
+    }
+    if (data === 'checksubscription') {
+      return subscriptionGate(ctx);
+    }
+
+    // التحذيرات والعقوبات[cite: 3, 5]
     if (data === 'warningsmenu') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
@@ -399,6 +456,80 @@ export function setupCommands(bot, db, helpers) {
       g.warningSettings.enabled = !g.warningSettings.enabled;
       save();
       return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'warningslimit') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.warningSettings.limit = g.warningSettings.limit >= 5 ? 1 : g.warningSettings.limit + 1;
+      save();
+      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث عدد التحذيرات إلى: ${g.warningSettings.limit}`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'warningsaction') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      const actions = ['mute', 'kick', 'ban', 'none'];
+      const currentIndex = actions.indexOf(g.warningSettings.action);
+      g.warningSettings.action = actions[(currentIndex + 1) % actions.length];
+      save();
+      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث العقوبة بنجاح.`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'warningsduration') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.warningSettings.duration = g.warningSettings.duration >= 60 ? 5 : g.warningSettings.duration + 5;
+      save();
+      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث مدة الكتم إلى: ${g.warningSettings.duration} دقيقة`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'warningslog') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      const log = g.warningLog || [];
+      const logText = log.slice(-10).map(l => `• ${l.name}: ${l.reason}`).join('\n') || 'لا توجد سجلات تحذير حتى الآن.';
+      return answer(ctx, `📋 سجل التحذيرات الأخيرة:\n\n${logText}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
+    }
+
+    if (data === 'warningsclear') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.warnings = {};
+      save();
+      return answer(ctx, `🧹 تم تصفير جميع تحذيرات أعضاء المجموعة بنجاح!`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
+    }
+
+    // إعدادات المجموعة المتقدمة[cite: 3, 5]
+    if (data === 'welcomeedit') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      pending(ctx, { action: 'edit-welcome', groupId: g.id });
+      return answer(ctx, `👋 أرسل رسالة الترحيب الجديدة.\n\nملاحظة: يمكنك استخدام \`{name}\` لاسم العضو و \`{title}\` لعنوان المجموعة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'groupsettings') });
+    }
+
+    if (data === 'togglelinks') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.links = !g.links;
+      save();
+      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+    }
+
+    if (data === 'toggleflood') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.flood = !g.flood;
+      save();
+      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+    }
+
+    if (data === 'togglereplies') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.autoReply = !g.autoReply;
+      save();
+      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
     }
 
     if (data === 'badwordsmenu') {
@@ -462,7 +593,7 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, '🗑️ تم حذف الرد بنجاح.', { reply_markup: repliesKeyboard() });
     }
 
-    // لوحة الحماية
+    // لوحة الحماية[cite: 4]
     if (data === 'protectionmenu') {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً أو افتح الزر داخل المجموعة.');
@@ -514,7 +645,7 @@ export function setupCommands(bot, db, helpers) {
       return;
     }
 
-    // لوحة المشرفين
+    // لوحة المشرفين[cite: 4]
     if (data === 'adminpanel') {
       const adminText = `👑 **قائمة أوامر المشرفين السريعة:**\n\n` +
         `• **الكتم:** الرد بكلمة (كتم + عدد الدقائق) مثل: \`كتم 10\`\n` +
@@ -527,7 +658,7 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, adminText, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'home') });
     }
 
-    // قائمة الألعاب والتحديات
+    // قائمة الألعاب والتحديات[cite: 4]
     if (data === 'gamesmenu' || data === 'games_list') {
       const gamesText = `🎮 **قائمة ألعاب نغنوغ والتحديات:**\n\n` +
         `اكتب أحد الرموز التالية داخل المجموعة للبدء:\n\n` +
@@ -577,11 +708,10 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, '📢 **قسم الإذاعة العامة**\n\nأرسل الآن النص أو الرسالة لجميع المستخدمين:', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'ownerpanel') });
     }
 
-    if (data === 'ownerpanel') return showOwnerPanel(ctx);
     return answer(ctx, 'زر غير معروف.');
   });
 
-  // معالجة الرسائل والذكاء التفاعلي والحماية والألعاب داخل المجموعات
+  // معالجة الرسائل والذكاء التفاعلي والحماية والألعاب داخل المجموعات[cite: 4]
   bot.on('message', async ctx => {
     ensureUser(ctx);
     const msg = ctx.message;
@@ -594,7 +724,7 @@ export function setupCommands(bot, db, helpers) {
       const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
       const uid = userKey(ctx);
 
-      // الحماية التلقائية
+      // الحماية التلقائية[cite: 4]
       if (!isAdmin && !isOwner(ctx)) {
         if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(text)) {
           try { await ctx.deleteMessage(); } catch {}
@@ -626,7 +756,7 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      // أوامر المشرفين السريعة بالرد
+      // أوامر المشرفين السريعة بالرد[cite: 4]
       if (msg.reply_to_message && (isAdmin || isOwner(ctx))) {
         const target = msg.reply_to_message.from;
         const targetId = target?.id;
@@ -714,7 +844,7 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // الأوامر التفاعلية للأعضاء
+      // الأوامر التفاعلية للأعضاء[cite: 4]
       if (text === 'ا') {
         return showProfileCard(ctx, g);
       }
@@ -753,7 +883,7 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // ألعاب الأسئلة ونظام النقاط
+      // ألعاب الأسئلة ونظام النقاط[cite: 4]
       const chatId = String(ctx.chat.id);
       db.activeGames[chatId] ||= null;
       const activeGame = db.activeGames[chatId];
@@ -801,7 +931,7 @@ export function setupCommands(bot, db, helpers) {
       }
 
     } else {
-      // معالجة المحادثات الخاصة والبيانات المعلقة
+      // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
         if (p.action === 'broadcast-message') {
@@ -819,6 +949,27 @@ export function setupCommands(bot, db, helpers) {
           }
 
           return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n📤 إرسال: ${successCount}\n❌ فشل: ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+        }
+
+        if (p.action === 'add-required-chat') {
+          clearPending(ctx);
+          let title = text;
+          let id = text;
+          let url = text.startsWith('@') ? `https://t.me/${text.replace('@', '')}` : '';
+          db.requiredChats ||= [];
+          db.requiredChats.push({ id, title, url });
+          save();
+          return answer(ctx, `✅ تم إضافة القناة أو المجموعة للاشتراك الإجباري بنجاح!`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+        }
+
+        if (p.action === 'edit-welcome') {
+          const g = db.groups[p.groupId];
+          if (g && await userCanManage(ctx, g)) {
+            g.welcomeText = text;
+            save();
+            clearPending(ctx);
+            return answer(ctx, `✅ تم تحديث رسالة الترحيب بنجاح!`, { reply_markup: groupSettingsKeyboard(g) });
+          }
         }
 
         if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
