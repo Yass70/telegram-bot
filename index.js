@@ -27,11 +27,14 @@ bot.catch((err) => {
 const freshGroup = () => ({
   id: '', title: '', activated: false, activatedBy: '', admins: [], activatedAt: null,
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
+  linksLock: false, mediaLock: false, badWordsLock: false, audioLock: false, audioClipsLock: false, forwardLock: false, contactsLock: false,
+  closedMessages: false,
   welcomeText: '🐾 أهلاً وسهلاً بـ {name} ❤️ نورت مجموعة {title}، نتمنى لك وقتاً ممتعاً ويانه!',
   badWords: [],
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 },
   warningSettings: { enabled: false, limit: 3, action: 'mute', duration: 10 },
   warnings: {},
+  userStats: {},
   warningLog: [],
   floodUsers: {},
   game: null
@@ -45,6 +48,8 @@ const freshDB = () => ({
   privateUsers: [],
   requiredChats: [],
   points: {},
+  groupPoints: {},
+  activeGames: {},
   customizations: {},
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 }
 });
@@ -63,10 +68,14 @@ function load() {
     db.groups ||= {}; db.selected ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
+    db.groupPoints ||= {};
+    db.activeGames ||= {};
     db.customizations ||= {};
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
+      if (oldGroup.linksLock === undefined) g.linksLock = !!g.links;
+      g.userStats ||= {};
       g.badWords ||= [];
       g.stats = { ...freshGroup().stats, ...(g.stats || {}) };
       g.floodUsers ||= {};
@@ -230,14 +239,14 @@ function selectedGroupKeyboard(ctx) {
 async function showGroups(ctx) {
   const { kb, entries } = selectedGroupKeyboard(ctx);
   if (!entries.length) return answer(ctx, customText(ctx, 'replies', 'nogroups'));
-  return answer(ctx, '👥 اختار المجموعة اللي تريد تديرها:', { reply_markup: kb });
+  return answer(ctx, `${customText(ctx, 'descriptions', 'groups') || '👥 مجموعاتي'}\n\nاختار المجموعة اللي تريد تديرها:`, { reply_markup: kb });
 }
 
 async function showGroupSettings(ctx, g = selectedGroup(ctx)) {
   if (!g) return answer(ctx, 'اختار مجموعتك أولاً.');
   if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة لمشرفيها فقط.');
   setSelected(ctx, g.id);
-  return answer(ctx, `⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+  return answer(ctx, `⚙️ إعدادات مجموعة: ${g.title}\n\n${customText(ctx, 'descriptions', 'settings') || ''}`, { reply_markup: groupSettingsKeyboard(g) });
 }
 
 async function showGroupStats(ctx, g = selectedGroup(ctx)) {
@@ -281,15 +290,24 @@ const PROFILE_PHRASES = [
 ];
 
 async function showProfileCard(ctx, g) {
-  const user = ctx.from;
+  const user = ctx.message?.reply_to_message?.from || ctx.from;
+  if (!user || user.is_bot) return ctx.reply('ما أگدر أطلع بطاقة لهذا الحساب.');
   const id = String(user.id);
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'عضو';
-  const username = user.username ? `@${user.username}` : 'ما عندك اسم مستخدم';
-  const points = Number(db.points[id] || 0);
-  const warnings = Number(g.warnings?.[id]?.count || 0);
+  const username = user.username ? `@${user.username}` : 'غير متوفر';
+  const points = Number((db.groupPoints?.[String(g?.id || ctx.chat?.id)] || {})[id] ?? db.points[id] ?? 0);
+  const warnings = Number(g?.warnings?.[id]?.count || 0);
+  const messages = Number(g?.userStats?.[id]?.messages || 0);
   const phrase = PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
-
-  const caption = `🐾 بطاقة عضو — نغنوغ\n\n👤 الاسم: ${name}\n🆔 المعرف: ${id}\n⭐ النقاط: ${points}\n⚠️ التحذيرات: ${warnings}\n\n💬 ${phrase}`;
+  const caption = `🐾 بطاقة عضو — نغنوغ\\n\\n👤 الاسم: ${name}\\n🔗 المستخدم: ${username}\\n🆔 Telegram ID: ${id}\\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\\n💬 الرسائل التي رصدها البوت: ${messages}\\n⚠️ التحذيرات المسجلة: ${warnings}\\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\\n\\n💬 ${phrase}`;
+  try {
+    const photos = await bot.api.getUserProfilePhotos(user.id, { limit: 1 });
+    const fileId = photos.photos?.[0]?.[0]?.file_id;
+    if (fileId) {
+      await ctx.replyWithPhoto(fileId, { caption, reply_to_message_id: ctx.message.message_id });
+      return;
+    }
+  } catch {}
   await ctx.reply(caption, { reply_to_message_id: ctx.message.message_id });
 }
 
