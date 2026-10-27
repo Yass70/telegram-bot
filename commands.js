@@ -226,17 +226,19 @@ export function setupCommands(bot, db, helpers) {
     return '🏆 **أبطال نغنوغ — أعلى 3 بهذه المجموعة**\n\n' +
       sorted.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\n');
   };
-  const protectionKeyboard = g => new InlineKeyboard()
+  const protectionBackTarget = ctx => db.protectionBack?.[userKey(ctx)] || (isGroup(ctx) ? 'publiccommands' : 'managementmenu');
+  const protectionKeyboard = (g, back = 'managementmenu') => new InlineKeyboard()
     .text(`${g.closedMessages ? '🔒 الدردشة مقفلة' : '🔓 الدردشة مفتوحة'}`, 'prot_chat').row()
     .text(`${g.linksLock ? '🟢' : '⚪'} الروابط`, 'prot_links')
-    .text(`${g.mediaLock ? '🟢' : '⚪'} الوسائط والملفات`, 'prot_media').row()
-    .text(`${g.badWordsLock ? '🟢' : '⚪'} كلمات الفشار`, 'prot_badwords')
-    .text(`${(g.audioLock || g.audioClipsLock) ? '🟢' : '⚪'} الصوتيات`, 'prot_audio').row()
-    .text(`${g.forwardLock ? '🟢' : '⚪'} توجيه الرسائل`, 'prot_forward')
+    .text(`${g.flood ? '🟢' : '⚪'} منع السبام`, 'prot_flood').row()
+    .text(`${g.mediaLock ? '🟢' : '⚪'} الوسائط والملفات`, 'prot_media')
+    .text(`${g.badWordsLock ? '🟢' : '⚪'} كلمات الفشار`, 'prot_badwords').row()
+    .text(`${(g.audioLock || g.audioClipsLock) ? '🟢' : '⚪'} الصوتيات`, 'prot_audio')
+    .text(`${g.forwardLock ? '🟢' : '⚪'} توجيه الرسائل`, 'prot_forward').row()
     .text(`${g.contactsLock ? '🟢' : '⚪'} المعرفات والأرقام`, 'prot_contacts').row()
     .text('⚡ تفعيل الحماية الشاملة', 'prot_all')
     .text('🛑 إيقاف الحماية الشاملة', 'prot_none').row()
-    .text('🔙 رجوع للقائمة السابقة', 'publiccommands');
+    .text('🔙 رجوع للقائمة السابقة', back);
 
   // أمر البداية /start[cite: 4]
   bot.command('start', async ctx => {
@@ -487,9 +489,8 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'managementmenu') {
       const kb = new InlineKeyboard()
         .text('⚙️ إعدادات المجموعة', 'groupsettings').row()
-        .text('🛡️ 〔 أوامر الحماية 〕', 'protectionmenu').row()
-        .text('👑 〔 أوامر المشرفين 〕', 'adminpanel').row()
-        .text('🧾 التحذيرات والكلمات الممنوعة', 'warningsmenu').row()
+        .text('🛡️ الحماية الموحدة', 'protectionmenu').row()
+        .text('👑 أوامر المشرفين', 'adminpanel').row()
         .text('🔙 القائمة الرئيسية', 'home');
       return answer(ctx, '╭━━━〔 🛡️ الإدارة والحماية 〕━━━╮\n\nاختَر القسم الذي تريد إدارته.\nبعض الخيارات متاحة للمشرفين فقط، كما تتطلب بعض العمليات منح نغنوغ صلاحيات الإدارة المناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
@@ -611,7 +612,13 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, text, { parse_mode: 'Markdown', reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
     }
     if (data === 'botsettings') return answer(ctx, '╭─〔 ⚙️ إعدادات البوت العامة 〕─╮\nتُدار إعدادات البوت من هذه اللوحة.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
-    if (data === 'globalprotection') return answer(ctx, '╭─〔 🛡️ الحماية العامة 〕─╮\nتعرض هذه الصفحة إعدادات الحماية العامة المتاحة.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'globalprotection') {
+      const g = selectedGroup(ctx);
+      if (!g) return answer(ctx, 'اختَر مجموعة من «مجموعاتي» أولاً، ثم افتح الحماية الموحدة من إعداداتها.', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 لوحة المالك', 'ownerpanel') });
+      if (!await userCanManage(ctx, g)) return answer(ctx, 'ما عندك صلاحية إدارة المجموعة المحددة.');
+      db.protectionBack ||= {}; db.protectionBack[userKey(ctx)] = 'ownerpanel'; save();
+      return answer(ctx, `╭━━━〔 🛡️ الحماية الموحدة 〕━━━╮\nالمجموعة: «${g.title}»\n\nهذه هي الإعدادات المشتركة نفسها المستخدمة من قوائم المجموعة.`, { reply_markup: protectionKeyboard(g, 'ownerpanel') });
+    }
     if (data === 'requiredmenu') return ownerRequiredMenu(ctx);
     if (data === 'requiredlist') return showRequiredList(ctx);
     if (data === 'requiredadd') {
@@ -698,21 +705,18 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, `👋 أرسل رسالة الترحيب الجديدة.\n\nملاحظة: يمكنك استخدام \`{name}\` لاسم العضو و \`{title}\` لعنوان المجموعة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'groupsettings') });
     }
 
-    if (data === 'togglelinks') {
+    if (data === 'togglelinks' || data === 'toggleflood') {
+      // توافق مع أزرار الإصدارات القديمة: أي ضغط قديم يغيّر نفس الإعداد الموحد.
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      g.links = !g.links;
-      g.linksLock = g.links;
+      const field = data === 'togglelinks' ? 'linksLock' : 'flood';
+      g[field] = !g[field];
+      if (field === 'linksLock') g.links = g.linksLock;
+      db.protectionBack ||= {}; db.protectionBack[userKey(ctx)] = 'groupsettings';
       save();
-      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
-    }
-
-    if (data === 'toggleflood') {
-      const g = selectedGroup(ctx);
-      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      g.flood = !g.flood;
-      save();
-      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
+      const label = field === 'linksLock' ? 'حماية الروابط' : 'منع السبام';
+      try { await ctx.api.sendMessage(g.id, `🛡️ تحديث الحماية — نغنوغ 🐈‍⬛\n\n${g[field] ? '🟢 تم تفعيل' : '⚪ تم إيقاف'} ${label}.\nالمجموعة: ${g.title}`); } catch {}
+      return answer(ctx, `🛡️ ${g[field] ? '🟢 تم تفعيل' : '⚪ تم إيقاف'} ${label}.\n\nتم نقل خيارات الحماية إلى القائمة الموحدة.`, { reply_markup: protectionKeyboard(g, 'groupsettings') });
     }
 
     if (data === 'togglereplies') {
@@ -789,20 +793,29 @@ export function setupCommands(bot, db, helpers) {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً من «مجموعاتي».');
       if (!await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
-      return answer(ctx, `╭━━━〔 🛡️ إعدادات الحماية 〕━━━╮\nالمجموعة: «${g.title}»\n✦ حالة كل ميزة موضّحة على الزر الخاص بها.`, { reply_markup: protectionKeyboard(g) });
+      const sourceText = String(ctx.callbackQuery?.message?.text || '');
+      let back = isGroup(ctx) ? 'publiccommands' : 'managementmenu';
+      if (sourceText.includes('إعدادات مجموعة')) back = 'groupsettings';
+      else if (sourceText.includes('لوحة مالك')) back = 'ownerpanel';
+      db.protectionBack ||= {};
+      db.protectionBack[userKey(ctx)] = back;
+      save();
+      return answer(ctx, `╭━━━〔 🛡️ إعدادات الحماية الموحدة 〕━━━╮\nالمجموعة: «${g.title}»\n\nكل زر يغيّر الحالة المحفوظة نفسها، وتظهر الحالة ذاتها في كل مكان.`, { reply_markup: protectionKeyboard(g, back) });
     }
 
     if (data.startsWith('prot_')) {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
       const type = data.slice(5);
-      const fieldByType = { links: 'linksLock', media: 'mediaLock', badwords: 'badWordsLock', audio: 'audioLock', audioclips: 'audioClipsLock', forward: 'forwardLock', contacts: 'contactsLock' };
+      const fieldByType = { links: 'linksLock', flood: 'flood', media: 'mediaLock', badwords: 'badWordsLock', audio: 'audioLock', forward: 'forwardLock', contacts: 'contactsLock' };
       if (type === 'all') {
         for (const field of Object.values(fieldByType)) g[field] = true;
-        g.links = true;
+        g.links = g.linksLock = true;
+        g.audioClipsLock = true;
       } else if (type === 'none') {
         for (const field of Object.values(fieldByType)) g[field] = false;
-        g.links = false;
+        g.links = g.linksLock = false;
+        g.audioClipsLock = false;
       } else if (type === 'chat') {
         const nextClosed = !g.closedMessages;
         try {
@@ -810,38 +823,73 @@ export function setupCommands(bot, db, helpers) {
             ? { can_send_messages: false, can_send_audios: false, can_send_documents: false, can_send_photos: false, can_send_videos: false, can_send_video_notes: false, can_send_voice_notes: false, can_send_polls: false, can_send_other_messages: false, can_add_web_page_previews: false }
             : { can_send_messages: true, can_send_audios: true, can_send_documents: true, can_send_photos: true, can_send_videos: true, can_send_video_notes: true, can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true, can_add_web_page_previews: true });
           g.closedMessages = nextClosed;
-        } catch { return answer(ctx, '❌ ما كدرت أغيّر صلاحيات الدردشة. تأكد أن نغنوغ مشرف وعنده صلاحية تقييد الأعضاء.', { reply_markup: protectionKeyboard(g) }); }
+        } catch { return answer(ctx, '❌ ما كدرت أغيّر صلاحيات الدردشة. تأكد أن نغنوغ مشرف وعنده صلاحية تقييد الأعضاء.', { reply_markup: protectionKeyboard(g, protectionBackTarget(ctx)) }); }
       } else if (fieldByType[type]) {
         g[fieldByType[type]] = !g[fieldByType[type]];
         if (type === 'links') g.links = g.linksLock;
         if (type === 'audio') g.audioClipsLock = g.audioLock;
       } else return answer(ctx, 'خيار حماية غير معروف.');
       save();
-      const status = type === 'all' ? '🟢 تم تفعيل جميع خيارات الحماية.' : type === 'none' ? '⚪ تم إيقاف جميع خيارات الحماية.' : type === 'chat' ? `تم ${g.closedMessages ? 'قفل' : 'فتح'} دردشة المجموعة.` : `تم ${g[fieldByType[type]] ? 'تفعيل' : 'إيقاف'} ${({ links: 'حماية الروابط', media: 'حماية الوسائط والملفات', badwords: 'حماية كلمات الفشار', audio: 'حماية الصوتيات', audioclips: 'حماية المقاطع الصوتية', forward: 'منع توجيه الرسائل', contacts: 'منع المعرفات والأرقام' })[type] || 'الميزة'} ${g[fieldByType[type]] ? '🟢' : '⚪'}`;
+      const status = type === 'all' ? '🟢 تم تفعيل جميع خيارات الحماية.' : type === 'none' ? '⚪ تم إيقاف جميع خيارات الحماية.' : type === 'chat' ? `تم ${g.closedMessages ? 'قفل' : 'فتح'} دردشة المجموعة.` : `تم ${g[fieldByType[type]] ? 'تفعيل' : 'إيقاف'} ${({ links: 'حماية الروابط', flood: 'منع السبام', media: 'حماية الوسائط والملفات', badwords: 'حماية كلمات الفشار', audio: 'حماية الصوتيات', forward: 'منع توجيه الرسائل', contacts: 'منع المعرفات والأرقام' })[type] || 'الميزة'} ${g[fieldByType[type]] ? '🟢' : '⚪'}`;
       const announcement = `🛡️ تحديث الحماية — نغنوغ 🐈‍⬛\n\n${status}\n\n${g.title ? `المجموعة: ${g.title}` : ''}`.trim();
       // لا نكتفي بتعديل نص اللوحة: أرسل إشعاراً مستقلاً داخل المجموعة أيضاً.
       try { await ctx.api.sendMessage(g.id || ctx.chat.id, announcement); }
       catch (err) { console.warn('[protection-announcement] Could not send group status:', err?.description || err?.message || err); }
-      return answer(ctx, `╭━━━〔 🛡️ تحديث الحماية 〕━━━╮\n\n${status}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: protectionKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ تحديث الحماية 〕━━━╮\n\n${status}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: protectionKeyboard(g, protectionBackTarget(ctx)) });
     }
 
     // لوحة المشرفين[cite: 4]
     if (data === 'adminpanel') {
-      const adminText = `╭━━━〔 👑 أوامر المشرفين — نغنوغ 〕━━━╮\n\n` +
-        `🔇 〔 كتم عضو 〕 ردّ على رسالته واكتب «كتم 10» لكتمه عشر دقائق.\n` +
-        `🔊 〔 فك الكتم 〕 ردّ على رسالته واكتب «فتح الكتم»، أو اكتب «فتح الكتم @username».\n` +
-        `🚪 〔 طرد عضو 〕 ردّ على رسالته واكتب «طرد»، أو اكتب «طرد @username».\n` +
-        `🔒 〔 قفل المجموعة 〕 اكتب «قفل الرسائل» أو «قفل المجموعة».\n` +
-        `🔓 〔 فتح المجموعة 〕 اكتب «افتح الرسائل» أو «افتح المجموعة».\n` +
-        `🗑️ 〔 حذف رسائل 〕 اكتب «امسح 10» أو «حذف الرسائل 10».\n` +
-        `🧹 〔 حذف الرسائل المرصودة 〕 اكتب «احذف جميع الرسائل» ثم أكّد العملية.\n` +
-        `⭐ 〔 إضافة نقاط 〕 ردّ على رسالة واكتب «اضف 5»، أو «اضف 5 @username».\n` +
-        `⚙️ 〔 إضافة مشرف 〕 اكتب «اضف مشرفا @username».\n` +
-        `👤 〔 معلومات عضو 〕 ردّ على رسالته واكتب «معلومات».\n` +
-        `🏘️ 〔 معلومات المجموعة 〕 اكتب «مجموعتي».\n` +
-        `🛡️ 〔 الحماية 〕 اكتب «تفعيل الحماية» أو «ايقاف الحماية».\n` +
-        `🧰 〔 خيارات الحماية 〕 تشغيل/إيقاف الروابط والوسائط والفشار والصوتيات وتوجيه الرسائل والمعرّفات.`
-      return answer(ctx, adminText + '\n\n🛠️ 〔 أوامر إضافية 〕 «اضف مشرفا @username» — «اضف 5 @username» — «معلومات @username» — «مجموعتي».\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('↩️ العودة إلى قائمة الأوامر', 'publiccommands') });
+      const adminText = `╭━━━〔 👑 أوامر المشرفين — نغنوغ 〕━━━╮
+
+` +
+        `🔇 كتم عضو
+ردّ على رسالة العضو واكتب «كتم 10» لكتمه 10 دقائق.
+━━━━━━━━━━━━━━━━━━
+` +
+        `🔊 فك الكتم
+ردّ على رسالته واكتب «فتح الكتم»، أو «فتح الكتم @username».
+━━━━━━━━━━━━━━━━━━
+` +
+        `🚪 طرد عضو
+ردّ على رسالته واكتب «طرد»، أو استخدم «طرد @username».
+━━━━━━━━━━━━━━━━━━
+` +
+        `🔒 قفل المجموعة
+اكتب «قفل المجموعة» أو «قفل الرسائل».
+━━━━━━━━━━━━━━━━━━
+` +
+        `🔓 فتح المجموعة
+اكتب «افتح المجموعة» أو «افتح الرسائل».
+━━━━━━━━━━━━━━━━━━
+` +
+        `🗑️ حذف عدد من الرسائل
+اكتب «امسح 10» لحذف آخر 10 رسائل مرصودة قبل الأمر.
+━━━━━━━━━━━━━━━━━━
+` +
+        `🧹 حذف الرسائل المرصودة
+اكتب «احذف جميع الرسائل» ثم أكّد الحذف؛ الحد الأقصى 100 رسالة مرصودة.
+━━━━━━━━━━━━━━━━━━
+` +
+        `⭐ إضافة نقاط
+ردّ على عضو واكتب «اضف 5»، أو «اضف 5 @username».
+━━━━━━━━━━━━━━━━━━
+` +
+        `⚙️ ترقية عضو إلى مشرف
+اكتب «اضف مشرفا @username» لعضو رصده البوت؛ يلزم أن يملك البوت صلاحية ترقية الأعضاء.
+━━━━━━━━━━━━━━━━━━
+` +
+        `👤 معلومات عضو
+ردّ على رسالته واكتب «معلومات»، أو استخدم «معلومات @username» لعضو رصده البوت.
+━━━━━━━━━━━━━━━━━━
+` +
+        `🏘️ معلومات المجموعة
+اكتب «مجموعتي» لعرض بيانات المجموعة والصورة إن أتاحها تيليگرام.
+━━━━━━━━━━━━━━━━━━
+` +
+        `🛡️ الحماية
+اكتب «تفعيل الحماية» أو «ايقاف الحماية»، أو افتح قائمة الحماية لإعداد كل ميزة.`;
+      return answer(ctx, adminText + '\n\n✦ الأوامر الإدارية تتطلب صلاحيات مناسبة، ويجب أن يمتلك نغنوغ الصلاحيات المطلوبة أيضاً.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('↩️ العودة للقائمة السابقة', isGroup(ctx) ? 'publiccommands' : 'managementmenu') });
     }
 
     // قائمة الألعاب والتحديات[cite: 4]
@@ -1016,7 +1064,7 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      const isAdminCommand = /^(كتم(?:\s+\d+)?|فتح\s+الكتم(?:\s+@?\w+)?|طرد(?:\s+@?\w+)?|قفل\s+(?:الرسائل|المجموعة)|افتح\s+(?:الرسائل|المجموعة)|امسح(?:\s+\d+)?|حذف\s+الرسائل(?:\s+\d+)?|المسح\s+جميع\s+الرسائل|احذف\s+جميع\s+الرسائل|تفعيل\s+الحماية|ايقاف\s+الحماية|إيقاف\s+الحماية|اضف\s+مشرفا?\s+@?\w+|اضف\s+\d+(?:\s+@?\w+)?|معلومات(?:\s+@?\w+)?|مجموعتي|ايقاف\s+المحادث(?:ة|ه)|إيقاف\s+المحادث(?:ة|ه)|تشغيل\s+المحادث(?:ة|ه)|ايقاف\s+الروابط|إيقاف\s+الروابط|تشغيل\s+الروابط|ايقاف\s+الوسائط|إيقاف\s+الوسائط|تشغيل\s+الوسائط|تشغيل\s+الفشار|ايقاف\s+الفشار|إيقاف\s+الفشار|ايقاف\s+الصوتيات|إيقاف\s+الصوتيات|تشغيل\s+الصوتيات|ايقاف\s+توجيه\s+الرسائل|إيقاف\s+توجيه\s+الرسائل|تشغيل\s+توجيه\s+الرسائل|ايقاف\s+(?:المعرفات|اليوزرات)|إيقاف\s+(?:المعرفات|اليوزرات)|تشغيل\s+(?:المعرفات|اليوزرات)|تثبيت|الغاء\s+التثبيت|إلغاء\s+التثبيت|فك\s+التثبيت)$/i.test(text);
+      const isAdminCommand = /^(كتم(?:\s+\d+)?|فتح\s+الكتم(?:\s+@?\w+)?|طرد(?:\s+@?\w+)?|قفل\s+(?:الرسائل|المجموعة)|افتح\s+(?:الرسائل|المجموعة)|امسح(?:\s+\d+)?|حذف\s+الرسائل(?:\s+\d+)?|المسح\s+جميع\s+الرسائل|احذف\s+جميع\s+الرسائل|تفعيل\s+الحماية|ايقاف\s+الحماية|إيقاف\s+الحماية|اضف\s+مشرفا?\s+@?\w+|اضف\s+\d+(?:\s+@?\w+)?|معلومات(?:\s+@?\w+)?|مجموعتي|ايقاف\s+المحادث(?:ة|ه)|إيقاف\s+المحادث(?:ة|ه)|تشغيل\s+المحادث(?:ة|ه)|ايقاف\s+الروابط|إيقاف\s+الروابط|تشغيل\s+الروابط|ايقاف\s+السبام|إيقاف\s+السبام|تشغيل\s+السبام|ايقاف\s+الوسائط|إيقاف\s+الوسائط|تشغيل\s+الوسائط|تشغيل\s+الفشار|ايقاف\s+الفشار|إيقاف\s+الفشار|ايقاف\s+الصوتيات|إيقاف\s+الصوتيات|تشغيل\s+الصوتيات|ايقاف\s+توجيه\s+الرسائل|إيقاف\s+توجيه\s+الرسائل|تشغيل\s+توجيه\s+الرسائل|ايقاف\s+(?:المعرفات|اليوزرات)|إيقاف\s+(?:المعرفات|اليوزرات)|تشغيل\s+(?:المعرفات|اليوزرات)|تثبيت|الغاء\s+التثبيت|إلغاء\s+التثبيت|فك\s+التثبيت)$/i.test(text);
       if (isAdminCommand && !isAdmin && !isOwner(ctx)) {
         await ctx.reply('الأمر غير مخصص إلك', { reply_to_message_id: msg.message_id });
         return;
@@ -1026,6 +1074,7 @@ export function setupCommands(bot, db, helpers) {
       if (isAdmin || isOwner(ctx) || (g.admins || []).includes(uid)) {
         const protectionCommands = [
           [/^(?:ايقاف|إيقاف) الروابط$/i, 'linksLock', false], [/^تشغيل الروابط$/i, 'linksLock', true],
+          [/^(?:ايقاف|إيقاف) السبام$/i, 'flood', false], [/^تشغيل السبام$/i, 'flood', true],
           [/^(?:ايقاف|إيقاف) الوسائط$/i, 'mediaLock', false], [/^تشغيل الوسائط$/i, 'mediaLock', true],
           [/^(?:ايقاف|إيقاف) الفشار$/i, 'badWordsLock', false], [/^تشغيل الفشار$/i, 'badWordsLock', true],
           [/^(?:ايقاف|إيقاف) الصوتيات$/i, 'audioLock', false], [/^تشغيل الصوتيات$/i, 'audioLock', true],
@@ -1039,7 +1088,7 @@ export function setupCommands(bot, db, helpers) {
           if (field === 'linksLock') g.links = enabled;
           if (field === 'audioLock') g.audioClipsLock = enabled;
           save();
-          return ctx.reply(`🛡️ ${enabled ? '🟢 تم تفعيل' : '⚪ تم إيقاف'} ${({ linksLock: 'حماية الروابط', mediaLock: 'حماية الوسائط والملفات', badWordsLock: 'حماية كلمات الفشار', audioLock: 'حماية الصوتيات', forwardLock: 'منع توجيه الرسائل', contactsLock: 'منع المعرفات والأرقام' })[field]} بنجاح.`, { reply_to_message_id: msg.message_id });
+          return ctx.reply(`🛡️ ${enabled ? '🟢 تم تفعيل' : '⚪ تم إيقاف'} ${({ linksLock: 'حماية الروابط', flood: 'منع السبام', mediaLock: 'حماية الوسائط والملفات', badWordsLock: 'حماية كلمات الفشار', audioLock: 'حماية الصوتيات', forwardLock: 'منع توجيه الرسائل', contactsLock: 'منع المعرفات والأرقام' })[field]} بنجاح.`, { reply_to_message_id: msg.message_id });
         }
         if (/^(?:ايقاف|إيقاف) المحادث(?:ة|ه)$/i.test(text) || /^تشغيل المحادث(?:ة|ه)$/i.test(text)) {
           const close = /^(?:ايقاف|إيقاف)/i.test(text);
@@ -1053,7 +1102,7 @@ export function setupCommands(bot, db, helpers) {
         }
         if (/^تفعيل الحماية$/i.test(text) || /^(?:ايقاف|إيقاف) الحماية$/i.test(text)) {
           const enabled = /^تفعيل/.test(text);
-          for (const field of ['linksLock', 'mediaLock', 'badWordsLock', 'audioLock', 'audioClipsLock', 'forwardLock', 'contactsLock']) g[field] = enabled;
+          for (const field of ['linksLock', 'flood', 'mediaLock', 'badWordsLock', 'audioLock', 'audioClipsLock', 'forwardLock', 'contactsLock']) g[field] = enabled;
           g.links = enabled; save();
           return ctx.reply(`🛡️ ${enabled ? '🟢 تم تفعيل جميع ميزات الحماية' : '⚪ تم إيقاف جميع ميزات الحماية'} بنجاح.`, { reply_to_message_id: msg.message_id });
         }
@@ -1151,16 +1200,15 @@ export function setupCommands(bot, db, helpers) {
           const target = memberByUsername(openMuteMatch[1]);
           if (!target) return ctx.reply('ما لكيت المستخدم ضمن الأعضاء المعروفين.');
           try {
-            const chatInfo = await ctx.api.getChat(ctx.chat.id);
-            const defaultPermissions = chatInfo.permissions || {
+            const unrestricted = {
               can_send_messages: true, can_send_audios: true, can_send_documents: true,
               can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
               can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
               can_add_web_page_previews: true
             };
-            await ctx.api.restrictChatMember(ctx.chat.id, Number(target.id), defaultPermissions);
+            await ctx.api.restrictChatMember(ctx.chat.id, Number(target.id), unrestricted);
             const after = await ctx.api.getChatMember(ctx.chat.id, Number(target.id));
-            if (after.status === 'restricted' && after.is_member && defaultPermissions.can_send_messages !== false && after.can_send_messages === false) {
+            if (after.status === 'restricted' && after.is_member && after.can_send_messages === false) {
               throw new Error('Member still restricted after unmute.');
             }
             return ctx.reply(`🔊 تم فك الكتم عن ${target.name || target.username} وإعادة صلاحيات المجموعة الافتراضية إليه.`);
@@ -1217,16 +1265,15 @@ export function setupCommands(bot, db, helpers) {
             await ctx.reply('لا يمكن فك قيود مشرف بهذه الطريقة.');
             return;
           }
-          const chatInfo = await ctx.api.getChat(ctx.chat.id);
-          const defaultPermissions = chatInfo.permissions || {
+          const unrestricted = {
             can_send_messages: true, can_send_audios: true, can_send_documents: true,
             can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
             can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
             can_add_web_page_previews: true
           };
-          await ctx.api.restrictChatMember(ctx.chat.id, target.id, defaultPermissions);
+          await ctx.api.restrictChatMember(ctx.chat.id, target.id, unrestricted);
           const after = await ctx.api.getChatMember(ctx.chat.id, target.id);
-          if (after.status === 'restricted' && after.is_member && defaultPermissions.can_send_messages !== false && after.can_send_messages === false) {
+          if (after.status === 'restricted' && after.is_member && after.can_send_messages === false) {
             throw new Error('Member is still restricted by Telegram after unmute.');
           }
           await ctx.reply(`🔊 تم فك الكتم عن ${target.first_name || 'العضو'} وإعادة صلاحيات المجموعة الافتراضية إليه.`);
@@ -1274,7 +1321,7 @@ export function setupCommands(bot, db, helpers) {
           return;
         }
         const history = (g.recentMessages || [])
-          .filter(entry => Number(entry.message_id) <= Number(msg.message_id))
+          .filter(entry => Number(entry.message_id) < Number(msg.message_id))
           .sort((a, b) => Number(a.message_id) - Number(b.message_id));
         const targets = history.slice(-count).reverse();
         if (!targets.length) return ctx.reply('⚠️ ما عندي رسائل مسجلة للمسح بعد. خلي البوت يراقب رسائل المجموعة ثم جرّب مجدداً.');
@@ -1292,7 +1339,7 @@ export function setupCommands(bot, db, helpers) {
 
       if (/^(?:المسح|احذف)\s+جميع\s+الرسائل$/i.test(text)) {
         db.pending ||= {};
-        db.pending[`clearall:${String(ctx.chat.id)}`] = { createdAt: Date.now(), messageIds: (g.recentMessages || []).filter(entry => Number(entry.message_id) <= Number(msg.message_id)).slice(-100).map(entry => Number(entry.message_id)) };
+        db.pending[`clearall:${String(ctx.chat.id)}`] = { createdAt: Date.now(), messageIds: (g.recentMessages || []).filter(entry => Number(entry.message_id) < Number(msg.message_id)).slice(-100).map(entry => Number(entry.message_id)) };
         save();
         const kb = new InlineKeyboard().text('🗑️ تأكيد الحذف (آخر 100 رسالة)', 'clearall_confirm')
           .row().text('❌ إلغاء', 'clearall_cancel');
@@ -1301,7 +1348,7 @@ export function setupCommands(bot, db, helpers) {
       }
 
       if (/^تفعيل\s+الحماية$/i.test(text)) {
-        for (const field of ['linksLock', 'mediaLock', 'badWordsLock', 'audioLock', 'audioClipsLock', 'forwardLock', 'contactsLock']) g[field] = true;
+        for (const field of ['linksLock', 'flood', 'mediaLock', 'badWordsLock', 'audioLock', 'audioClipsLock', 'forwardLock', 'contactsLock']) g[field] = true;
         g.links = true;
         save();
         let canDelete = false;
