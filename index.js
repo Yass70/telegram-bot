@@ -131,6 +131,9 @@ function selectedGroup(ctx) {
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
 const DEFAULT_CUSTOMIZATION = {
+  labels: { groups: '👥 مجموعاتي', addBot: '➕ أضفني للمجموعة', management: '⚙️ الإدارة', profile: '👤 ملفي الشخصي', customize: '🎨 تخصيص نغنوغ', help: '📖 المساعدة', back: '↩️ رجوع', home: '🏠 الرئيسية', cancel: '❌ إلغاء' },
+  helpText: '',
+  uiTexts: { management: '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️', groups: '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾', customMenu: '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯' },
   startText: '🐈‍⬛ أهلاً بيك! أني بوت نغنوغ 🐾❤️\n\n🤖 وظيفتي أساعدك بحماية وإداره مجموعتك،\n\n🛡️ حماية المجموعة من السبام والمخالفات.\n⚙️ أدوات إدارة حسب الصلاحيات الممنوحة إليّ.\n🎮 ألعاب وتحديات ترفيهية.\n🏆 نظام نقاط وإحصائيات للأعضاء.\n⚠️ تحذيرات وعقوبات للمخالفين.\n💬 ردود تلقائية ومخصصة حسب رغبتكم.\n\n━━━━━━━━━━━━━━━━━━\n\n🎁 بالمناسبة، أني مجاني بالكامل، هدية من المطوّر إلكم! ❤️‍🔥\n\nإختر القسم اللي تحتاجه من الإسفل، وخلي الباقي عليّ! 🐈‍⬛🐾',
   descriptions: {
     settings: '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️',
@@ -154,6 +157,11 @@ function getCustomization(ctx) {
     const saved = db.customizations[id];
     saved.descriptions ||= {};
     saved.replies ||= {};
+    saved.labels ||= {};
+    saved.uiTexts ||= {};
+    if (typeof saved.helpText !== 'string') saved.helpText = '';
+    saved.labels = { ...DEFAULT_CUSTOMIZATION.labels, ...saved.labels };
+    saved.uiTexts = { ...DEFAULT_CUSTOMIZATION.uiTexts, ...saved.uiTexts };
     if (typeof saved.startText !== 'string' || saved.startText === '╭━━━〔 🐈‍⬛ نَغْنُوغ 🐾 〕━━━╮\n\nأهلاً وسهلاً بيك بعالم نغنوغ ❤️\nمساعدك الذكي لإدارة المجموعة وتنظيمها وحمايتها.\n\n✦ اختَر القسم المناسب من القائمة أدناه للبدء.\n\n╰━━━━━━━━━━━━━━━━━━╯') saved.startText = DEFAULT_CUSTOMIZATION.startText;
   }
   return db.customizations[id];
@@ -161,11 +169,15 @@ function getCustomization(ctx) {
 
 function customText(ctx, section, key) {
   const c = getCustomization(ctx);
-  return section === 'startText' ? c.startText : c[section]?.[key];
+  if (section === 'startText') return c.startText;
+  if (section === 'helpText') return c.helpText || HELP_TEXT;
+  if (section === 'labels' || section === 'uiTexts') return c[section]?.[key];
+  return c[section]?.[key];
 }
+function uiText(ctx, key, fallback) { const value = getCustomization(ctx).uiTexts?.[key]; return typeof value === 'string' && value.trim() ? value : fallback; }
 
 function getHomeKeyboard(ctx) {
-  const kb = mainKeyboard(ctx, bot);
+  const kb = mainKeyboard(ctx, bot, getCustomization(ctx));
   const hasCustomizationButton = (kb.inline_keyboard || []).some(row =>
     row.some(button => button.callback_data === 'custommenu')
   );
@@ -250,7 +262,7 @@ function selectedGroupKeyboard(ctx) {
 async function showGroups(ctx) {
   const { kb, entries } = selectedGroupKeyboard(ctx);
   if (!entries.length) return answer(ctx, customText(ctx, 'replies', 'nogroups'));
-  return answer(ctx, `👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾`, { reply_markup: kb });
+  return answer(ctx, uiText(ctx, 'groups', '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾'), { reply_markup: kb });
 }
 
 async function showGroupSettings(ctx, g = selectedGroup(ctx)) {
@@ -341,13 +353,48 @@ async function showProfileCard(ctx, g, targetUser = null) {
 
 async function handleViolation(ctx, g, reason) {
   const userId = userKey(ctx);
-  const name = ctx.from.first_name || 'عضو';
+  const name = ctx.from?.first_name || 'عضو';
+  const settings = g.warningSettings || (g.warningSettings = { enabled: false, limit: 3, action: 'mute', duration: 10 });
+  if (!settings.enabled || !userId || String(userId) === String(bot.botInfo?.id)) return;
   g.warnings ||= {};
   g.warnings[userId] ||= { count: 0, name };
-  g.warnings[userId].count += 1;
+  g.warnings[userId].count = Number(g.warnings[userId].count || 0) + 1;
+  g.warnings[userId].name = name;
   g.warningLog ||= [];
-  g.warningLog.push({ userId, name, reason, date: new Date().toISOString() });
+  g.warningLog.push({ userId, name, reason, count: g.warnings[userId].count, date: new Date().toISOString() });
+  if (g.warningLog.length > 200) g.warningLog = g.warningLog.slice(-200);
+  const count = g.warnings[userId].count;
+  const limit = Math.max(1, Number(settings.limit) || 3);
   save();
+  try { await ctx.reply(`⚠️ تحذير للعضو ${name} (${count}/${limit})\nالسبب: ${reason}`); } catch {}
+  if (count < limit || settings.action === 'none') return;
+  try {
+    const member = await ctx.api.getChatMember(ctx.chat.id, Number(userId));
+    if (['administrator', 'creator'].includes(member.status) || ctx.from?.is_bot) return;
+    if (settings.action === 'mute') {
+      const mins = Math.max(1, Number(settings.duration) || 10);
+      const until = Math.floor(Date.now() / 1000) + mins * 60;
+      await ctx.api.restrictChatMember(ctx.chat.id, Number(userId), {
+        can_send_messages: false, can_send_audios: false, can_send_documents: false,
+        can_send_photos: false, can_send_videos: false, can_send_video_notes: false,
+        can_send_voice_notes: false, can_send_polls: false, can_send_other_messages: false,
+        can_add_web_page_previews: false
+      }, { until_date: until });
+      await ctx.reply(`🔇 تم كتم ${name} لمدة ${mins} دقيقة بعد بلوغه حد التحذيرات.`);
+    } else if (settings.action === 'kick') {
+      await ctx.api.banChatMember(ctx.chat.id, Number(userId));
+      await ctx.api.unbanChatMember(ctx.chat.id, Number(userId));
+      await ctx.reply(`🚪 تم طرد ${name} بعد بلوغه حد التحذيرات.`);
+    } else if (settings.action === 'ban') {
+      await ctx.api.banChatMember(ctx.chat.id, Number(userId));
+      await ctx.reply(`⛔ تم حظر ${name} بعد بلوغه حد التحذيرات.`);
+    }
+    g.warnings[userId].count = 0;
+    save();
+  } catch (error) {
+    console.warn('Warning punishment failed:', error?.description || error?.message || error);
+    try { await ctx.reply('⚠️ وصل العضو إلى حد التحذيرات، لكن تعذر تنفيذ العقوبة. تأكد أن نغنوغ مشرف ويملك صلاحية تقييد الأعضاء.'); } catch {}
+  }
 }
 
 // تفعيل ملف الأوامر المنفصل
@@ -357,7 +404,7 @@ setupCommands(bot, db, {
   HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate,
   selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
   showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList,
-  showProfileCard, handleViolation, showOwnerPanel, PROFILE_PHRASES
+  showProfileCard, handleViolation, showOwnerPanel, PROFILE_PHRASES, uiText
 });
 
 bot.start();
