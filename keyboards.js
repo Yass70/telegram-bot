@@ -2,22 +2,14 @@ import { InlineKeyboard } from 'grammy';
 
 export function mainKeyboard(ctx, bot) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
-  const isOwnerPrivate = ctx?.chat?.type === 'private'
-    && !!String(process.env.BOT_OWNER_ID || '').trim()
-    && String(ctx?.from?.id || '') === String(process.env.BOT_OWNER_ID || '').trim();
-
+  // واجهة الخاص الأساسية موحّدة للمالك والمستخدم، مع أزرار المالك الإضافية من index.js.
   const kb = new InlineKeyboard()
-    .url('➕ إضافة نغنوغ للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
-    .text('👥 〔 مجموعاتي 〕', 'mygroups').row();
-
-  // واجهة المالك الرئيسية أخف: نخفي مركز الأوامر والنقاط والإحصائيات فقط،
-  // مع إبقاء الوظائف متاحة من القوائم المناسبة وبقية المستخدمين كما هم.
-  if (!isOwnerPrivate) kb.text('📚 〔 مركز الأوامر 〕', 'publiccommands');
-  kb.text('🛡️ 〔 الإدارة والحماية 〕', 'managementmenu').row();
-  if (!isOwnerPrivate) kb.text('🏆 〔 النقاط والإحصائيات 〕', 'statsmenu');
-  kb.text('👤 〔 ملفّي الشخصي 〕', 'accountinfo').row()
-    .text('🎨 〔 تخصيص نغنوغ 〕', 'custommenu')
-    .text('📖 〔 دليل الاستخدام 〕', 'help');
+    .text('👥 مجموعاتي', 'mygroups')
+    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
+    .text('⚙️ الإدارة', 'managementmenu').row()
+    .text('👤 ملفي الشخصي', 'accountinfo').row()
+    .text('🎨 تخصيص نغنوغ', 'custommenu')
+    .text('📖 المساعدة', 'help');
   return kb;
 }
 
@@ -60,25 +52,25 @@ export function customizationRepliesKeyboard() {
 
 export function helpKeyboard() {
   return new InlineKeyboard()
-    .text('👥 〔 إدارة المجموعات 〕', 'mygroups')
+    .text('👥 مجموعاتي', 'mygroups')
     .row()
-    .text('🏠 الرئيسية', 'home')
-    .url('👤 〔 حساب المطوّر 〕', 'https://t.me/llll6llll6');
+    .text('🏠 الرئيسية', 'home').row()
+    .url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
 }
 
 export function ownerKeyboard() {
   return new InlineKeyboard()
-    .text('📊 〔 إحصائيات نغنوغ 〕', 'botstats')
+    .text('📊 إحصائيات نغنوغ', 'botstats')
     .row()
-    .text('👥 〔 المجموعات النشطة 〕', 'activatedgroups')
+    .text('👥 المجموعات النشطة', 'activatedgroups')
     .row()
-    .text('📢 〔 إرسال إشعار عام 〕', 'broadcastmenu')
+    .text('📢 إرسال إشعار عام', 'broadcastmenu')
     .row()
-    .text('⚙️ 〔 إعدادات البوت العامة 〕', 'botsettings')
+    .text('⚙️ إعدادات البوت العامة', 'botsettings')
     .row()
-    .text('🛡️ 〔 حماية المجموعة المحددة 〕', 'globalprotection')
+    .text('🛡️ حماية المجموعة المحددة', 'globalprotection')
     .row()
-    .text('🔐 〔 الاشتراك الإجباري 〕', 'requiredmenu')
+    .text('🔐 الاشتراك الإجباري', 'requiredmenu')
     .row()
     .text('🔙 القائمة الرئيسية', 'home');
 }
@@ -106,7 +98,7 @@ export function warningsKeyboard(g) {
     .row()
     .text(`🔢 عدد التحذيرات: ${w.limit}`, 'warningslimit')
     .row()
-    .text(`⚖️ العقوبة: ${actionNames[w.action] || 'كتم'}`, 'warningsaction')
+    .text(`⚖️ العقوبة: ${actionNamesw.action || 'كتم'}`, 'warningsaction')
     .row()
     .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration')
     .row()
@@ -121,17 +113,17 @@ export function warningsKeyboard(g) {
 
 export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
-    .text('👋 تخصيص رسالة الترحيب', 'welcomeedit')
+    .text('👋 رسالة الترحيب', 'welcomeedit')
     .row()
-    .text('🛡️ إدارة الحماية الموحدة', 'protectionmenu')
+    .text('🛡️ الحماية الموحدة', 'protectionmenu')
     .row()
-    .text('🛡️ التحذيرات والعقوبات', 'warningsmenu')
+    .text('⚠️ التحذيرات والعقوبات', 'warningsmenu')
     .row()
-    .text('💬 إدارة الردود التلقائية', 'repliesmenu')
+    .text('💬 الردود التلقائية', 'repliesmenu')
     .row()
     .text('📊 إحصائيات المجموعة', 'groupstats')
     .row()
-    .text('↩️ العودة إلى الإدارة والحماية', 'managementmenu');
+    .text('🔙 العودة للمجموعة', 'groupoverview');
 }
 
 export function repliesKeyboard() {
