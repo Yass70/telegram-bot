@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { GROUP_RULES, NORMAL_MEMBER_RULES_REPLY, findAutoReply } from './autoReplies.js';
+
 import {
   mainKeyboard,
   helpKeyboard,
@@ -9,7 +10,11 @@ import {
   repliesKeyboard,
   customizationKeyboard,
   customizationDescriptionsKeyboard,
-  customizationRepliesKeyboard
+  customizationRepliesKeyboard,
+  publicCommandsKeyboard,
+  publicGamesKeyboard,
+  publicInteractiveKeyboard,
+  publicInfoBackKeyboard
 } from './keyboards.js';
 
 // قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)[cite: 4]
@@ -305,37 +310,23 @@ export function setupCommands(bot, db, helpers) {
   // يقبل: /commands ، الأوامر ، الاوامر
   // ==========================================
 
-  const noghnoghCommandsKeyboard = () => new InlineKeyboard()
-    .text('🎮 ساحة الألعاب', 'gamesmenu')
-    .text('🏆 لوحة الأبطال', 'game_top')
-    .row()
-    .text('💬 سوالف نغنوغ', 'public_interactive')
-    .row()
-    .text('🛡️ الحماية', 'protectionmenu')
-    .text('👑 إدارة المجموعة', 'adminpanel')
-    .row()
-    .text('📖 دليل الاستخدام', 'help')
-    .row()
-    .text('✖️ إغلاق', 'close_public_commands');
-
-  const sendNoghnoghCommands = async ctx => {
+    const sendNoghnoghCommands = async ctx => {
     const message =
-      '🐈‍⬛  نَغْنُوغ | مركز أوامر المجموعة\n' +
+      '🐈‍⬛「 نَغْنُوغ | مَرْكَز أَوَامِر المَجْمُوعَة 」\n' +
       '━━━━━━━━━━━━━━━━━━\n\n' +
-      'هلا بيك عيني! ❤️\n' +
-      'كل أدوات نغنوغ بمكان واحد، اختار القسم اللي تحتاجه من الأزرار أدناه.\n\n' +
-      '🎮 العب وتحدّى الأعضاء\n' +
-      '🏆 اجمع النقاط ونافس على الصدارة\n' +
-      '💬 استمتع بالسوالف والردود العراقية\n' +
-      '🛡️ أدوات الحماية والإدارة للمخولين\n\n' +
+      'هَلَا بِيك عَيْنِي ❤️\n' +
+      'اختار القسم اللي تحتاجه من الأزرار أدناه:\n\n' +
+      '🎮「 الألعاب 」 تحدّيات وأسئلة وألغاز\n' +
+      '💬「 الأوامر التفاعلية 」 سوالف وميزات نغنوغ\n' +
+      '🛡️「 الحماية 」 تعليمات حماية المجموعة\n' +
+      '👑「 الإدارة 」 أوامر المشرفين\n\n' +
       '━━━━━━━━━━━━━━━━━━\n' +
-      '🐾 نغنوغ موجود حتى يخلي مجموعتكم أحلى!';
+      '🐾 نَغْنُوغ يخلّي سوالف مجموعتكم أحلى!';
 
     return ctx.reply(message, {
-      reply_markup: noghnoghCommandsKeyboard()
+      reply_markup: publicCommandsKeyboard()
     });
   };
-
   // الأمر /commands
   bot.command('commands', sendNoghnoghCommands);
 
@@ -514,13 +505,16 @@ export function setupCommands(bot, db, helpers) {
       return;
     }
 
-    if (data === 'publiccommands') {
-      return answer(
-        ctx,
-        '🐈‍⬛ نَغْنُوغ | مركز أوامر المجموعة\n\nاختار القسم اللي تحتاجه ❤️',
-        { reply_markup: noghnoghCommandsKeyboard() }
-      );
-    }
+    
+if (data === 'publiccommands') {
+  return answer(
+    ctx,
+    '🐈‍⬛「 نَغْنُوغ | مَرْكَز أَوَامِر المَجْمُوعَة 」\n\n' +
+    'هَلَا بِيك عَيْنِي ❤️\n' +
+    'اختار القسم اللي تحتاجه من الأزرار أدناه:',
+    { reply_markup: publicCommandsKeyboard() }
+  );
+}
 
     if (data === 'public_interactive') {
       const keyboard = new InlineKeyboard()
