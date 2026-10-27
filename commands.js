@@ -299,27 +299,50 @@ export function setupCommands(bot, db, helpers) {
   });
 
   // أمر عرض الأوامر علناً في المجموعة للجميع (/commands أو الأوامر)
-  bot.command(['commands', 'الأوامر'], async ctx => {
-    const publicHelpText = `📋 **قائمة أوامر وميزات بوت (نغنوغ) في المجموعة:**\n\n` +
-      `🎮 **ألعاب التحدي والنقاط:**\n` +
-      `• \`خ\` ➜ لعبة اختر الخيار الصحيح\n` +
-      `• \`ر\` ➜ لعبة الرياضيات السريعة\n` +
-      `• \`ح\` ➜ لعبة معرفة الحيوان من الحرف الأول\n` +
-      `• \`س\` ➜ لعبة أسئلة عامة وثقافية\n` +
-      `• \`توب\` ➜ عرض قائمة أبطال النقاط (أعلى 3)\n\n` +
-      `💬 **الردود والتفاعل اليومي:**\n` +
-      `• \`ا\` ➜ عرض بطاقة ملفك الشخصي ونقاطك\n` +
-      `• \`كت\` ➜ سؤال فضفضة وموقف عشوائي\n` +
-      `• \`ش\` ➜ أبيات شعرية لطيفة\n` +
-      `• \`ن\` أو \`نغنوغ\` ➜ قفشات وردود نغنوغ العراقية\n\n` +
-      `👑 **أوامر الإدارة للمشرفين (بالرد على الرسالة):**\n` +
-      `• \`كتم [الدقائق]\` ➜ كتم العضو (مثال: \`كتم 10\`)\n` +
-      `• \`طرد\` ➜ طرد العضو من المجموعة\n` +
-      `• \`قفل الرسائل\` / \`افتح الرسائل\`\n` +
-      `• \`امسح [العدد]\` ➜ حذف الرسائل (مثال: \`امسح 10\`)\n` +
-      `• \`تفعيل الحماية\` ➜ تشغيل الحماية الشاملة تلقائياً`;
+  
+  // ==========================================
+  // 🐈‍⬛ مركز أوامر نغنوغ — الواجهة الاحترافية
+  // يقبل: /commands ، الأوامر ، الاوامر
+  // ==========================================
 
-    await ctx.reply(publicHelpText, { parse_mode: 'Markdown' });
+  const noghnoghCommandsKeyboard = () => new InlineKeyboard()
+    .text('🎮 ساحة الألعاب', 'gamesmenu')
+    .text('🏆 لوحة الأبطال', 'game_top')
+    .row()
+    .text('💬 سوالف نغنوغ', 'public_interactive')
+    .row()
+    .text('🛡️ الحماية', 'protectionmenu')
+    .text('👑 إدارة المجموعة', 'adminpanel')
+    .row()
+    .text('📖 دليل الاستخدام', 'help')
+    .row()
+    .text('✖️ إغلاق', 'close_public_commands');
+
+  const sendNoghnoghCommands = async ctx => {
+    const message =
+      '🐈‍⬛  نَغْنُوغ | مركز أوامر المجموعة\n' +
+      '━━━━━━━━━━━━━━━━━━\n\n' +
+      'هلا بيك عيني! ❤️\n' +
+      'كل أدوات نغنوغ بمكان واحد، اختار القسم اللي تحتاجه من الأزرار أدناه.\n\n' +
+      '🎮 العب وتحدّى الأعضاء\n' +
+      '🏆 اجمع النقاط ونافس على الصدارة\n' +
+      '💬 استمتع بالسوالف والردود العراقية\n' +
+      '🛡️ أدوات الحماية والإدارة للمخولين\n\n' +
+      '━━━━━━━━━━━━━━━━━━\n' +
+      '🐾 نغنوغ موجود حتى يخلي مجموعتكم أحلى!';
+
+    return ctx.reply(message, {
+      reply_markup: noghnoghCommandsKeyboard()
+    });
+  };
+
+  // الأمر /commands
+  bot.command('commands', sendNoghnoghCommands);
+
+  // الكلمات العربية بدون / — مع دعم الهمزة وبدونها
+  bot.hears(/^(?:الأوامر|الاوامر)$/u, async ctx => {
+    if (!isGroup(ctx)) return;
+    return sendNoghnoghCommands(ctx);
   });
 
   bot.hears(/^الأوامر$/i, async ctx => {
@@ -502,6 +525,57 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'interactive_n') return answer(ctx, 'اكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
         if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
+    // 🐈‍⬛ معالجات أزرار مركز أوامر نغنوغ
+
+    if (data === 'close_public_commands') {
+      try {
+        await ctx.deleteMessage();
+      } catch {}
+      return;
+    }
+
+    if (data === 'publiccommands') {
+      return answer(
+        ctx,
+        '🐈‍⬛ نَغْنُوغ | مركز أوامر المجموعة\n\nاختار القسم اللي تحتاجه ❤️',
+        { reply_markup: noghnoghCommandsKeyboard() }
+      );
+    }
+
+    if (data === 'public_interactive') {
+      const keyboard = new InlineKeyboard()
+        .text('👤 بطاقة العضو — ا', 'public_profile_info')
+        .row()
+        .text('🧠 سؤال عشوائي — كت', 'public_confession_info')
+        .row()
+        .text('📜 شعر — ش', 'public_poem_info')
+        .row()
+        .text('🐈‍⬛ ردود نغنوغ — ن', 'public_noghnogh_info')
+        .row()
+        .text('🔙 رجوع', 'publiccommands');
+
+      return answer(
+        ctx,
+        '💬 سوالف نغنوغ\n\nاختار الأمر اللي تريد تعرف طريقة استخدامه:',
+        { reply_markup: keyboard }
+      );
+    }
+
+    if (data === 'public_profile_info') {
+      return answer(ctx, '👤 بطاقة العضو\n\nاكتب «ا» داخل المجموعة، أو ردّ بالحرف على رسالة العضو لعرض بطاقته.');
+    }
+
+    if (data === 'public_confession_info') {
+      return answer(ctx, '🧠 السؤال العشوائي\n\nاكتب «كت» داخل المجموعة حتى يظهر سؤال عشوائي.');
+    }
+
+    if (data === 'public_poem_info') {
+      return answer(ctx, '📜 الشعر\n\nاكتب «ش» داخل المجموعة حتى يظهر شعر قصير.');
+    }
+
+    if (data === 'public_noghnogh_info') {
+      return answer(ctx, '🐈‍⬛ ردود نغنوغ\n\nاكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
+    }
     // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
