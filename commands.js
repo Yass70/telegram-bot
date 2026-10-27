@@ -308,15 +308,15 @@ export function setupCommands(bot, db, helpers) {
 
   // لوحة الأوامر التفاعلية: تظهر كأزرار داخل المجموعة وتُحدّث الرسالة نفسها عند الاختيار.
   const publicCommandsKeyboard = () => new InlineKeyboard()
-    .text('🎮 الألعاب', 'gamesmenu').row()
-    .text('💬 الأوامر التفاعلية', 'interactive_menu').row()
-    .text('🛡️ أوامر الحماية', 'protectionmenu').row()
-    .text('👑 أوامر المشرفين', 'adminpanel').row()
-    .text('🏆 المتصدرون والنقاط', 'statsmenu').row()
-    .url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
+    .text('🎮 〔 الألعاب 〕', 'gamesmenu').row()
+    .text('💬 〔 الأوامر التفاعلية 〕', 'interactive_menu').row()
+    .text('🛡️ 〔 أوامر الحماية 〕', 'protectionmenu').row()
+    .text('👑 〔 أوامر المشرفين 〕', 'adminpanel').row()
+    .text('🏆 〔 المتصدرون والنقاط 〕', 'statsmenu').row()
+    .url('👨🏻‍💻 〔 المطوّر 〕', 'https://t.me/llll6llll6');
   const sendPublicCommands = async ctx => {
-    if (!isGroup(ctx)) return ctx.reply('🐾 افتح «الأوامر» داخل المجموعة حتى تشوف لوحة نغنوغ التفاعلية.');
-    return ctx.reply('🐈‍⬛ لوحة أوامر نغنوغ 🐾\n\nاختار القسم، والقائمة راح تتبدل بنفس الرسالة. الألعاب والتفاعل متاحة للجميع، والحماية والإشراف للمخوّلين فقط.', { reply_markup: publicCommandsKeyboard() });
+    if (!isGroup(ctx)) return ctx.reply('🐾 〔 تنبيه 〕 افتح «الأوامر» داخل المجموعة حتى تظهر لك لوحة نغنوغ التفاعلية.');
+    return ctx.reply('╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين مخصّصة للمخوّلين فقط.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
   };
   bot.command('commands', sendPublicCommands);
   bot.hears(/^الأوامر$/i, sendPublicCommands);
@@ -466,40 +466,49 @@ export function setupCommands(bot, db, helpers) {
     try { await ctx.answerCallbackQuery(); } catch {}
 
     const showHomeFunc = async (cCtx) => {
+      if (isGroup(cCtx)) {
+        await safeEdit(cCtx,
+          '╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين تتطلب صلاحيات مناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯',
+          publicCommandsKeyboard());
+        return;
+      }
       const c = getCustomization(cCtx);
       await safeEdit(cCtx, c.startText, getHomeKeyboard(cCtx));
     };
 
     if (data === 'home') return showHomeFunc(ctx);
     if (data === 'publiccommands') {
-      return answer(ctx, '🐈‍⬛ لوحة أوامر نغنوغ 🐾\n\nاختار القسم المطلوب. الألعاب والتفاعل متاحة للجميع، أما الحماية وأوامر المشرفين فتحتاج صلاحيات المجموعة.', { reply_markup: publicCommandsKeyboard() });
+      return answer(ctx, '╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين تتطلب صلاحيات مناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
     }
     if (data === 'showpublichelp') {
-      const kb = new InlineKeyboard().text('🔙 مركز الأوامر', 'publiccommands').row().text('🏠 الرئيسية', 'home');
-      return answer(ctx, '🐾 أوامر المجموعة\n\n🎮 الألعاب: خ، ر، ح، س\n🏆 توب: عرض أعلى ثلاثة أعضاء بالنقاط\n👤 ا: بطاقة العضو، أو ردّ بـ «ا» على رسالة عضو\n🧠 كت: سؤال عشوائي\n📜 ش: شعر قصير\n🐈‍⬛ ن: رد عراقي من نغنوغ\n\nالألعاب متاحة داخل المجموعات المفعّلة.', { reply_markup: kb });
+      const kb = new InlineKeyboard().text('↩️ العودة إلى مركز الأوامر', 'publiccommands').row().text('🏠 القائمة الرئيسية', 'home');
+      return answer(ctx, '╭━━━〔 📚 دليل أوامر المجموعة 〕━━━╮\n\n🎮 〔 الألعاب 〕 خ — ر — ح — س\n🏆 〔 توب 〕 عرض الأعضاء الأعلى نقاطاً.\n👤 〔 ا 〕 بطاقة العضو؛ ويمكن الرد بالرمز على رسالة العضو.\n🧠 〔 كت 〕 سؤال أو موقف عشوائي.\n📜 〔 ش 〕 أبيات وعبارات شعرية.\n🐈‍⬛ 〔 ن 〕 ردود نغنوغ العراقية.\n\n✦ تعمل الألعاب داخل المجموعات المفعّلة.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
     if (data === 'managementmenu') {
       const kb = new InlineKeyboard()
         .text('⚙️ إعدادات المجموعة', 'groupsettings').row()
-        .text('🛡️ أوامر الحماية', 'protectionmenu').row()
-        .text('👑 أوامر المشرفين', 'adminpanel').row()
+        .text('🛡️ 〔 أوامر الحماية 〕', 'protectionmenu').row()
+        .text('👑 〔 أوامر المشرفين 〕', 'adminpanel').row()
         .text('🧾 التحذيرات والكلمات الممنوعة', 'warningsmenu').row()
         .text('🔙 القائمة الرئيسية', 'home');
-      return answer(ctx, '⚙️ الإدارة والحماية\n\nاختار القسم المطلوب. بعض الخيارات تحتاج أن تكون مشرفاً في المجموعة المحددة، وأن يمتلك البوت الصلاحيات اللازمة.', { reply_markup: kb });
+      return answer(ctx, '╭━━━〔 🛡️ الإدارة والحماية 〕━━━╮\n\nاختَر القسم الذي تريد إدارته.\nبعض الخيارات متاحة للمشرفين فقط، كما تتطلب بعض العمليات منح نغنوغ صلاحيات الإدارة المناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
-    if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
-    if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
+    if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
+    if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'interactive_menu') {
-      const kb = new InlineKeyboard().text('👤 بطاقة العضو (ا)', 'interactive_profile').row()
-        .text('🧠 كت', 'interactive_ket').text('📜 شعر (ش)', 'interactive_poem').row()
-        .text('🐈‍⬛ نغنوغ (ن)', 'interactive_n').row().text('🏆 توب النقاط', 'game_top').row()
-        .text('🔙 مركز الأوامر', 'publiccommands');
-      return answer(ctx, '💬 الأوامر التفاعلية المتاحة للجميع داخل المجموعة:\nا — بطاقة العضو (بالرد على رسالة لعرض بطاقته)\nكت — سؤال عشوائي\nش — شعر قصير\nن — رد عراقي من نغنوغ\nتوب — أفضل ثلاثة أعضاء بالنقاط.', { reply_markup: kb });
+      const kb = new InlineKeyboard().text('👤 〔 بطاقة العضو: ا 〕', 'interactive_profile').row()
+        .text('🧠 〔 كت 〕', 'interactive_ket').text('📜 〔 الشعر: ش 〕', 'interactive_poem').row()
+        .text('🐈‍⬛ 〔 نغنوغ: ن 〕', 'interactive_n').row().text('🏆 〔 المتصدرون: توب 〕', 'game_top').row()
+        .text('↩️ العودة إلى قائمة الأوامر', 'publiccommands');
+      return answer(ctx, '╭━━━〔 💬 الأوامر التفاعلية 〕━━━╮\n\n👤 〔 ا 〕 بطاقة العضو — أرسل الرمز أو ردّ به على رسالة العضو.\n🧠 〔 كت 〕 سؤال أو موقف عشوائي.\n📜 〔 ش 〕 أبيات وعبارات شعرية.\n🐈‍⬛ 〔 ن 〕 تفاعل باللهجة العراقية من نغنوغ.\n🏆 〔 توب 〕 قائمة الأعضاء المتصدرين بالنقاط.\n\n✦ هذه الأوامر متاحة لجميع الأعضاء.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
-    if (data === 'interactive_profile') return answer(ctx, 'اكتب «ا» داخل المجموعة، أو ردّ بها على رسالة عضو لعرض بطاقته.');
-    if (data === 'interactive_ket') return answer(ctx, 'اكتب «كت» داخل المجموعة حتى يظهر سؤال عشوائي.');
-    if (data === 'interactive_poem') return answer(ctx, 'اكتب «ش» داخل المجموعة حتى يظهر شعر قصير.');
-    if (data === 'interactive_n') return answer(ctx, 'اكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
+    const interactiveDetailKeyboard = () => new InlineKeyboard()
+      .text('🔙 رجوع للأوامر التفاعلية', 'interactive_menu').row()
+      .text('📚 رجوع لقائمة الأوامر', 'publiccommands');
+    if (data === 'interactive_profile') return answer(ctx, `╭━━━〔 👤 بطاقة العضو 〕━━━╮\n\nاكتب «ا» داخل المجموعة، أو ردّ بالرمز على رسالة العضو لعرض المعلومات المتاحة عنه.\n\n✦ ستظهر البيانات التي يتيحها تيليگرام فقط.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
+    if (data === 'interactive_ket') return answer(ctx, `╭━━━〔 🧠 أمثلة عشوائية 〕━━━╮\n\nاكتب «كت» داخل المجموعة حتى يرسل نغنوغ سؤالاً أو موقفاً عشوائياً للنقاش.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
+    if (data === 'interactive_poem') return answer(ctx, `╭━━━〔 📜 قسم الشعر 〕━━━╮\n\nاكتب «ش» داخل المجموعة حتى يشاركك نغنوغ بيتاً أو عبارة شعرية.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
+    if (data === 'interactive_n') return answer(ctx, `╭━━━〔 🐈‍⬛ تفاعل مع نغنوغ 〕━━━╮\n\nاكتب «ن» داخل المجموعة حتى يردّ عليك نغنوغ باللهجة العراقية.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
         if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
     // الأزرار الأساسية والحساب[cite: 3, 4]
@@ -545,15 +554,15 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'custommenu') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       clearPending(ctx);
-      return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط.', { reply_markup: customizationKeyboard() });
+      return answer(ctx, '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا يمكنك تخصيص النصوص التي تظهر لك في محادثتك الخاصة فقط.\n✦ تعديلاتك شخصية ولا تغيّر رسائل بقية المستخدمين.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: customizationKeyboard() });
     }
 
     if (data === 'customdescmenu') {
-      return answer(ctx, '🔘 تخصيص شرح الأزرار:', { reply_markup: customizationDescriptionsKeyboard() });
+      return answer(ctx, '╭─〔 📝 تخصيص شروحات الأزرار 〕─╮\nاختَر القسم الذي تريد تعديل شرحه.', { reply_markup: customizationDescriptionsKeyboard() });
     }
 
     if (data === 'customreplymenu') {
-      return answer(ctx, '💬 تخصيص ردود البوت:', { reply_markup: customizationRepliesKeyboard() });
+      return answer(ctx, '╭─〔 💬 تخصيص ردود نغنوغ 〕─╮\nاختَر الرد الذي تريد تعديله.', { reply_markup: customizationRepliesKeyboard() });
     }
 
     if (data.startsWith('customdesc:')) {
@@ -593,7 +602,7 @@ export function setupCommands(bot, db, helpers) {
       const totalUsers = db.users?.length || 0;
       const privateUsers = db.privateUsers?.length || 0;
       const groupsCount = Object.keys(db.groups || {}).length;
-      return answer(ctx, `📊 إحصائيات البوت الشاملة:\n\n👥 إجمالي المستخدمين: ${totalUsers}\n💬 مستخدمو الخاص: ${privateUsers}\n🏘️ المجموعات المسجلة: ${groupsCount}`, { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+      return answer(ctx, `╭━━━〔 📊 إحصائيات نغنوغ 〕━━━╮\n\n👥 إجمالي المستخدمين: ${totalUsers}\n💬 مستخدمو المحادثة الخاصة: ${privateUsers}\n🏘️ المجموعات المسجّلة: ${groupsCount}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
     }
     if (data === 'activatedgroups') {
       const activeGroups = Object.values(db.groups || {}).filter(g => g.activated);
@@ -601,8 +610,8 @@ export function setupCommands(bot, db, helpers) {
       activeGroups.forEach((g, i) => { text += `${i + 1}. ${g.title} (\`${g.id}\`)\n`; });
       return answer(ctx, text, { parse_mode: 'Markdown', reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
     }
-    if (data === 'botsettings') return answer(ctx, '⚙️ إعدادات البوت العامة تعمل بشكل جيد.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
-    if (data === 'globalprotection') return answer(ctx, '🛡️ إعدادات الحماية العامة مفعلة تلقائياً.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'botsettings') return answer(ctx, '╭─〔 ⚙️ إعدادات البوت العامة 〕─╮\nتُدار إعدادات البوت من هذه اللوحة.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'globalprotection') return answer(ctx, '╭─〔 🛡️ الحماية العامة 〕─╮\nتعرض هذه الصفحة إعدادات الحماية العامة المتاحة.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
     if (data === 'requiredmenu') return ownerRequiredMenu(ctx);
     if (data === 'requiredlist') return showRequiredList(ctx);
     if (data === 'requiredadd') {
@@ -627,7 +636,7 @@ export function setupCommands(bot, db, helpers) {
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       save();
-      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nالمجموعة: ${g.title}`, { reply_markup: warningsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningstoggle') {
@@ -636,7 +645,7 @@ export function setupCommands(bot, db, helpers) {
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       g.warningSettings.enabled = !g.warningSettings.enabled;
       save();
-      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}`, { reply_markup: warningsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningslimit') {
@@ -670,7 +679,7 @@ export function setupCommands(bot, db, helpers) {
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       const log = g.warningLog || [];
       const logText = log.slice(-10).map(l => `• ${l.name}: ${l.reason}`).join('\n') || 'لا توجد سجلات تحذير حتى الآن.';
-      return answer(ctx, `📋 سجل التحذيرات الأخيرة:\n\n${logText}`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
+      return answer(ctx, `╭━━━〔 📋 سجل التحذيرات الأخيرة 〕━━━╮\n\n${logText}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
     }
 
     if (data === 'warningsclear') {
@@ -695,7 +704,7 @@ export function setupCommands(bot, db, helpers) {
       g.links = !g.links;
       g.linksLock = g.links;
       save();
-      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
     }
 
     if (data === 'toggleflood') {
@@ -703,7 +712,7 @@ export function setupCommands(bot, db, helpers) {
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.flood = !g.flood;
       save();
-      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
     }
 
     if (data === 'togglereplies') {
@@ -711,7 +720,7 @@ export function setupCommands(bot, db, helpers) {
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.autoReply = !g.autoReply;
       save();
-      return ctx.editMessageText(`⚙️ إعدادات مجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
     }
 
     if (data === 'badwordsmenu') {
@@ -723,7 +732,7 @@ export function setupCommands(bot, db, helpers) {
       g.badWords.forEach((word, index) => { kb.text(`🗑️ حذف: ${word}`, `badworddel:${index}`).row(); });
       kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
       const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
-      return ctx.editMessageText(`🚫 إدارة الكلمات الممنوعة\n\nالمجموعة: ${g.title}\nالكلمات:\n${wordsList}`, { reply_markup: kb });
+      return ctx.editMessageText(`╭━━━〔 🚫 إدارة الكلمات الممنوعة 〕━━━╮\nالمجموعة: «${g.title}»\n\n〔 الكلمات المسجّلة 〕\n${wordsList}`, { reply_markup: kb });
     }
 
     if (data === 'badwordadd') {
@@ -748,10 +757,10 @@ export function setupCommands(bot, db, helpers) {
       g.badWords.forEach((word, idx) => { kb.text(`🗑️ حذف: ${word}`, `badworddel:${idx}`).row(); });
       kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
       const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
-      return ctx.editMessageText(`🚫 إدارة الكلمات الممنوعة\n\nالمجموعة: ${g.title}\nالكلمات:\n${wordsList}`, { reply_markup: kb });
+      return ctx.editMessageText(`╭━━━〔 🚫 إدارة الكلمات الممنوعة 〕━━━╮\nالمجموعة: «${g.title}»\n\n〔 الكلمات المسجّلة 〕\n${wordsList}`, { reply_markup: kb });
     }
 
-    if (data === 'repliesmenu') return answer(ctx, '💬 إدارة الردود التلقائية', { reply_markup: repliesKeyboard() });
+    if (data === 'repliesmenu') return answer(ctx, '╭─〔 💬 إدارة الردود التلقائية 〕─╮', { reply_markup: repliesKeyboard() });
     if (data === 'replyadd') { 
       const g = selectedGroup(ctx); 
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.'); 
@@ -780,7 +789,7 @@ export function setupCommands(bot, db, helpers) {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً من «مجموعاتي».');
       if (!await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
-      return answer(ctx, `🛡️ إعدادات الحماية — ${g.title}\nالحالة الحالية موضحة على كل زر:`, { reply_markup: protectionKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ إعدادات الحماية 〕━━━╮\nالمجموعة: «${g.title}»\n✦ حالة كل ميزة موضّحة على الزر الخاص بها.`, { reply_markup: protectionKeyboard(g) });
     }
 
     if (data.startsWith('prot_')) {
@@ -808,43 +817,47 @@ export function setupCommands(bot, db, helpers) {
         if (type === 'audio') g.audioClipsLock = g.audioLock;
       } else return answer(ctx, 'خيار حماية غير معروف.');
       save();
-      const status = type === 'all' ? '🟢 تم تفعيل جميع خيارات الحماية.' : type === 'none' ? '⚪ تم إيقاف جميع خيارات الحماية.' : type === 'chat' ? `تم ${g.closedMessages ? 'قفل' : 'فتح'} دردشة المجموعة.` : `الحالة الجديدة: ${g[fieldByType[type]] ? 'مفعّل ✅' : 'متوقف ❌'}`;
-      return answer(ctx, `🛡️ تحديث الحماية\n\n${status}`, { reply_markup: protectionKeyboard(g) });
+      const status = type === 'all' ? '🟢 تم تفعيل جميع خيارات الحماية.' : type === 'none' ? '⚪ تم إيقاف جميع خيارات الحماية.' : type === 'chat' ? `تم ${g.closedMessages ? 'قفل' : 'فتح'} دردشة المجموعة.` : `تم ${g[fieldByType[type]] ? 'تفعيل' : 'إيقاف'} ${({ links: 'حماية الروابط', media: 'حماية الوسائط والملفات', badwords: 'حماية كلمات الفشار', audio: 'حماية الصوتيات', audioclips: 'حماية المقاطع الصوتية', forward: 'منع توجيه الرسائل', contacts: 'منع المعرفات والأرقام' })[type] || 'الميزة'} ${g[fieldByType[type]] ? '🟢' : '⚪'}`;
+      const announcement = `🛡️ تحديث الحماية — نغنوغ 🐈‍⬛\n\n${status}\n\n${g.title ? `المجموعة: ${g.title}` : ''}`.trim();
+      // لا نكتفي بتعديل نص اللوحة: أرسل إشعاراً مستقلاً داخل المجموعة أيضاً.
+      try { await ctx.api.sendMessage(g.id || ctx.chat.id, announcement); }
+      catch (err) { console.warn('[protection-announcement] Could not send group status:', err?.description || err?.message || err); }
+      return answer(ctx, `╭━━━〔 🛡️ تحديث الحماية 〕━━━╮\n\n${status}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: protectionKeyboard(g) });
     }
 
     // لوحة المشرفين[cite: 4]
     if (data === 'adminpanel') {
-      const adminText = `👑 أوامر المشرفين — نغنوغ 🐾\n\n` +
-        `🔇 كتم عضو: ردّ على رسالته واكتب كتم 10 (عشر دقائق)\n` +
-        `🔊 فتح الكتم: ردّ على رسالته واكتب فتح الكتم، أو فتح الكتم @username\n` +
-        `🚪 طرد عضو: ردّ على رسالته واكتب طرد، أو طرد @username\n` +
-        `🔒 قفل الدردشة: قفل الرسائل أو قفل المجموعة\n` +
-        `🔓 فتح الدردشة: افتح الرسائل أو افتح المجموعة\n` +
-        `🗑️ حذف عدد: امسح 10 أو حذف الرسائل 10\n` +
-        `🧹 حذف آخر الرسائل: احذف جميع الرسائل (يطلب تأكيداً)\n` +
-        `⭐ إضافة نقاط: ردّ على رسالة واكتب اضف 5، أو اضف 5 @username\n` +
-        `⚙️ صلاحية داخل نغنوغ: اضف مشرفا @username\n` +
-        `👤 معلومات عضو: ردّ على رسالته واكتب معلومات\n` +
-        `🏘️ معلومات المجموعة: مجموعتي\n` +
-        `🛡️ الحماية: تفعيل الحماية أو ايقاف الحماية\n` +
-        `🧰 أوامر الحماية: تشغيل/ايقاف الروابط، الوسائط، الفشار، الصوتيات، توجيه الرسائل والمعرفات`
-      return answer(ctx, adminText + '\n\n🛠️ الأوامر الإضافية: «اضف مشرفا @username»، «اضف 5 @username»، «معلومات @username»، «مجموعتي».', { reply_markup: new InlineKeyboard().text('🔙 لوحة الأوامر', 'publiccommands').row().text('🏠 الرئيسية', 'home') });
+      const adminText = `╭━━━〔 👑 أوامر المشرفين — نغنوغ 〕━━━╮\n\n` +
+        `🔇 〔 كتم عضو 〕 ردّ على رسالته واكتب «كتم 10» لكتمه عشر دقائق.\n` +
+        `🔊 〔 فك الكتم 〕 ردّ على رسالته واكتب «فتح الكتم»، أو اكتب «فتح الكتم @username».\n` +
+        `🚪 〔 طرد عضو 〕 ردّ على رسالته واكتب «طرد»، أو اكتب «طرد @username».\n` +
+        `🔒 〔 قفل المجموعة 〕 اكتب «قفل الرسائل» أو «قفل المجموعة».\n` +
+        `🔓 〔 فتح المجموعة 〕 اكتب «افتح الرسائل» أو «افتح المجموعة».\n` +
+        `🗑️ 〔 حذف رسائل 〕 اكتب «امسح 10» أو «حذف الرسائل 10».\n` +
+        `🧹 〔 حذف الرسائل المرصودة 〕 اكتب «احذف جميع الرسائل» ثم أكّد العملية.\n` +
+        `⭐ 〔 إضافة نقاط 〕 ردّ على رسالة واكتب «اضف 5»، أو «اضف 5 @username».\n` +
+        `⚙️ 〔 إضافة مشرف 〕 اكتب «اضف مشرفا @username».\n` +
+        `👤 〔 معلومات عضو 〕 ردّ على رسالته واكتب «معلومات».\n` +
+        `🏘️ 〔 معلومات المجموعة 〕 اكتب «مجموعتي».\n` +
+        `🛡️ 〔 الحماية 〕 اكتب «تفعيل الحماية» أو «ايقاف الحماية».\n` +
+        `🧰 〔 خيارات الحماية 〕 تشغيل/إيقاف الروابط والوسائط والفشار والصوتيات وتوجيه الرسائل والمعرّفات.`
+      return answer(ctx, adminText + '\n\n🛠️ 〔 أوامر إضافية 〕 «اضف مشرفا @username» — «اضف 5 @username» — «معلومات @username» — «مجموعتي».\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('↩️ العودة إلى قائمة الأوامر', 'publiccommands') });
     }
 
     // قائمة الألعاب والتحديات[cite: 4]
     if (data === 'gamesmenu' || data === 'games_list') {
-      const gamesText = `🎮 قائمة ألعاب نغنوغ والتحديات 🐾\n\n` +
-        `اكتب أحد الرموز التالية داخل المجموعة للبدء:\n\n` +
+      const gamesText = `╭━━━〔 🎮 ألعاب نغنوغ وتحدّياته 〕━━━╮\n\n` +
+        `✦ اكتب الرمز المطلوب داخل المجموعة لبدء اللعب:\n\n` +
         `🧩 (خ) ➜ لعبة اختر الخيار الصحيح\n` +
         `🔢 (ر) ➜ لعبة الرياضيات السريعة\n` +
         `🐅 (ح) ➜ لعبة معرفة الحيوان من الحرف الأول\n` +
         `💡 (س) ➜ لعبة أسئلة عامة وثقافية\n\n` +
-        `🏆 اجمع النقاط وتابع تصدرك عبر كتابة (توب) في الشات!`;
+        `🏆 اجمع النقاط وتابع ترتيبك بكتابة «توب» داخل المجموعة.\n╰━━━━━━━━━━━━━━━━━━╯`;
       
       const gamesKb = new InlineKeyboard()
-        .text('🧩 خيار صحيح (خ)', 'game_ch').text('🔢 رياضيات (ر)', 'game_ma').row()
-        .text('🐅 حيوانات (ح)', 'game_an').text('💡 أسئلة عامة (س)', 'game_ge').row()
-        .text('🏆 لوحة المتصدرين (توب)', 'game_top').row()
+        .text('🧩 〔 الاختيار الصحيح: خ 〕', 'game_ch').text('🔢 〔 الرياضيات: ر 〕', 'game_ma').row()
+        .text('🐅 〔 معرفة الحيوان: ح 〕', 'game_an').text('💡 〔 أسئلة عامة: س 〕', 'game_ge').row()
+        .text('🏆 〔 المتصدرون: توب 〕', 'game_top').row()
         .text('🔙 رجوع لمركز الأوامر', 'publiccommands');
 
       if (ctx.callbackQuery) {
@@ -862,12 +875,12 @@ export function setupCommands(bot, db, helpers) {
         game_an: '🐾 لعبة الحيوان\nاكتب «ح» داخل المجموعة وخمّن اسم الحيوان من أول حرف. أول إجابة صحيحة تربح نقطة.',
         game_ge: '💡 الأسئلة العامة\nاكتب «س» داخل المجموعة وجاوب عن السؤال. أول إجابة صحيحة تربح نقطة.'
       };
-      return answer(ctx, details[data], { reply_markup: new InlineKeyboard().text('🎮 رجوع للألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
+      return answer(ctx, details[data], { reply_markup: new InlineKeyboard().text('↩️ العودة إلى الألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
     }
     
     if (data === 'game_top') {
       const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
-      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 الألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
+      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('↩️ العودة إلى الألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
     }
 
     if (data === 'clearall_confirm') {
@@ -880,16 +893,20 @@ export function setupCommands(bot, db, helpers) {
       }
       delete db.pending[`clearall:${chatId}`]; save();
       let deleted = 0, failed = 0;
-      for (let mid = job.fromMessageId; mid >= Math.max(1, job.fromMessageId - 99); mid--) {
-        try { await ctx.api.deleteMessage(ctx.chat.id, mid); deleted++; } catch { failed++; }
+      const messageIds = Array.isArray(job.messageIds) ? job.messageIds : [];
+      for (const mid of [...messageIds].reverse()) {
+        try { await ctx.api.deleteMessage(ctx.chat.id, Number(mid)); deleted++; } catch { failed++; }
       }
-      try { await ctx.reply(`🧹 انتهت محاولة المسح. حذف: ${deleted}، تعذر حذف: ${failed}. قد يمنع تيليگرام حذف بعض الرسائل القديمة.`); } catch {}
+      const removed = new Set(messageIds.map(Number));
+      g.recentMessages = (g.recentMessages || []).filter(entry => !removed.has(Number(entry.message_id)));
+      save();
+      try { await ctx.reply(`🧹 انتهت محاولة المسح. حذف: ${deleted}، تعذر حذف: ${failed}. جرى الاعتماد على الرسائل التي رصدها البوت، لأن تيليگرام لا يتيح له جلب سجل المجموعة كاملاً.`); } catch {}
       return;
     }
     if (data === 'clearall_cancel') {
       const chatId = String(ctx.chat?.id || '');
       delete db.pending?.[`clearall:${chatId}`]; save();
-      return answer(ctx, 'تم إلغاء عملية الحذف.', { reply_markup: new InlineKeyboard().text('🏠 الرئيسية', 'home') });
+      return answer(ctx, 'تم إلغاء عملية الحذف.', { reply_markup: new InlineKeyboard().text('🏠 القائمة الرئيسية', 'home') });
     }
 
     if (data === 'statsmenu' || data === 'stats_points') {
@@ -901,25 +918,25 @@ export function setupCommands(bot, db, helpers) {
       const total = Object.values(scores).reduce((sum, n) => sum + Number(n || 0), 0);
       const kb = new InlineKeyboard().text('🏆 أفضل 3 أعضاء', 'stats_top').row()
         .text('⭐ نقاطي في هذه المجموعة', 'stats_mine').row()
-        .text('🎮 تعليمات الألعاب', 'gamesmenu').row().text('🏠 الرئيسية', 'home');
-      return answer(ctx, `📊 النقاط والإحصائيات${g ? ` — ${g.title}` : ''}\n\n👥 أعضاء لديهم نقاط: ${Object.keys(scores).length}\n⭐ مجموع النقاط الممنوحة: ${total}\n⭐ نقاطك: ${mine}`, { reply_markup: kb });
+        .text('🎮 تعليمات الألعاب', 'gamesmenu').row().text('🏠 القائمة الرئيسية', 'home');
+      return answer(ctx, `╭━━━〔 📊 النقاط والإحصائيات 〕━━━╮${g ? `\nالمجموعة: «${g.title}»` : ''}\n\n👥 الأعضاء الذين لديهم نقاط: ${Object.keys(scores).length}\n⭐ مجموع النقاط الممنوحة: ${total}\n🌟 رصيدك من النقاط: ${mine}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
     if (data === 'stats_top') {
       const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
-      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 الرئيسية', 'home') });
+      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'stats_mine') {
       const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
-      return answer(ctx, `⭐ نقاطك في هذه المجموعة: ${Number(groupScores(chatId)[userKey(ctx)] || 0)}`, { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 الرئيسية', 'home') });
+      return answer(ctx, `╭─〔 ⭐ رصيدك من النقاط 〕─╮\nرصيدك في هذه المجموعة: ${Number(groupScores(chatId)[userKey(ctx)] || 0)} نقطة.`, { reply_markup: new InlineKeyboard().text('🔙 النقاط والإحصائيات', 'statsmenu').row().text('🏠 القائمة الرئيسية', 'home') });
     }
 
     if (data === 'broadcastmenu') {
       if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.');
       pending(ctx, { action: 'broadcast-message' });
-      return answer(ctx, '📢 **قسم الإذاعة العامة**\n\nأرسل الآن النص أو الرسالة لجميع المستخدمين:', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'ownerpanel') });
+      return answer(ctx, '╭━━━〔 📢 الإذاعة العامة 〕━━━╮\n\nأرسل الآن النص أو الرسالة التي تريد إيصالها إلى المستخدمين المسجّلين.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'ownerpanel') });
     }
 
-    return answer(ctx, 'زر غير معروف.');
+    return answer(ctx, '⚠️ 〔 خيار غير معروف 〕\nجرّب الرجوع إلى القائمة السابقة واختيار أحد الأزرار المتاحة.');
   });
 
   // معالجة الرسائل والذكاء التفاعلي والحماية والألعاب داخل المجموعات[cite: 4]
@@ -939,6 +956,12 @@ export function setupCommands(bot, db, helpers) {
       g.userStats[uid] ||= { messages: 0 };
       g.knownMembers ||= {};
       g.knownMembers[uid] = { id: msg.from.id, name: [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'عضو', username: msg.from.username || '', seenAt: Date.now() };
+      // حفظ معرّفات الرسائل التي شاهدها البوت؛ Telegram Bot API لا يوفّر جلب سجل المجموعة عشوائياً.
+      g.recentMessages ||= [];
+      if (!g.recentMessages.some(entry => Number(entry.message_id) === Number(msg.message_id))) {
+        g.recentMessages.push({ message_id: Number(msg.message_id), date: Date.now(), user_id: Number(msg.from.id) });
+        if (g.recentMessages.length > 300) g.recentMessages = g.recentMessages.slice(-300);
+      }
       g.userStats[uid].messages = Number(g.userStats[uid].messages || 0) + 1;
       g.stats ||= { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 };
       g.stats.messages = Number(g.stats.messages || 0) + 1;
@@ -1091,14 +1114,29 @@ export function setupCommands(bot, db, helpers) {
           save(); return ctx.reply(`⭐ تمت إضافة ${amount} نقطة إلى ${target.first_name || target.username || 'العضو'} بنجاح.`);
         }
         if (/^مجموعتي$/i.test(text)) {
-          let chat, count = 'غير متاح', admins = [], photoId = null;
-          try { chat = await ctx.api.getChat(ctx.chat.id); count = String(await ctx.api.getChatMemberCount(ctx.chat.id)); photoId = chat.photo?.big_file_id || null; admins = await ctx.api.getChatAdministrators(ctx.chat.id); } catch {}
+          let chat = null, count = 'غير متاح', admins = [], photoId = null;
+          try {
+            chat = await ctx.api.getChat(ctx.chat.id);
+            const chatPhoto = chat?.photo || ctx.chat?.photo;
+            photoId = chatPhoto?.big_file_id || chatPhoto?.small_file_id || null;
+          } catch (err) { console.warn('[group-info] getChat failed:', err?.description || err?.message || err); }
+          try { count = String(await ctx.api.getChatMemberCount(ctx.chat.id)); }
+          catch (err) { console.warn('[group-info] getChatMemberCount failed:', err?.description || err?.message || err); }
+          try { admins = await ctx.api.getChatAdministrators(ctx.chat.id); }
+          catch (err) { console.warn('[group-info] getChatAdministrators failed:', err?.description || err?.message || err); }
           const creator = admins.find(a => a.status === 'creator');
           const known = Object.values(g.knownMembers || {});
           const list = known.slice(0, 60).map(m => `• ${m.name || 'عضو'} — ${m.username ? '@' + m.username : 'بدون يوزر'} — ${m.id}`).join('\n') || 'لا توجد أسماء محفوظة بعد.';
           const caption = `🏘️ معلومات المجموعة — نغنوغ\n\n📌 الاسم: ${chat?.title || ctx.chat.title}\n🆔 الآيدي: ${ctx.chat.id}\n👥 عدد الأعضاء: ${count}\n🛡️ عدد المشرفين: ${admins.length}\n👑 المالك: ${creator ? `${creator.user.first_name} (${creator.user.id})` : 'غير متاح'}\n📝 وصف المجموعة: ${chat?.description || 'ماكو وصف'}`;
-          if (photoId) { try { await ctx.replyWithPhoto(photoId, { caption }); } catch { await ctx.reply(caption); } }
-          else await ctx.reply(caption);
+          if (photoId) {
+            try { await ctx.replyWithPhoto(photoId, { caption }); }
+            catch (err) {
+              console.warn('[group-info] Sending group photo failed:', err?.description || err?.message || err);
+              await ctx.reply(`🖼️ تعذر إرسال صورة المجموعة من تيليگرام، وهذه المعلومات بدلاً منها:\n\n${caption}`);
+            }
+          } else {
+            await ctx.reply(`🖼️ لم يُرجع تيليگرام صورة للمجموعة عبر Bot API.\n\n${caption}`);
+          }
           return ctx.reply(`📋 الأعضاء الذين رصدهم البوت (${known.length} معروف؛ تيليگرام ما يسمح للبوت بجلب قائمة كل الأعضاء تلقائياً):\n${list}`.slice(0, 4000));
         }
         const infoMatch = text.match(/^معلومات(?:\s+(@?[A-Za-z0-9_]{4,}))?$/i);
@@ -1113,9 +1151,20 @@ export function setupCommands(bot, db, helpers) {
           const target = memberByUsername(openMuteMatch[1]);
           if (!target) return ctx.reply('ما لكيت المستخدم ضمن الأعضاء المعروفين.');
           try {
-            await ctx.api.restrictChatMember(ctx.chat.id, Number(target.id), { can_send_messages: true, can_send_audios: true, can_send_documents: true, can_send_photos: true, can_send_videos: true, can_send_video_notes: true, can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true, can_add_web_page_previews: true });
-            return ctx.reply(`🔊 تم فتح الكتم عن ${target.name || target.username}.`);
-          } catch { return ctx.reply('❌ تعذر فتح الكتم. تأكد من صلاحيات البوت.'); }
+            const chatInfo = await ctx.api.getChat(ctx.chat.id);
+            const defaultPermissions = chatInfo.permissions || {
+              can_send_messages: true, can_send_audios: true, can_send_documents: true,
+              can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
+              can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
+              can_add_web_page_previews: true
+            };
+            await ctx.api.restrictChatMember(ctx.chat.id, Number(target.id), defaultPermissions);
+            const after = await ctx.api.getChatMember(ctx.chat.id, Number(target.id));
+            if (after.status === 'restricted' && after.is_member && defaultPermissions.can_send_messages !== false && after.can_send_messages === false) {
+              throw new Error('Member still restricted after unmute.');
+            }
+            return ctx.reply(`🔊 تم فك الكتم عن ${target.name || target.username} وإعادة صلاحيات المجموعة الافتراضية إليه.`);
+          } catch { return ctx.reply('❌ تعذر فك الكتم. تأكد من صلاحيات البوت وأن العضو ليس مشرفاً.'); }
         }
       }
 
@@ -1135,10 +1184,9 @@ export function setupCommands(bot, db, helpers) {
           if (targetId && !await userIsAdmin(ctx.chat.id, targetId) && !target.is_bot) {
             const until = Math.floor(Date.now() / 1000) + (mins * 60);
             try {
-              await ctx.api.restrictChatMember(ctx.chat.id, targetId, {
-                permissions: { can_send_messages: false, can_send_media_messages: false, can_send_polls: false, can_send_other_messages: false },
-                until_date: until
-              });
+              await ctx.api.restrictChatMember(ctx.chat.id, targetId,
+                { can_send_messages: false, can_send_audios: false, can_send_documents: false, can_send_photos: false, can_send_videos: false, can_send_video_notes: false, can_send_voice_notes: false, can_send_polls: false, can_send_other_messages: false, can_add_web_page_previews: false },
+                { until_date: until });
               await ctx.reply(`🔇 تم كتم العضو ${targetName} لمدة **${mins}** دقيقة بنجاح.`, { parse_mode: 'Markdown' });
             } catch { await ctx.reply("❌ عذراً، لا أملك صلاحية كتم هذا المستخدم."); }
           }
@@ -1169,10 +1217,19 @@ export function setupCommands(bot, db, helpers) {
             await ctx.reply('لا يمكن فك قيود مشرف بهذه الطريقة.');
             return;
           }
-          await ctx.api.restrictChatMember(ctx.chat.id, target.id, {
-            permissions: { can_send_messages: true, can_send_audios: true, can_send_documents: true, can_send_photos: true, can_send_videos: true, can_send_video_notes: true, can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true, can_add_web_page_previews: true }
-          });
-          await ctx.reply(`🔊 تم فك الكتم عن ${target.first_name || 'العضو'}.`);
+          const chatInfo = await ctx.api.getChat(ctx.chat.id);
+          const defaultPermissions = chatInfo.permissions || {
+            can_send_messages: true, can_send_audios: true, can_send_documents: true,
+            can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
+            can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
+            can_add_web_page_previews: true
+          };
+          await ctx.api.restrictChatMember(ctx.chat.id, target.id, defaultPermissions);
+          const after = await ctx.api.getChatMember(ctx.chat.id, target.id);
+          if (after.status === 'restricted' && after.is_member && defaultPermissions.can_send_messages !== false && after.can_send_messages === false) {
+            throw new Error('Member is still restricted by Telegram after unmute.');
+          }
+          await ctx.reply(`🔊 تم فك الكتم عن ${target.first_name || 'العضو'} وإعادة صلاحيات المجموعة الافتراضية إليه.`);
         } catch { await ctx.reply('❌ تعذر فك الكتم. تحقق من صلاحيات البوت.'); }
         return;
       }
@@ -1216,19 +1273,26 @@ export function setupCommands(bot, db, helpers) {
           await ctx.reply('حدد عدداً من 1 إلى 100 رسالة.');
           return;
         }
+        const history = (g.recentMessages || [])
+          .filter(entry => Number(entry.message_id) <= Number(msg.message_id))
+          .sort((a, b) => Number(a.message_id) - Number(b.message_id));
+        const targets = history.slice(-count).reverse();
+        if (!targets.length) return ctx.reply('⚠️ ما عندي رسائل مسجلة للمسح بعد. خلي البوت يراقب رسائل المجموعة ثم جرّب مجدداً.');
         let deleted = 0, failed = 0;
-        // النطاق محدد: آخر N رسائل حتى رسالة الأمر نفسها.
-        for (let i = 0; i < count; i++) {
-          try { await ctx.api.deleteMessage(ctx.chat.id, msg.message_id - i); deleted++; }
+        for (const entry of targets) {
+          try { await ctx.api.deleteMessage(ctx.chat.id, Number(entry.message_id)); deleted++; }
           catch { failed++; }
         }
-        try { await ctx.reply(`🗑️ انتهت عملية المسح: حذف ${deleted} رسالة، وتعذر حذف ${failed}.`); } catch {}
+        const removed = new Set(targets.map(entry => Number(entry.message_id)));
+        g.recentMessages = (g.recentMessages || []).filter(entry => !removed.has(Number(entry.message_id)));
+        save();
+        try { await ctx.reply(`🗑️ انتهت عملية المسح: حذف ${deleted} من ${targets.length} رسالة، وتعذر حذف ${failed}.\n\nملاحظة: لا يستطيع تيليگرام حذف رسالة قديمة أو رسالة لا يملك البوت صلاحية حذفها.`); } catch {}
         return;
       }
 
       if (/^(?:المسح|احذف)\s+جميع\s+الرسائل$/i.test(text)) {
         db.pending ||= {};
-        db.pending[`clearall:${String(ctx.chat.id)}`] = { createdAt: Date.now(), fromMessageId: msg.message_id - 1 };
+        db.pending[`clearall:${String(ctx.chat.id)}`] = { createdAt: Date.now(), messageIds: (g.recentMessages || []).filter(entry => Number(entry.message_id) <= Number(msg.message_id)).slice(-100).map(entry => Number(entry.message_id)) };
         save();
         const kb = new InlineKeyboard().text('🗑️ تأكيد الحذف (آخر 100 رسالة)', 'clearall_confirm')
           .row().text('❌ إلغاء', 'clearall_cancel');
@@ -1409,7 +1473,7 @@ export function setupCommands(bot, db, helpers) {
           db.requiredChats ||= [];
           db.requiredChats.push({ id, title, url });
           save();
-          return answer(ctx, `✅ تم إضافة القناة أو المجموعة للاشتراك الإجباري بنجاح!`, { reply_markup: new InlineKeyboard().text('📢 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          return answer(ctx, `✅ تم إضافة القناة أو المجموعة للاشتراك الإجباري بنجاح!`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
         }
 
         if (p.action === 'edit-welcome') {
@@ -1460,7 +1524,7 @@ export function setupCommands(bot, db, helpers) {
           const entry = { trigger, response: text.trim() };
           if (existing >= 0) g.replies[existing] = entry; else g.replies.push(entry);
           save(); clearPending(ctx);
-          return ctx.reply('تمام عيني، انحفظ الرد بنجاح 🐾', { reply_markup: new InlineKeyboard().text('📋 عرض الردود', 'replylist').row().text('💬 إدارة الردود', 'repliesmenu') });
+          return ctx.reply('تمام عيني، انحفظ الرد بنجاح 🐾', { reply_markup: new InlineKeyboard().text('📋 قائمة الردود', 'replylist').row().text('💬 إدارة الردود', 'repliesmenu') });
         }
 
         if (p.action === 'badwordadd') {
@@ -1470,7 +1534,7 @@ export function setupCommands(bot, db, helpers) {
             g.badWords.push(text);
             save();
             clearPending(ctx);
-            return answer(ctx, `✅ تم إضافة الكلمة "${text}" إلى قائمة الممنوعات بنجاح!`, { reply_markup: new InlineKeyboard().text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu') });
+            return answer(ctx, `✅ تم إضافة الكلمة "${text}" إلى قائمة الممنوعات بنجاح!`, { reply_markup: new InlineKeyboard().text('🚫 الكلمات الممنوعة', 'badwordsmenu') });
           }
         }
       }
