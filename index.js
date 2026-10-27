@@ -35,6 +35,7 @@ const freshGroup = () => ({
   warningSettings: { enabled: false, limit: 3, action: 'mute', duration: 10 },
   warnings: {},
   userStats: {},
+  knownMembers: {},
   warningLog: [],
   floodUsers: {},
   game: null
@@ -76,6 +77,7 @@ function load() {
       g.id ||= id; g.replies ||= []; g.admins ||= [];
       if (oldGroup.linksLock === undefined) g.linksLock = !!g.links;
       g.userStats ||= {};
+      g.knownMembers ||= {};
       g.badWords ||= [];
       g.stats = { ...freshGroup().stats, ...(g.stats || {}) };
       g.floodUsers ||= {};
@@ -179,7 +181,7 @@ async function showOwnerPanel(ctx) {
 
 async function answer(ctx, text, extra = {}) {
   if (ctx.callbackQuery) {
-    try { await ctx.answerCallbackQuery({ text: text.length < 190 ? text : undefined }); } catch {}
+    try { await ctx.answerCallbackQuery(); } catch {}
     if (extra.reply_markup) return safeEdit(ctx, text, extra.reply_markup);
     return safeEdit(ctx, text, new InlineKeyboard().text('🔙 رجوع', 'home'));
   }
@@ -289,20 +291,37 @@ const PROFILE_PHRASES = [
   'الحلو مالتنا وصل 😻❤️', 'يا بعد عيون نغنوغ إنت 🐾💕', 'ولك شهلطلة هاي، منوّر الدنيا 😂❤️'
 ];
 
-async function showProfileCard(ctx, g) {
-  const user = ctx.message?.reply_to_message?.from || ctx.from;
+async function showProfileCard(ctx, g, targetUser = null) {
+  const user = targetUser || ctx.message?.reply_to_message?.from || ctx.from;
   if (!user || user.is_bot) return ctx.reply('ما أگدر أطلع بطاقة لهذا الحساب.');
   const id = String(user.id);
-  const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'عضو';
-  const username = user.username ? `@${user.username}` : 'غير متوفر';
-  const points = Number((db.groupPoints?.[String(g?.id || ctx.chat?.id)] || {})[id] ?? db.points[id] ?? 0);
+  const name = [user.first_name || user.name, user.last_name].filter(Boolean).join(' ') || 'عضو';
+  const username = user.username ? `@${user.username}` : 'ما عنده يوزر';
+  const chatId = String(g?.id || ctx.chat?.id || '');
+  const scores = db.groupPoints?.[chatId] || {};
+  const points = Number(scores[id] ?? db.points?.[id] ?? 0);
+  const sortedIds = Object.entries(scores).sort((a, b) => Number(b[1]) - Number(a[1])).map(([userId]) => userId);
+  const rank = sortedIds.indexOf(id) >= 0 ? sortedIds.indexOf(id) + 1 : null;
   const warnings = Number(g?.warnings?.[id]?.count || 0);
   const messages = Number(g?.userStats?.[id]?.messages || 0);
+  const lastSeen = Number(g?.knownMembers?.[id]?.seenAt || 0);
+  const activity = lastSeen && Date.now() - lastSeen < 7 * 24 * 60 * 60 * 1000 ? '🟢 متفاعل خلال آخر 7 أيام' : '⚪ ما رصدنا له تفاعلاً خلال آخر 7 أيام';
+  let groupRole = 'عضو';
+  try {
+    if (g?.id || ctx.chat?.id) {
+      const memberInfo = await ctx.api.getChatMember(g?.id || ctx.chat.id, Number(id));
+      if (memberInfo.status === 'creator') groupRole = '👑 مالك المجموعة';
+      else if (memberInfo.status === 'administrator') groupRole = '🛡️ مشرف تيليگرام';
+      else if (g?.admins?.includes(id)) groupRole = '⚙️ مشرف نغنوغ';
+      else if (memberInfo.status === 'restricted') groupRole = '🔇 عضو مقيّد';
+      else if (memberInfo.status === 'left' || memberInfo.status === 'kicked') groupRole = '🚪 ليس عضواً حالياً';
+    }
+  } catch { if (g?.admins?.includes(id)) groupRole = '⚙️ مشرف نغنوغ'; }
   const phrase = PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
-  const caption = `🐾 بطاقة عضو — نغنوغ\n\n👤 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 Telegram ID: ${id}\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\n💬 الرسائل التي رصدها البوت: ${messages}\n⚠️ التحذيرات المسجلة: ${warnings}\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\n\n💬 ${phrase}`;
+  const caption = `🐾 بطاقة عضو — نغنوغ\n\n👤 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 Telegram ID: ${id}\n🎖️ الرتبة داخل المجموعة: ${groupRole}\n🏅 الترتيب بالنقاط: ${rank ? `#${rank}` : 'بعده ما دخل قائمة المتصدرين'}\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\n💬 الرسائل التي رصدها البوت: ${messages}\n⚠️ التحذيرات المسجلة: ${warnings}\n📈 التفاعل: ${activity}\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\n\n💬 ${phrase}`;
   try {
     const photos = await bot.api.getUserProfilePhotos(user.id, { limit: 1 });
-    const fileId = photos.photos?.[0]?.[0]?.file_id;
+    const fileId = photos.photos?.[0]?.at(-1)?.file_id;
     if (fileId) {
       await ctx.replyWithPhoto(fileId, { caption, reply_to_message_id: ctx.message.message_id });
       return;
