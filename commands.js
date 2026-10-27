@@ -10,7 +10,7 @@ import {
   customizationKeyboard
 } from './keyboards.js';
 
-// قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة)
+// قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)
 const QUESTIONS_DB = {
   choose: [
     { q: "ما هي عاصمة اليابان؟", options: ["طوكيو", "أوساكا", "كيوتو"], answer: "طوكيو" },
@@ -28,18 +28,18 @@ const QUESTIONS_DB = {
     { q: "ما هي أكبر قارة في العالم من حيث المساحة؟", options: ["أفريقيا", "آسيا", "أوروبا"], answer: "آسيا" },
     { q: "ما هو أثقل عضو في جسم الإنسان؟", options: ["القلب", "الكبد", "الدماغ"], answer: "الكبد" },
     { q: "كم عدد أضلاع المثلث؟", options: ["3", "4", "5"], answer: "3" },
-    { q: "ما هو غاز التفس الذي نتشهقه للحياة؟", options: ["النيتروجين", "الأكسجين", "الهيدروجين"], answer: "الأكسجين" },
+    { q: "ما هو غاز التنفس الذي ننتعشه للحياة؟", options: ["النيتروجين", "الأكسجين", "الهيدروجين"], answer: "الأكسجين" },
     { q: "ما هي عاصمة الإمارات العربية المتحدة؟", options: ["دبي", "أبوظبي", "الشارقة"], answer: "أبوظبي" },
     { q: "ما هي العملة الرسمية في الولايات المتحدة؟", options: ["اليورو", "الدولار", "الباوند"], answer: "الدولار" },
     { q: "ما هي أصغر قارة في العالم؟", options: ["أستراليا", "أوروبا", "أمريكا الجنوبية"], answer: "أستراليا" },
     { q: "أي من العناصر التالية رمزها الكيميائي (Au)؟", options: ["الفضة", "الذهب", "الحديد"], answer: "الذهب" },
     { q: "ما هي عاصمة إيطاليا؟", options: ["ميلانو", "روما", "البندقية"], answer: "روما" },
     { q: "كم عدد لاعبي فريق كرة القدم داخل الملعب؟", options: ["10", "11", "12"], answer: "11" },
-    { q: "ما هو أصلح بحر في العالم لا يعيش فيه السمك؟", options: ["البحر الأحمر", "البحر الميت", "البحر المتوسط"], answer: "البحر الميت" },
+    { q: "ما هو أملح بحر في العالم لا يعيش فيه السمك؟", options: ["البحر الأحمر", "البحر الميت", "البحر المتوسط"], answer: "البحر الميت" },
     { q: "ما هي عاصمة مصر؟", options: ["الإسكندرية", "القاهرة", "أسوان"], answer: "القاهرة" },
     { q: "ما هو أقرب كوكب للشمس؟", options: ["عطارد", "الزهرة", "الأرض"], answer: "عطارد" },
     { q: "ما هي عاصمة ألمانيا؟", options: ["ميونخ", "برلين", "فرانكفورت"], answer: "برلين" },
-    { q: "ما هو الحيوان الذي يُسمى ب king of jungle؟", options: ["الأسد", "النمر", "الفهد"], answer: "الأسد" },
+    { q: "ما هو الحيوان الذي يُسمى ملك الغابة؟", options: ["الأسد", "النمر", "الفهد"], answer: "الأسد" },
     { q: "في أي قارة تقع دولة مصر؟", options: ["آسيا", "أفريقيا", "أوروبا"], answer: "أفريقيا" },
     { q: "ما هو المعدن السائل في درجة حرارة الغرفة؟", options: ["الزئبق", "الحديد", "النحاس"], answer: "الزئبق" },
     { q: "كم عدد ساعات اليوم الواحد؟", options: ["12", "24", "48"], answer: "24" },
@@ -207,6 +207,7 @@ export function setupCommands(bot, db, helpers) {
 
   db.activeGames ||= {};
 
+  // أمر البداية /start
   bot.command('start', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
@@ -215,12 +216,14 @@ export function setupCommands(bot, db, helpers) {
     await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
   });
 
+  // أمر المساعدة /help
   bot.command('help', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
   });
 
+  // أمر الإذاعة للمالك
   bot.command('broadcast', async ctx => {
     if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت فقط.');
     const textToSend = ctx.message.text.replace(/^\/broadcast\s*/, '').trim();
@@ -271,6 +274,7 @@ export function setupCommands(bot, db, helpers) {
     return ctx.reply('🐾 نغنوغ — تم التفعيل بنجاح!');
   });
 
+  // معالجة جميع الأزرار واللوحات (القديمة والجديدة) بدون تعارض
   bot.on('callback_query:data', async ctx => {
     ensureUser(ctx);
     const data = ctx.callbackQuery.data;
@@ -286,10 +290,11 @@ export function setupCommands(bot, db, helpers) {
     const restrictedActions = [
       'protectionmenu', 'adminpanel', 'groupsettings', 'warningsmenu', 'badwordsmenu', 
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
-      'toggleforward', 'togglecontacts', 'enableallprotection', 'gamesmenu'
+      'toggleforward', 'togglecontacts', 'enableallprotection', 'gamesmenu', 'mygroups', 
+      'accountinfo', 'custommenu', 'groupstats', 'userreplies', 'repliesmenu'
     ];
 
-    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_')) {
+    if (restrictedActions.includes(data) || data.startsWith('prot_') || data.startsWith('admin_') || data.startsWith('choosegroup:') || data.startsWith('warning') || data.startsWith('badword') || data.startsWith('reply')) {
       if (isGroup(ctx)) {
         const g = groupFor(ctx.chat);
         const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
@@ -314,8 +319,150 @@ export function setupCommands(bot, db, helpers) {
     };
 
     if (data === 'home') return showHomeFunc(ctx);
+    if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
+    if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
+    // الأزرار القديمة الأساسية
+    if (data === 'accountinfo') {
+      const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
+      const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
+      const userId = ctx.from.id;
+      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
+    }
+    
+    if (data === 'userreplies') {
+      return answer(ctx, customText(ctx, 'replies', 'replies'), { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
+    }
+
+    if (data === 'mygroups') {
+      if (!isPrivate(ctx)) return answer(ctx, 'إدارة المجموعات متاحة من الخاص فقط.');
+      return showGroups(ctx);
+    }
+
+    if (data.startsWith('choosegroup:')) {
+      const id = data.slice('choosegroup:'.length); 
+      const g = db.groups[id];
+      if (!g?.activated) return answer(ctx, 'هذه المجموعة غير مفعّلة.');
+      if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة للمشرفين فقط.');
+      setSelected(ctx, id); 
+      return showGroupSettings(ctx, g);
+    }
+    
+    if (data === 'groupsettings') {
+      const { entries } = selectedGroupKeyboard(ctx);
+      if (!selectedGroup(ctx)) {
+        if (entries.length) return showGroups(ctx);
+        return answer(
+          ctx,
+          '⚙️ إعدادات نغنوغ 🐾\n\nمن هذا القسم تگدر تتحكم بميزات البوت داخل مجموعتك.',
+          { reply_markup: new InlineKeyboard().url('➕ أضف نغنوغ لمجموعتك', `https://t.me/${bot.botInfo?.username || 'YZ_VIDbot'}?startgroup=true`).row().text('🔙 القائمة الرئيسية', 'home') }
+        );
+      }
+      return showGroupSettings(ctx);
+    }
+
+    if (data === 'custommenu') {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
+      clearPending(ctx);
+      return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط.', { reply_markup: customizationKeyboard() });
+    }
+
+    if (data === 'customstart') {
+      pending(ctx, { action: 'custom-start' });
+      return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'custommenu') });
+    }
+
+    if (data === 'customreset') {
+      db.customizations ||= {};
+      delete db.customizations[userKey(ctx)];
+      clearPending(ctx);
+      save();
+      return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationKeyboard() });
+    }
+
+    if (data === 'groupstats') return showGroupStats(ctx);
+
+    // التحذيرات وإدارة الكلمات والردود التلقائية
+    if (data === 'warningsmenu') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
+      save();
+      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nالمجموعة: ${g.title}`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'warningstoggle') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
+      g.warningSettings.enabled = !g.warningSettings.enabled;
+      save();
+      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}`, { reply_markup: warningsKeyboard(g) });
+    }
+
+    if (data === 'badwordsmenu') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.badWords ||= [];
+      const kb = new InlineKeyboard();
+      kb.text('➕ إضافة كلمة ممنوعة', 'badwordadd').row();
+      g.badWords.forEach((word, index) => { kb.text(`🗑️ حذف: ${word}`, `badworddel:${index}`).row(); });
+      kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
+      const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
+      return ctx.editMessageText(`🚫 إدارة الكلمات الممنوعة\n\nالمجموعة: ${g.title}\nالكلمات:\n${wordsList}`, { reply_markup: kb });
+    }
+
+    if (data === 'badwordadd') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      pending(ctx, { action: 'badwordadd', groupId: g.id });
+      return answer(ctx, '➕ أرسل الآن الكلمة أو العبارة المخالفة.');
+    }
+
+    if (data.startsWith('badworddel:')) {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      const index = Number(data.split(':')[1]);
+      g.badWords ||= [];
+      if (g.badWords[index]) {
+        const removed = g.badWords.splice(index, 1)[0];
+        save();
+        await answer(ctx, `✅ تم حذف الكلمة "${removed}".`);
+      }
+      const kb = new InlineKeyboard();
+      kb.text('➕ إضافة كلمة ممنوعة', 'badwordadd').row();
+      g.badWords.forEach((word, idx) => { kb.text(`🗑️ حذف: ${word}`, `badworddel:${idx}`).row(); });
+      kb.text('🔙 رجوع للتحذيرات', 'warningsmenu');
+      const wordsList = g.badWords.length > 0 ? g.badWords.join(', ') : 'لا توجد كلمات ممنوعة مضافة حالياً.';
+      return ctx.editMessageText(`🚫 إدارة الكلمات الممنوعة\n\nالمجموعة: ${g.title}\nالكلمات:\n${wordsList}`, { reply_markup: kb });
+    }
+
+    if (data === 'repliesmenu') return answer(ctx, '💬 إدارة الردود التلقائية', { reply_markup: repliesKeyboard() });
+    if (data === 'replyadd') { 
+      const g = selectedGroup(ctx); 
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.'); 
+      pending(ctx, { action: 'reply-trigger', groupId: g.id }); 
+      return answer(ctx, '➕ أرسل العبارة التي تريد أن يلتقطها البوت:'); 
+    }
+    if (data === 'replylist') return showReplyList(ctx);
+    if (data === 'replydelete') {
+      const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      if (!g.replies || !g.replies.length) return answer(ctx, 'ماكو ردود.', { reply_markup: repliesKeyboard() });
+      const kb = new InlineKeyboard();
+      g.replies.forEach((r, i) => kb.text(`🗑️ ${i + 1}. ${r.trigger.slice(0, 25)}`, `replydel:${i}`).row());
+      kb.text('🔙 رجوع', 'repliesmenu');
+      return answer(ctx, 'اختر الرد للحذف:', { reply_markup: kb });
+    }
+    if (data.startsWith('replydel:')) {
+      const g = selectedGroup(ctx); if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'خطأ صلاحيات.');
+      const i = Number(data.split(':')[1]);
+      g.replies.splice(i, 1);
+      save();
+      return answer(ctx, '🗑️ تم حذف الرد بنجاح.', { reply_markup: repliesKeyboard() });
+    }
+
+    // لوحة الحماية
     if (data === 'protectionmenu') {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً أو افتح الزر داخل المجموعة.');
@@ -367,6 +514,7 @@ export function setupCommands(bot, db, helpers) {
       return;
     }
 
+    // لوحة المشرفين
     if (data === 'adminpanel') {
       const adminText = `👑 **قائمة أوامر المشرفين السريعة:**\n\n` +
         `• **الكتم:** الرد بكلمة (كتم + عدد الدقائق) مثل: \`كتم 10\`\n` +
@@ -379,6 +527,7 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, adminText, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'home') });
     }
 
+    // قائمة الألعاب والتحديات
     if (data === 'gamesmenu' || data === 'games_list') {
       const gamesText = `🎮 **قائمة ألعاب نغنوغ والتحديات:**\n\n` +
         `اكتب أحد الرموز التالية داخل المجموعة للبدء:\n\n` +
@@ -432,6 +581,7 @@ export function setupCommands(bot, db, helpers) {
     return answer(ctx, 'زر غير معروف.');
   });
 
+  // معالجة الرسائل والذكاء التفاعلي والحماية والألعاب داخل المجموعات
   bot.on('message', async ctx => {
     ensureUser(ctx);
     const msg = ctx.message;
@@ -444,6 +594,7 @@ export function setupCommands(bot, db, helpers) {
       const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
       const uid = userKey(ctx);
 
+      // الحماية التلقائية
       if (!isAdmin && !isOwner(ctx)) {
         if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(text)) {
           try { await ctx.deleteMessage(); } catch {}
@@ -475,6 +626,7 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
+      // أوامر المشرفين السريعة بالرد
       if (msg.reply_to_message && (isAdmin || isOwner(ctx))) {
         const target = msg.reply_to_message.from;
         const targetId = target?.id;
@@ -562,48 +714,9 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
+      // الأوامر التفاعلية للأعضاء
       if (text === 'ا') {
-        const user = msg.from;
-        const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'عضو';
-        const username = user.username ? `@${user.username}` : 'لا يوجد معرف';
-        const userPoints = Number(db.points?.[uid] || 0);
-        const userMsgs = g.stats?.messages || 1;
-        const warnings = g.warnings?.[uid]?.count || 0;
-        
-        let rank = "عضو عادي 👤";
-        if (isOwner({ from: user })) rank = "مالك البوت 👑";
-        else if (isAdmin) rank = "مشرف المجموعة 🛡️";
-
-        const randomPhrases = [
-          "عسل مصفّى ومنورنا اليوم 🍯✨",
-          "فديت هالطّلة الحلوة وراعيها 😎❤️",
-          "منور الدنيا يا غالي، ربي يحفظك 🌸",
-          "وجودك يزيد المجموعة تفاعل وجمال 🚀"
-        ];
-        const randomPhrase = randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
-
-        const caption = 
-          `🐾 **بطاقة الملف الشخصي الاحترافية**\n\n` +
-          `👤 **الاسم:** ${name}\n` +
-          `🔗 **المعرف:** ${username}\n` +
-          `🆔 **الآيدي:** \`${user.id}\`\n` +
-          `🎖️ **الرتبة:** ${rank}\n` +
-          `⭐ **النقاط (ألعاب):** ${userPoints} نقطة\n` +
-          `💬 **عدد الرسائل:** ${userMsgs}\n` +
-          `⚠️ **التحذيرات:** ${warnings}\n\n` +
-          `💬 **رسالة لك:** ${randomPhrase}`;
-
-        try {
-          const photos = await ctx.api.getUserProfilePhotos(user.id, { limit: 1 });
-          if (photos.total_count > 0 && photos.photos[0]?.[0]) {
-            const photoFileId = photos.photos[0][photos.photos[0].length - 1].file_id;
-            await ctx.replyWithPhoto(photoFileId, { caption, parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
-            return;
-          }
-        } catch {}
-
-        await ctx.reply(caption, { parse_mode: 'Markdown', reply_to_message_id: msg.message_id });
-        return;
+        return showProfileCard(ctx, g);
       }
 
       if (text === 'كت') {
@@ -640,6 +753,7 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
+      // ألعاب الأسئلة ونظام النقاط
       const chatId = String(ctx.chat.id);
       db.activeGames[chatId] ||= null;
       const activeGame = db.activeGames[chatId];
@@ -687,27 +801,51 @@ export function setupCommands(bot, db, helpers) {
       }
 
     } else {
+      // معالجة المحادثات الخاصة والبيانات المعلقة
       const p = db.pending[userKey(ctx)];
-      if (p && p.action === 'broadcast-message') {
-        clearPending(ctx);
-        const users = db.privateUsers || [];
-        let successCount = 0, failCount = 0;
-        const statusMsg = await ctx.reply(`📢 جاري إرسال الإذاعة...`);
+      if (p) {
+        if (p.action === 'broadcast-message') {
+          clearPending(ctx);
+          const users = db.privateUsers || [];
+          let successCount = 0, failCount = 0;
+          const statusMsg = await ctx.reply(`📢 جاري إرسال الإذاعة...`);
 
-        for (const userId of users) {
-          try {
-            await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${text}`, { parse_mode: 'Markdown', disable_notification: false });
-            successCount++;
-            await new Promise(resolve => setTimeout(resolve, 40));
-          } catch { failCount++; }
+          for (const userId of users) {
+            try {
+              await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${text}`, { parse_mode: 'Markdown', disable_notification: false });
+              successCount++;
+              await new Promise(resolve => setTimeout(resolve, 40));
+            } catch { failCount++; }
+          }
+
+          return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n📤 إرسال: ${successCount}\n❌ فشل: ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
         }
 
-        return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n📤 إرسال: ${successCount}\n❌ فشل: ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+        if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
+          if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
+          const c = getCustomization(ctx);
+          if (p.action === 'custom-start') c.startText = text;
+          save();
+          clearPending(ctx);
+          return ctx.reply('✅ تم حفظ النص الخاص بيك بنجاح ❤️', {
+            reply_markup: new InlineKeyboard().text('🎨 قائمة التخصيص', 'custommenu').row().text('🏠 القائمة الرئيسية', 'home')
+          });
+        }
+        if (p.action === 'badwordadd') {
+          const g = db.groups[p.groupId];
+          if (g && await userCanManage(ctx, g)) {
+            g.badWords ||= [];
+            g.badWords.push(text);
+            save();
+            clearPending(ctx);
+            return answer(ctx, `✅ تم إضافة الكلمة "${text}" إلى قائمة الممنوعات بنجاح!`, { reply_markup: new InlineKeyboard().text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu') });
+          }
+        }
       }
 
       const showHomeFunc = async (cCtx) => {
         const c = getCustomization(cCtx);
-        await safeEdit(cCtx, c.startText, getHomeKeyboard(cCtx));
+        await safeEdit(cCtx, c.startTest, getHomeKeyboard(cCtx));
       };
       return showHomeFunc(ctx);
     }
