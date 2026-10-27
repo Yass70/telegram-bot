@@ -9,7 +9,8 @@ import {
   repliesKeyboard,
   customizationKeyboard,
   customizationDescriptionsKeyboard,
-  customizationRepliesKeyboard
+  customizationRepliesKeyboard,
+  customizationUILabelsKeyboard
 } from './keyboards.js';
 
 // قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)[cite: 4]
@@ -205,7 +206,7 @@ const N_PHRASES = [
 ];
 
 export function setupCommands(bot, db, helpers) {
-  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel } = helpers;
+  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
 
   db.activeGames ||= {};
   db.groupPoints ||= {};
@@ -253,7 +254,7 @@ export function setupCommands(bot, db, helpers) {
   bot.command('help', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
-    await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
+    await ctx.reply(customText(ctx, 'helpText') || HELP_TEXT, { reply_markup: helpKeyboard(getCustomization(ctx)) });
   });
 
   bot.command('id', async ctx => {
@@ -493,7 +494,7 @@ export function setupCommands(bot, db, helpers) {
         .text('👑 أوامر المشرفين', 'adminpanel').row()
         .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row()
         .text('🔙 القائمة الرئيسية', 'home');
-      return answer(ctx, '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️', { reply_markup: kb });
+      return answer(ctx, uiText ? uiText(ctx, 'management', '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') : '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️', { reply_markup: kb });
     }
     if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
@@ -511,14 +512,14 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'interactive_ket') return answer(ctx, `╭━━━〔 🧠 أمثلة عشوائية 〕━━━╮\n\nاكتب «كت» داخل المجموعة حتى يرسل نغنوغ سؤالاً أو موقفاً عشوائياً للنقاش.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
     if (data === 'interactive_poem') return answer(ctx, `╭━━━〔 📜 قسم الشعر 〕━━━╮\n\nاكتب «ش» داخل المجموعة حتى يشاركك نغنوغ بيتاً أو عبارة شعرية.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
     if (data === 'interactive_n') return answer(ctx, `╭━━━〔 🐈‍⬛ تفاعل مع نغنوغ 〕━━━╮\n\nاكتب «ن» داخل المجموعة حتى يردّ عليك نغنوغ باللهجة العراقية.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
-        if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
+        if (data === 'help') return answer(ctx, customText(ctx, 'helpText') || HELP_TEXT, { reply_markup: helpKeyboard(getCustomization(ctx)) });
     
     // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
       const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
       const userId = ctx.from.id;
-      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n${customText(ctx, 'descriptions', 'account') || ''}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text('🔙 القائمة الرئيسية', 'home') });
+      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n${customText(ctx, 'descriptions', 'account') || ''}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
     }
     
     if (data === 'userreplies') {
@@ -543,6 +544,7 @@ export function setupCommands(bot, db, helpers) {
       if (!g) return showGroups(ctx);
       const kb = new InlineKeyboard()
         .text('⚙️ إعدادات المجموعة', 'groupsettings').row()
+        .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row()
         .text('🛡️ الحماية الموحدة', 'protectionmenu').row()
         .text('💬 الردود التلقائية', 'repliesmenu').row()
         .text('📊 إحصائيات المجموعة', 'groupstats').row()
@@ -570,7 +572,27 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'custommenu') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       clearPending(ctx);
-      return answer(ctx, '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا يمكنك تخصيص النصوص التي تظهر لك في محادثتك الخاصة فقط.\n✦ تعديلاتك شخصية ولا تغيّر رسائل بقية المستخدمين.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: customizationKeyboard() });
+      return answer(ctx, uiText ? uiText(ctx, 'customMenu', '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯') : '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
+    }
+
+    if (data === 'customuimenu') {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
+      return answer(ctx, '🔘 اختَر اسم الزر الذي تريد تغييره. التغيير يظهر إلك وحدك في القائمة الرئيسية.', { reply_markup: customizationUILabelsKeyboard(getCustomization(ctx)) });
+    }
+
+    if (data.startsWith('customlabel:')) {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
+      const key = data.split(':')[1];
+      const allowed = ['groups', 'addBot', 'management', 'profile', 'customize', 'help', 'back', 'home', 'cancel'];
+      if (!allowed.includes(key)) return answer(ctx, 'اسم الزر غير معروف.');
+      pending(ctx, { action: 'custom-label', key });
+      return answer(ctx, `🔘 أرسل الاسم الجديد للزر.\n\nالاسم الحالي: ${getCustomization(ctx).labels?.[key] || 'الافتراضي'}\n\nأرسل نصاً قصيراً، بحد أقصى 50 حرفاً.`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'customuimenu') });
+    }
+
+    if (data === 'customhelp') {
+      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
+      pending(ctx, { action: 'custom-help' });
+      return answer(ctx, `📖 أرسل نص قسم المساعدة الجديد.\n\nالنص الحالي:\n${customText(ctx, 'helpText') || HELP_TEXT}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'custommenu') });
     }
 
     if (data === 'customdescmenu') {
@@ -598,7 +620,7 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'customstart') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       pending(ctx, { action: 'custom-start' });
-      return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'custommenu') });
+      return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'custommenu') });
     }
 
     if (data === 'customreset') {
@@ -607,7 +629,7 @@ export function setupCommands(bot, db, helpers) {
       delete db.customizations[userKey(ctx)];
       clearPending(ctx);
       save();
-      return answer(ctx, '♻️ تم استعادة النصوص الافتراضية المعتمدة حديثاً لحسابك فقط.\nتخصيصات بقية المستخدمين وبيانات المجموعات لم تتغير.', { reply_markup: customizationKeyboard() });
+      return answer(ctx, '♻️ تم استعادة النصوص الافتراضية المعتمدة حديثاً لحسابك فقط.\nتخصيصات بقية المستخدمين وبيانات المجموعات لم تتغير.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
     }
 
     if (data === 'groupstats') return showGroupStats(ctx);
@@ -689,10 +711,11 @@ export function setupCommands(bot, db, helpers) {
     // التحذيرات والعقوبات[cite: 3, 5]
     if (data === 'warningsmenu') {
       const g = selectedGroup(ctx);
-      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      if (!g) { const { entries } = selectedGroupKeyboard(ctx); if (entries.length) return showGroups(ctx); return answer(ctx, 'ما عندك مجموعة مفعّلة بعد. أضف نغنوغ لمجموعتك وفعّله، وبعدها تگدر تدير التحذيرات والعقوبات.'); }
+      if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة التحذيرات متاحة لمشرفي المجموعة فقط.');
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       save();
-      return ctx.editMessageText(`╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\nالمجموعة: «${g.title}»\n\nاضغط على الأزرار لتغيير الخيارات بالتتابع.\nالتحذيرات: 1، 2، 3، 4، 5، 7، 10، 15، 20.\nمدد الكتم بالدقائق: 5، 10، 15، 20، 30، 45، 60، 90، 120، 180، 360، 720، 1440.\nبعدها فعّل النظام من الزر الأول.`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningstoggle') {
@@ -701,15 +724,18 @@ export function setupCommands(bot, db, helpers) {
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       g.warningSettings.enabled = !g.warningSettings.enabled;
       save();
-      return ctx.editMessageText(`╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningslimit') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      g.warningSettings.limit = g.warningSettings.limit >= 5 ? 1 : g.warningSettings.limit + 1;
+      const limits = [1, 2, 3, 4, 5, 7, 10, 15, 20];
+      const currentLimit = Number(g.warningSettings?.limit) || 3;
+      const limitIndex = limits.indexOf(currentLimit);
+      g.warningSettings.limit = limits[limitIndex < 0 ? 0 : (limitIndex + 1) % limits.length];
       save();
-      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث عدد التحذيرات إلى: ${g.warningSettings.limit}`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث عدد التحذيرات إلى: ${g.warningSettings.limit}`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningsaction') {
@@ -719,15 +745,18 @@ export function setupCommands(bot, db, helpers) {
       const currentIndex = actions.indexOf(g.warningSettings.action);
       g.warningSettings.action = actions[(currentIndex + 1) % actions.length];
       save();
-      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث العقوبة بنجاح.`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث العقوبة إلى: ${{ mute: 'كتم', kick: 'طرد', ban: 'حظر', none: 'بدون إجراء' }[g.warningSettings.action]}.`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningsduration') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      g.warningSettings.duration = g.warningSettings.duration >= 60 ? 5 : g.warningSettings.duration + 5;
+      const durations = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 360, 720, 1440];
+      const currentDuration = Number(g.warningSettings?.duration) || 10;
+      const durationIndex = durations.indexOf(currentDuration);
+      g.warningSettings.duration = durations[durationIndex < 0 ? 0 : (durationIndex + 1) % durations.length];
       save();
-      return ctx.editMessageText(`🛡️ التحذيرات والعقوبات\n\nتم تحديث مدة الكتم إلى: ${g.warningSettings.duration} دقيقة`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث مدة الكتم إلى: ${g.warningSettings.duration} دقيقة`, { reply_markup: warningsKeyboard(g) });
     }
 
     if (data === 'warningslog') {
@@ -1077,6 +1106,7 @@ export function setupCommands(bot, db, helpers) {
         g.floodUsers[uid] = recent;
         if (recent.length > 6) {
           try { await ctx.deleteMessage(); g.stats.floodEvents = Number(g.stats.floodEvents || 0) + 1; save(); } catch {}
+          await handleViolation(ctx, g, 'إغراق الرسائل / سبام');
           return;
         }
       }
@@ -1085,30 +1115,37 @@ export function setupCommands(bot, db, helpers) {
       if (!isAdmin && !isOwner(ctx)) {
         if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(protectionText)) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'نشر رابط ممنوع');
           return;
         }
         if (g.mediaLock && (msg.photo || msg.video || msg.document || msg.sticker || msg.animation || msg.video_note)) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'إرسال وسائط ممنوعة');
           return;
         }
         if (g.badWordsLock && (g.badWords || []).some(word => word && protectionText.toLocaleLowerCase('ar').includes(String(word).toLocaleLowerCase('ar')))) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'استخدام كلمة ممنوعة');
           return;
         }
         if (g.audioLock && msg.voice) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'إرسال رسالة صوتية ممنوعة');
           return;
         }
         if (g.audioClipsLock && msg.audio) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'إرسال ملف صوتي ممنوع');
           return;
         }
         if (g.forwardLock && (msg.forward_from || msg.forward_from_chat || msg.forward_origin)) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'إعادة توجيه ممنوعة');
           return;
         }
         if (g.contactsLock && (msg.contact || /@[A-Za-z0-9_]{4,}/i.test(protectionText) || /\+?[0-9]{10,}/.test(protectionText))) {
           try { await ctx.deleteMessage(); } catch {}
+          await handleViolation(ctx, g, 'نشر معرف أو رقم ممنوع');
           return;
         }
       }
@@ -1582,10 +1619,17 @@ export function setupCommands(bot, db, helpers) {
           }
         }
 
-        if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
+        if (['custom-start', 'custom-description', 'custom-reply', 'custom-label', 'custom-help'].includes(p.action)) {
           if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
           const c = getCustomization(ctx);
           if (p.action === 'custom-start') c.startText = text;
+          if (p.action === 'custom-help') c.helpText = text;
+          if (p.action === 'custom-label') {
+            const allowedLabels = ['groups', 'addBot', 'management', 'profile', 'customize', 'help', 'back', 'home', 'cancel'];
+            if (!allowedLabels.includes(p.key)) { clearPending(ctx); return ctx.reply('اسم الزر غير معروف.'); }
+            if (text.length > 50) return ctx.reply('❌ خلي اسم الزر 50 حرف أو أقل. جرّب مرة ثانية.');
+            c.labels ||= {}; c.labels[p.key] = text;
+          }
           if (p.action === 'custom-description') {
             c.descriptions ||= {};
             if (!['settings', 'groups', 'account', 'replies'].includes(p.key)) { clearPending(ctx); return ctx.reply('القسم غير معروف.'); }
@@ -1598,7 +1642,7 @@ export function setupCommands(bot, db, helpers) {
           }
           save();
           clearPending(ctx);
-          return ctx.reply('✅ تم حفظ النص الخاص بيك بنجاح ❤️', {
+          return ctx.reply('✅ تم حفظ التعديل الخاص بيك بنجاح ❤️', {
             reply_markup: new InlineKeyboard().text('🎨 قائمة التخصيص', 'custommenu').row().text('🏠 القائمة الرئيسية', 'home')
           });
         }
