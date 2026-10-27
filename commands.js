@@ -10,31 +10,175 @@ import {
   customizationKeyboard
 } from './keyboards.js';
 
-// قاعدة بيانات ألعاب الأسئلة والتحديات الجديدة
+// قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة)
 const QUESTIONS_DB = {
   choose: [
-    { q: "ما هي عاصمة اليابان؟", options: ["طوكيو", "أوسكا", "كيوتو"], answer: "طوكيو" },
+    { q: "ما هي عاصمة اليابان؟", options: ["طوكيو", "أوساكا", "كيوتو"], answer: "طوكيو" },
     { q: "أي من هذه الحيوانات يعتبر من الثدييات البحرية؟", options: ["القرش", "الحوت الأزرق", "الأخطبوط"], answer: "الحوت الأزرق" },
     { q: "كم عدد سور القرآن الكريم؟", options: ["112", "114", "120"], answer: "114" },
-    { q: "ما هو أكبر كوكب في المجموعة الشمسية؟", options: ["المريخ", "المشتري", "زحل"], answer: "المشتري" }
+    { q: "ما هو أكبر كوكب في المجموعة الشمسية؟", options: ["المريخ", "المشتري", "زحل"], answer: "المشتري" },
+    { q: "ما هي عاصمة فرنسا؟", options: ["مدريد", "باريس", "برلين"], answer: "باريس" },
+    { q: "ما هو أطول نهر في العالم؟", options: ["النيل", "الأمازون", "الفرات"], answer: "النيل" },
+    { q: "ما هو الكوكب الملقب بالكوكب الأحمر؟", options: ["المريخ", "الزهرة", "عطارد"], answer: "المريخ" },
+    { q: "كم عدد ألوان قوس قزح؟", options: ["5", "6", "7"], answer: "7" },
+    { q: "ما هي عاصمة جمهورية العراق؟", options: ["بغداد", "البصرة", "أربيل"], answer: "بغداد" },
+    { q: "أين تقع أهرامات الجيزة؟", options: ["السودان", "مصر", "المغرب"], answer: "مصر" },
+    { q: "ما هو أسرع حيوان بري في العالم؟", options: ["الفهد", "الأسد", "الغزال"], answer: "الفهد" },
+    { q: "ما هي عاصمة المملكة العربية السعودية؟", options: ["جدة", "الرياض", "مكة"], answer: "الرياض" },
+    { q: "ما هي أكبر قارة في العالم من حيث المساحة؟", options: ["أفريقيا", "آسيا", "أوروبا"], answer: "آسيا" },
+    { q: "ما هو أثقل عضو في جسم الإنسان؟", options: ["القلب", "الكبد", "الدماغ"], answer: "الكبد" },
+    { q: "كم عدد أضلاع المثلث؟", options: ["3", "4", "5"], answer: "3" },
+    { q: "ما هو غاز التفس الذي نتشهقه للحياة؟", options: ["النيتروجين", "الأكسجين", "الهيدروجين"], answer: "الأكسجين" },
+    { q: "ما هي عاصمة الإمارات العربية المتحدة؟", options: ["دبي", "أبوظبي", "الشارقة"], answer: "أبوظبي" },
+    { q: "ما هي العملة الرسمية في الولايات المتحدة؟", options: ["اليورو", "الدولار", "الباوند"], answer: "الدولار" },
+    { q: "ما هي أصغر قارة في العالم؟", options: ["أستراليا", "أوروبا", "أمريكا الجنوبية"], answer: "أستراليا" },
+    { q: "أي من العناصر التالية رمزها الكيميائي (Au)؟", options: ["الفضة", "الذهب", "الحديد"], answer: "الذهب" },
+    { q: "ما هي عاصمة إيطاليا؟", options: ["ميلانو", "روما", "البندقية"], answer: "روما" },
+    { q: "كم عدد لاعبي فريق كرة القدم داخل الملعب؟", options: ["10", "11", "12"], answer: "11" },
+    { q: "ما هو أصلح بحر في العالم لا يعيش فيه السمك؟", options: ["البحر الأحمر", "البحر الميت", "البحر المتوسط"], answer: "البحر الميت" },
+    { q: "ما هي عاصمة مصر؟", options: ["الإسكندرية", "القاهرة", "أسوان"], answer: "القاهرة" },
+    { q: "ما هو أقرب كوكب للشمس؟", options: ["عطارد", "الزهرة", "الأرض"], answer: "عطارد" },
+    { q: "ما هي عاصمة ألمانيا؟", options: ["ميونخ", "برلين", "فرانكفورت"], answer: "برلين" },
+    { q: "ما هو الحيوان الذي يُسمى ب king of jungle؟", options: ["الأسد", "النمر", "الفهد"], answer: "الأسد" },
+    { q: "في أي قارة تقع دولة مصر؟", options: ["آسيا", "أفريقيا", "أوروبا"], answer: "أفريقيا" },
+    { q: "ما هو المعدن السائل في درجة حرارة الغرفة؟", options: ["الزئبق", "الحديد", "النحاس"], answer: "الزئبق" },
+    { q: "كم عدد ساعات اليوم الواحد؟", options: ["12", "24", "48"], answer: "24" },
+    { q: "ما هي عاصمة اسبانيا؟", options: ["برشلونة", "مدريد", "إشبيلية"], answer: "مدريد" },
+    { q: "ما هو أطول حيوان في العالم؟", options: ["الفيل", "الزرافة", "الحوت"], answer: "الزرافة" },
+    { q: "ما هي عاصمة روسيا؟", options: ["موسكو", "سان بطرسبرغ", "سيبيريا"], answer: "موسكو" },
+    { q: "كم عدد أركان الإسلام؟", options: ["4", "5", "6"], answer: "5" },
+    { q: "ما هو الغاز الأكثر وجوداً في الغلاف الجوي للأرض؟", options: ["الأكسجين", "النيتروجين", "ثاني أكسيد الكربون"], answer: "النيتروجين" },
+    { q: "ما هي عاصمة سوريا؟", options: ["حلب", "دمشق", "حمص"], answer: "دمشق" },
+    { q: "من هو النبي الذي أُلقي في النار فجعلها الله برداً وسلاماً؟", options: ["موسى", "إبراهيم", "عيسى"], answer: "إبراهيم" },
+    { q: "ما هي عاصمة الأردن؟", options: ["إربد", "عمان", "العقبة"], answer: "عمان" },
+    { q: "كم عدد أركان الإيمان؟", options: ["5", "6", "7"], answer: "6" },
+    { q: "ما هي عاصمة الكويت؟", options: ["الجابرية", "الكويت", "الجهراء"], answer: "الكويت" }
   ],
   math: [
     { q: "ناتج عملية الحساب التالية: 15 + 25 × 2 = ؟", answer: "65" },
     { q: "ما هو ناتج: 100 ÷ 4 + 15 = ؟", answer: "40" },
     { q: "كم يساوي: 9 × 8 - 12 = ؟", answer: "60" },
-    { q: "ناتج جمع: 45 + 55 - 20 = ؟", answer: "80" }
+    { q: "ناتج جمع: 45 + 55 - 20 = ؟", answer: "80" },
+    { q: "ما هو ناتج: 12 × 12 = ؟", answer: "144" },
+    { q: "احسب ناتج: 50 - 15 + 25 = ؟", answer: "60" },
+    { q: "ما هو ناتج: 7 × 7 + 1 = ؟", answer: "50" },
+    { q: "ناتج قسمة: 81 ÷ 9 = ؟", answer: "9" },
+    { q: "احسب: 10 + 20 + 30 - 10 = ؟", answer: "50" },
+    { q: "ما هو ضعف العدد 25؟", answer: "50" },
+    { q: "ما هو نصف العدد 150؟", answer: "75" },
+    { q: "احسب: 5 × 6 + 10 = ؟", answer: "40" },
+    { q: "ما هو ناتج: 100 - 37 = ؟", answer: "63" },
+    { q: "احسب: 8 × 5 = ؟", answer: "40" },
+    { q: "ما هو ثلث العدد 90؟", answer: "30" },
+    { q: "احسب ناتج: 14 + 16 = ؟", answer: "30" },
+    { q: "ما هو ناتج: 64 ÷ 8 = ؟", answer: "8" },
+    { q: "احسب: 100 ÷ 2 + 50 = ؟", answer: "100" },
+    { q: "ما هو مربع العدد 5 (5 × 5)؟", answer: "25" },
+    { q: "احسب: 11 × 3 + 7 = ؟", answer: "40" },
+    { q: "ما هو ناتج: 200 - 150 + 50 = ؟", answer: "100" },
+    { q: "احسب: 9 × 9 = ؟", answer: "81" },
+    { q: "ما هو ناتج: 30 × 3 = ؟", answer: "90" },
+    { q: "احسب: 75 ÷ 3 = ؟", answer: "25" },
+    { q: "ما هو ناتج: 15 + 15 + 15 = ؟", answer: "45" },
+    { q: "احسب ناتج: 25 × 4 = ؟", answer: "100" },
+    { q: "ما هو ناتج: 99 ÷ 3 = ؟", answer: "33" },
+    { q: "احسب: 18 + 22 + 40 = ؟", answer: "80" },
+    { q: "ما هو ناتج: 500 ÷ 5 = ؟", answer: "100" },
+    { q: "احسب: 7 × 8 - 6 = ؟", answer: "50" },
+    { q: "ما هو مكعب العدد 2 (2 × 2 × 2)؟", answer: "8" },
+    { q: "احسب: 45 ÷ 5 + 15 = ؟", answer: "24" },
+    { q: "ما هو ناتج: 13 × 3 = ؟", answer: "39" },
+    { q: "احسب: 1000 - 450 = ؟", answer: "550" },
+    { q: "ما هو ناتج: 16 + 16 + 18 = ؟", answer: "50" },
+    { q: "احسب: 60 ÷ 4 = ؟", answer: "15" },
+    { q: "ما هو ناتج: 11 × 11 = ؟", answer: "121" },
+    { q: "احسب: 80 - 25 - 15 = ؟", answer: "40" },
+    { q: "ما هو ناتج: 50 × 2 ÷ 4 = ؟", answer: "25" },
+    { q: "احسب: 72 ÷ 9 + 12 = ؟", answer: "20" }
   ],
   animals: [
     { hint: "أسد", q: "حيوان مفترس يُلقب بملك الغابة، يبدأ بحرف (أ)", answer: "أسد" },
     { hint: "فيل", q: "حيوان ضخم جداً له خرطوم طويل، يبدأ بحرف (ف)", answer: "فيل" },
     { hint: "زرافة", q: "حيوان عشب طويل الرقبة، يبدأ بحرف (ز)", answer: "زرافة" },
-    { hint: "ذئب", q: "حيوان ذكي من فصيلة الكلبيات، يبدأ بحرف (ذ)", answer: "ذئب" }
+    { hint: "ذئب", q: "حيوان ذكي من فصيلة الكلبيات، يبدأ بحرف (ذ)", answer: "ذئب" },
+    { hint: "نمر", q: "حيوان مفترس مخطّط ومفرط السرعة، يبدأ بحرف (ن)", answer: "نمر" },
+    { hint: "جمل", q: "حيوان يسمى سفينة الصحراء، يبدأ بحرف (ج)", answer: "جمل" },
+    { hint: "حصان", q: "حيوان أليف يُستخدم للركوب والسباقات، يبدأ بحرف (ح)", answer: "حصان" },
+    { hint: "قرد", q: "حيوان ذكي يحب أكل الموز والتسلق، يبدأ بحرف (ق)", answer: "قرد" },
+    { hint: "دب", q: "حيوان ضخم يحب أكل العسل والأسماك، يبدأ بحرف (د)", answer: "دب" },
+    { hint: "ثعلب", q: "حيوان يُضرب به المثل في المكر والمراوغة، يبدأ بحرف (ث)", answer: "ثعلب" },
+    { hint: "أرنب", q: "حيوان أليف صغير يحب أكل الجزر، يبدأ بحرف (أ)", answer: "أرنب" },
+    { hint: "غزال", q: "حيوان جميل وسريع جداً برقبته الجذابة، يبدأ بحرف (غ)", answer: "غزال" },
+    { hint: "كلب", q: "حيوان يُعرف بوفائه الشديد للإنسان، يبدأ بحرف (ك)", answer: "كلب" },
+    { hint: "قطة", q: "حيوان أليف صغير يعيش في المنازل ويموء، يبدأ بحرف (ق)", answer: "قطة" },
+    { hint: "صقر", q: "طائر مفترس حاد البصر يُستخدم في الصيد، يبدأ بحرف (ص)", answer: "صقر" },
+    { hint: "تمساح", q: "زاحف مفترس ضخم يعيش في الماء والبر ولديه فك قوي، يبدأ بحرف (ت)", answer: "تمساح" },
+    { hint: "حوت", q: "أضخم كائن حي يعيش في المحيطات، يبدأ بحرف (ح)", answer: "حوت" },
+    { hint: "بطريق", q: "طائر لا يطير ويعيش في المناطق الجليدية الباردة، يبدأ بحرف (ب)", answer: "بطريق" },
+    { hint: "نسر", q: "طائر جارح كبير يحلق في أرتفاعات عالية، يبدأ بحرف (ن)", answer: "نسر" },
+    { hint: "ثعبان", q: "زاحف طويل ليس له أرجُل ويقوم باللدغ، يبدأ بحرف (ث)", answer: "ثعبان" },
+    { hint: "ضبع", q: "حيوان مفترس يعيش في جماعات ويقتات على الجيف، يبدأ بحرف (ض)", answer: "ضبع" },
+    { hint: "كانغارو", q: "حيوان يمتلك جيباً يحمل فيه صغاره ويقفز، يبدأ بحرف (ك)", answer: "كانغارو" },
+    { hint: "بومة", q: "طائر ليلي يُرمز له بالحكمة، يبدأ بحرف (ب)", answer: "بومة" },
+    { hint: "حمار", q: "حيوان أليف يتحمل المشقة والعمل الشاق، يبدأ بحرف (ح)", answer: "حمار" },
+    { hint: "خروف", q: "حيوان يعطينا الصوف واللحم وتتم تضحيته بالعيد، يبدأ بحرف (خ)", answer: "خروف" },
+    { hint: "أسد", q: "ملك الغابة وأشرس السنوريات الكبرى، يبدأ بحرف (أ)", answer: "أسد" },
+    { hint: "فهد", q: "أسرع حيوان بري على وجه الأرض، يبدأ بحرف (ف)", answer: "فهد" },
+    { hint: "فيل", q: "حيوان عملاق يتميز بآذان ضخمة وأنياب عاجية، يبدأ بحرف (ف)", answer: "فيل" },
+    { hint: "بطة", q: "طائر مائي أليف يسبح في المرتفعات المائية، يبدأ بحرف (ب)", answer: "بطة" },
+    { hint: "دجاجة", q: "طائر أليف نأخذ منه البيض واللحم، يبدأ بحرف (د)", answer: "دجاجة" },
+    { hint: "ماعز", q: "حيوان من شبيهات الأغنام يتربى بالريف، يبدأ بحرف (م)", answer: "ماعز" },
+    { hint: "فأر", q: "قارض صغير يخاف منه الكثيرون ويحب الجبن، يبدأ بحرف (ف)", answer: "فأر" },
+    { hint: "سنجاب", q: "حيوان شجري صغير يحب تخزين الجوز والبندق، يبدأ بحرف (س)", answer: "سنجاب" },
+    { hint: "راكون", q: "حيوان يشبه الهروب البري وله ذيل مخطط، يبدأ بحرف (ر)", answer: "راكون" },
+    { hint: "قنفذ", q: "حيوان تغطي جسمه أشواك حادة للدفاع عن نفسه، يبدأ بحرف (ق)", answer: "قنفذ" },
+    { hint: "بطريق", q: "حيوان بحري يرتدي شبيه البدلة الرسمية، يبدأ بحرف (ب)", answer: "بطريق" },
+    { hint: "حرباء", q: "زاحف يغير لونه حسب البيئة المحيطة، يبدأ بحرف (ح)", answer: "حرباء" },
+    { hint: "سلحفاة", q: "زاحف بطيء يمتلك درعاً صلبأً على ظهره، يبدأ بحرف (س)", answer: "سلحفاة" },
+    { hint: "فراشة", q: "حشرة جميلة ذات أجنحة ملونة تزهو بالورود، يبدأ بحرف (ف)", answer: "فراشة" },
+    { hint: "نحلة", q: "حشرة نافعة تصنع العسل اللذيذ، يبدأ بحرف (ن)", answer: "نحلة" }
   ],
   general: [
     { q: "في أي سنة انطلقت أول رحلة صعود للقمر؟", answer: "1969" },
     { q: "ما هي الدولة الأكثر تعداداً للسكان في العالم حالياً؟", answer: "الهند" },
     { q: "ما هو العنصر الكيميائي الأكثر وفرة في قشرة الأرض؟", answer: "الأكسجين" },
-    { q: "من هو واضع علم الجبر؟", answer: "الخوارزمي" }
+    { q: "من هو واضع علم الجبر؟", answer: "الخوارزمي" },
+    { q: "كم عدد خلفاء الراشدين؟", answer: "4" },
+    { q: "ما هي أكبر بحيرة في العالم من حيث المساحة؟", answer: "قزوين" },
+    { q: "من هو النبي الذي بنى السفينة بإذن الله؟", answer: "نوح" },
+    { q: "كم عدد القارات في الكرة الأرضية؟", answer: "7" },
+    { q: "ما هو اللقب الذي يُطلق على الشاعر أحمد شوقي؟", answer: "أمير الشعراء" },
+    { q: "كم سنة استمرت الحرب العالمية الثانية؟", answer: "6" },
+    { q: "ما هي اللغة الرسمية في البرازيل؟", answer: "البرتغالية" },
+    { q: "من هو مكتشف جاذبية الأرض؟", answer: "نيوتن" },
+    { q: "ما هي الدولة التي تُسمى أرض الفراعنة؟", answer: "مصر" },
+    { q: "ما هو الحيوان الذي يُلقب بسفينة الصحراء؟", answer: "الجمل" },
+    { q: "ما هي أطول سلسة جبال في العالم؟", answer: "الأنديز" },
+    { q: "كم عدد أسنان الإنسان البالغ؟", answer: "32" },
+    { q: "من هو أول خلفاء المسلمين بعد وفاة النبي؟", answer: "أبو بكر الصديق" },
+    { q: "ما هي القناة التي تربط بين البحر الأبيض والبحر الأحمر؟", answer: "قناة السويس" },
+    { q: "ما هو الكائن الذي يمتلك 3 قلوب؟", answer: "الأخطبوط" },
+    { q: "ما هو أطول بناء بني بإيدي البشر تاريخياً؟", answer: "سور الصين العظيم" },
+    { q: "ما هي البلد التي تشتهر بزراعة واستخراج الشاي والسيلان؟", answer: "سريلانكا" },
+    { q: "كم عدد سجدات التلاوة في القرآن الكريم؟", answer: "15" },
+    { q: "ما هي عاصمة الدولة العباسية تاريخياً؟", answer: "بغداد" },
+    { q: "من هو مخترع المصباح الكهربائي؟", answer: "أديسون" },
+    { q: "كم يبلغ عدد ألوان علم جمهورية العراق؟", answer: "4" },
+    { q: "ما هي السورة التي تُسمى قلب القرآن؟", answer: "يس" },
+    { q: "من هو قائد معركة القادسية من المسلمين؟", answer: "سعد بن أبي وقاص" },
+    { q: "في أي عام أُقيمت أول بطولة كأس عالم لكرة القدم؟", answer: "1930" },
+    { q: "ما هي الدولة الأكثر إنتاجاً للقهوة في العالم؟", answer: "البرازيل" },
+    { q: "كم عدد أجزاء القرآن الكريم؟", answer: "30" },
+    { q: "من هو الصحابي الملقب بأسد الله الغلاب؟", answer: "حمزة بن عبد المطلب" },
+    { q: "ما هو أسرع كوكب في الدوران حول الشمس؟", answer: "عطارد" },
+    { q: "ما هي الدولة التي تقع فيها مدينة تونس؟", answer: "تونس" },
+    { q: "كم عدد الشهور الهجرية في السنة؟", answer: "12" },
+    { q: "من هو شاعر الرسول صلى الله عليه وسلم؟", answer: "حسان بن ثابت" },
+    { q: "ما هو الحيوان البرمائي الذي ينام وعينه مفتوحة؟", answer: "التمساح" },
+    { q: "ما هي الدولة العربية التي تقع في أفريقيا وتجاور مصر من الغرب؟", answer: "ليبيا" },
+    { q: "من هو أول من استشهد من النساء في الإسلام؟", answer: "سمية بنت خياط" },
+    { q: "ما هي العاصمة الإدارية لتركيا؟", answer: "أنقرة" },
+    { q: "كم عدد عظام جسم الإنسان البالغ؟", answer: "206" }
   ]
 };
 
@@ -61,10 +205,8 @@ const N_PHRASES = [
 export function setupCommands(bot, db, helpers) {
   const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel } = helpers;
 
-  // تهيئة جدول الألعاب النشطة في الذاكرة
   db.activeGames ||= {};
 
-  // أمر البداية /start
   bot.command('start', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
@@ -73,17 +215,14 @@ export function setupCommands(bot, db, helpers) {
     await ctx.reply(c.startText, { reply_markup: getHomeKeyboard(ctx) });
   });
 
-  // أمر المساعدة /help
   bot.command('help', async ctx => {
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
   });
 
-  // أمر الإذاعة المباشر (Broadcast) للمالك
   bot.command('broadcast', async ctx => {
     if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت فقط.');
-    
     const textToSend = ctx.message.text.replace(/^\/broadcast\s*/, '').trim();
     if (!textToSend) {
       return ctx.reply('⚠️ عذراً، أرسل النص بعد الأمر هكذا:\n`/broadcast السلام عليكم، البوت تحت الصيانة حالياً`', { parse_mode: 'Markdown' });
@@ -132,12 +271,10 @@ export function setupCommands(bot, db, helpers) {
     return ctx.reply('🐾 نغنوغ — تم التفعيل بنجاح!');
   });
 
-  // معالجة الأزرار الشفافة وصلاحيات الحماية والأعضاء
   bot.on('callback_query:data', async ctx => {
     ensureUser(ctx);
     const data = ctx.callbackQuery.data;
 
-    // أزرار المالك
     const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu'];
     if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:')) {
       if (!isOwner(ctx)) {
@@ -146,7 +283,6 @@ export function setupCommands(bot, db, helpers) {
       }
     }
 
-    // الأزرار الخاصة بأوامر الحماية والمشرفين (تظهر تنبيه شريطي مؤقت للأعضاء العاديين)
     const restrictedActions = [
       'protectionmenu', 'adminpanel', 'groupsettings', 'warningsmenu', 'badwordsmenu', 
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
@@ -180,7 +316,6 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'home') return showHomeFunc(ctx);
     if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
-    // 1. زر أوامر الحماية والقوائم الفرعية
     if (data === 'protectionmenu') {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً أو افتح الزر داخل المجموعة.');
@@ -232,7 +367,6 @@ export function setupCommands(bot, db, helpers) {
       return;
     }
 
-    // 2. زر أوامر المشرفين
     if (data === 'adminpanel') {
       const adminText = `👑 **قائمة أوامر المشرفين السريعة:**\n\n` +
         `• **الكتم:** الرد بكلمة (كتم + عدد الدقائق) مثل: \`كتم 10\`\n` +
@@ -245,7 +379,6 @@ export function setupCommands(bot, db, helpers) {
       return answer(ctx, adminText, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'home') });
     }
 
-    // 4. زر الألعاب والتحديات الجديد
     if (data === 'gamesmenu' || data === 'games_list') {
       const gamesText = `🎮 **قائمة ألعاب نغنوغ والتحديات:**\n\n` +
         `اكتب أحد الرموز التالية داخل المجموعة للبدء:\n\n` +
@@ -299,7 +432,6 @@ export function setupCommands(bot, db, helpers) {
     return answer(ctx, 'زر غير معروف.');
   });
 
-  // معالجة الرسائل والخدمات والحماية وأوامر المشرفين والألعاب
   bot.on('message', async ctx => {
     ensureUser(ctx);
     const msg = ctx.message;
@@ -312,7 +444,6 @@ export function setupCommands(bot, db, helpers) {
       const isAdmin = await userIsAdmin(ctx.chat.id, ctx.from.id);
       const uid = userKey(ctx);
 
-      // ─── 1. تطبيق الحماية التلقائية إذا كانت مفعلة ───
       if (!isAdmin && !isOwner(ctx)) {
         if (g.linksLock && /(https?:\/\/|www\.|t\.me\/)/i.test(text)) {
           try { await ctx.deleteMessage(); } catch {}
@@ -322,7 +453,7 @@ export function setupCommands(bot, db, helpers) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
-        if (g.badWordsLock && /(فشار|كلمة_سيئة)/i.test(text)) { // مثال توضيحي للكلمات النابية
+        if (g.badWordsLock && /(فشار|كلمة_سيئة)/i.test(text)) {
           try { await ctx.deleteMessage(); } catch {}
           return;
         }
@@ -344,13 +475,11 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      // ─── 2. أوامر المشرفين السريعة داخل المجموعة ───
       if (msg.reply_to_message && (isAdmin || isOwner(ctx))) {
         const target = msg.reply_to_message.from;
         const targetId = target?.id;
         const targetName = target?.first_name || 'العضو';
 
-        // أ) كتم شخص بالرد (مثل: كتم 10)
         if (/^كتم\s+(\d+)$/i.test(text)) {
           const match = text.match(/^كتم\s+(\d+)$/i);
           const mins = parseInt(match[1]);
@@ -367,7 +496,6 @@ export function setupCommands(bot, db, helpers) {
           return;
         }
 
-        // ب) طرد شخص بالرد بكلمة (طرد)
         if (/^طرد$/i.test(text)) {
           if (targetId && !await userIsAdmin(ctx.chat.id, targetId)) {
             try {
@@ -380,13 +508,11 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      // جـ) فك الكتم (فتح الكتم + اليوزر)
       if (/^فتح\s+الكتم\s+@?[a-zA-Z0-9_]+$/i.test(text) && (isAdmin || isOwner(ctx))) {
         await ctx.reply(`🔊 تم فك الكتم ورفع القيود عن المستخدم بنجاح.`);
         return;
       }
 
-      // د) قفل وفتح الدردشة
       if (/^قفل\s+الرسائل$/i.test(text) && (isAdmin || isOwner(ctx))) {
         try {
           await ctx.api.setChatPermissions(ctx.chat.id, { can_send_messages: false });
@@ -405,7 +531,6 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // هـ) مسح عدد من الرسائل (امسح + رقم)
       if (/^امسح\s+(\d+)$/i.test(text) && (isAdmin || isOwner(ctx))) {
         const match = text.match(/^امسح\s+(\d+)$/i);
         const count = parseInt(match[1]);
@@ -421,13 +546,11 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // و) مسح جميع الرسائل
       if (/^المسح\s+جميع\s+الرسائل$/i.test(text) && (isAdmin || isOwner(ctx))) {
         await ctx.reply(`🧹 جارٍ تنظيف ومسح الرسائل المتاحة في المجموعة...`);
         return;
       }
 
-      // ─── 3. الأمر الخاص (تفعيل الحماية) التلقائي ───
       if (/^تفعيل\s+الحماية$/i.test(text) && (isAdmin || isOwner(ctx))) {
         g.linksLock = true;
         g.mediaLock = true;
@@ -439,9 +562,6 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // ─── 4. الأوامر التفاعلية المخصصة للأعضاء ───
-      
-      // أ) أمر حرف (ا) - بطاقة الملف الشخصي
       if (text === 'ا') {
         const user = msg.from;
         const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'عضو';
@@ -486,14 +606,12 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // ب) كلمة (كت)
       if (text === 'كت') {
         const randomKet = KET_LIST[Math.floor(Math.random() * KET_LIST.length)];
         await ctx.reply(`🧠 **سؤال كت (فضفضة):**\n\n${randomKet}`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
         return;
       }
 
-      // جـ) كلمة (توب) - قائمة أفضل 3 لاعبين
       if (text === 'توب') {
         const pointsObj = db.points || {};
         const sorted = Object.entries(pointsObj).sort((a, b) => b[1] - a[1]).slice(0, 3);
@@ -510,28 +628,25 @@ export function setupCommands(bot, db, helpers) {
         return;
       }
 
-      // د) كلمة (ش) - شعر قصير
       if (text === 'ش') {
         const randomPoem = SHUAR_LIST[Math.floor(Math.random() * SHUAR_LIST.length)];
         await ctx.reply(`📜 **أبيات شعرية:**\n\n${randomPoem}`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
         return;
       }
 
-      // هـ) كلمة (ن) أو (نغنوغ) - اللهجة العراقية اللطيفة
       if (text === 'ن' || text === 'نغنوغ') {
         const randomN = N_PHRASES[Math.floor(Math.random() * N_PHRASES.length)];
         await ctx.reply(`🐱 **نغنوغ:**\n\n${randomN}`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
         return;
       }
 
-      // ─── 5. نظام الألعاب التفاعلية الجديد وتوزيع النقاط ───
       const chatId = String(ctx.chat.id);
       db.activeGames[chatId] ||= null;
       const activeGame = db.activeGames[chatId];
 
       if (activeGame && activeGame.active) {
         if (text.trim() === activeGame.answer) {
-          db.activeGames[chatId] = null; // إنهاء الجولة الحالية
+          db.activeGames[chatId] = null;
           db.points ||= {};
           db.points[uid] = (db.points[uid] || 0) + 1;
           save();
@@ -541,7 +656,6 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      // تشغيل ألعاب جديدة عبر الأحرف (خ، ر، ح، س)
       if (['خ', 'ر', 'ح', 'س'].includes(text)) {
         let gameType = '';
         let chosen = null;
@@ -564,7 +678,6 @@ export function setupCommands(bot, db, helpers) {
         }
       }
 
-      // الردود التلقائية العادية
       if (g.autoReply) {
         const automaticReply = findAutoReply(text);
         if (automaticReply) {
@@ -574,7 +687,6 @@ export function setupCommands(bot, db, helpers) {
       }
 
     } else {
-      // التعامل مع رسائل الخاص والإذاعة
       const p = db.pending[userKey(ctx)];
       if (p && p.action === 'broadcast-message') {
         clearPending(ctx);
