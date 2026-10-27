@@ -4,74 +4,74 @@ export function mainKeyboard(ctx, bot) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
 
   return new InlineKeyboard()
-    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
-    .text('👥 مجموعاتي', 'mygroups').row()
-    .text('📚 مركز الأوامر', 'publiccommands')
-    .text('⚙️ الإدارة والحماية', 'managementmenu').row()
-    .text('📊 النقاط والإحصائيات', 'statsmenu')
-    .text('👤 حسابي', 'accountinfo').row()
-    .text('🎨 تخصيص البوت', 'custommenu')
-    .text('📖 المساعدة', 'help');
+    .url('➕ إضافة نغنوغ للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
+    .text('👥 〔 مجموعاتي 〕', 'mygroups').row()
+    .text('📚 〔 مركز الأوامر 〕', 'publiccommands')
+    .text('🛡️ 〔 الإدارة والحماية 〕', 'managementmenu').row()
+    .text('🏆 〔 النقاط والإحصائيات 〕', 'statsmenu')
+    .text('👤 〔 ملفّي الشخصي 〕', 'accountinfo').row()
+    .text('🎨 〔 تخصيص نغنوغ 〕', 'custommenu')
+    .text('📖 〔 دليل الاستخدام 〕', 'help');
 }
 
 export function customizationKeyboard() {
   return new InlineKeyboard()
-    .text('👋 تعديل مقدمة /start', 'customstart')
+    .text('👋 تعديل رسالة البداية', 'customstart')
     .row()
-    .text('🔘 تعديل شرح الأزرار', 'customdescmenu')
+    .text('📝 تعديل شروحات الأزرار', 'customdescmenu')
     .row()
-    .text('💬 تعديل ردود البوت', 'customreplymenu')
+    .text('💬 تخصيص ردود نغنوغ', 'customreplymenu')
     .row()
-    .text('♻️ استعادة النصوص الأصلية', 'customreset')
+    .text('♻️ استعادة النصوص الافتراضية', 'customreset')
     .row()
-    .text('🔙 رجوع للقائمة الرئيسية', 'home');
+    .text('↩️ العودة إلى القائمة الرئيسية', 'home');
 }
 
 export function customizationDescriptionsKeyboard() {
   return new InlineKeyboard()
     .text('⚙️ شرح إعدادات المجموعة', 'customdesc:settings')
     .row()
-    .text('👥 شرح مجموعاتي', 'customdesc:groups')
+    .text('👥 شرح قسم مجموعاتي', 'customdesc:groups')
     .row()
-    .text('👤 شرح معلومات حسابي', 'customdesc:account')
+    .text('👤 شرح الملف الشخصي', 'customdesc:account')
     .row()
     .text('💬 شرح الردود التلقائية', 'customdesc:replies')
     .row()
-    .text('🔙 رجوع للتخصيص', 'custommenu');
+    .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
 export function customizationRepliesKeyboard() {
   return new InlineKeyboard()
-    .text('👤 رسالة معلومات الحساب', 'customreply:account')
+    .text('👤 نص الملف الشخصي', 'customreply:account')
     .row()
-    .text('💬 رسالة قسم الردود التلقائية', 'customreply:replies')
+    .text('💬 نص الردود التلقائية', 'customreply:replies')
     .row()
-    .text('👥 رسالة عدم وجود مجموعات', 'customreply:nogroups')
+    .text('👥 نص عدم وجود مجموعات', 'customreply:nogroups')
     .row()
-    .text('🔙 رجوع للتخصيص', 'custommenu');
+    .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
 export function helpKeyboard() {
   return new InlineKeyboard()
-    .text('👥 إدارة المجموعات', 'mygroups')
+    .text('👥 〔 إدارة المجموعات 〕', 'mygroups')
     .row()
-    .text('🏠 القائمة الرئيسية', 'home')
-    .url('👤 حساب المطوّر', 'https://t.me/llll6llll6');
+    .text('🏠 الرئيسية', 'home')
+    .url('👤 〔 حساب المطوّر 〕', 'https://t.me/llll6llll6');
 }
 
 export function ownerKeyboard() {
   return new InlineKeyboard()
-    .text('📊 إحصائيات البوت', 'botstats')
+    .text('📊 〔 إحصائيات نغنوغ 〕', 'botstats')
     .row()
-    .text('👥 المجموعات المفعّلة', 'activatedgroups')
+    .text('👥 〔 المجموعات النشطة 〕', 'activatedgroups')
     .row()
-    .text('📢 إذاعة عامة (للمستخدمين)', 'broadcastmenu')
+    .text('📢 〔 إرسال إشعار عام 〕', 'broadcastmenu')
     .row()
-    .text('⚙️ إعدادات البوت', 'botsettings')
+    .text('⚙️ 〔 إعدادات البوت العامة 〕', 'botsettings')
     .row()
-    .text('🛡️ إعدادات الحماية العامة', 'globalprotection')
+    .text('🛡️ 〔 الحماية العامة 〕', 'globalprotection')
     .row()
-    .text('📢 إدارة الاشتراك الإجباري', 'requiredmenu')
+    .text('🔐 〔 الاشتراك الإجباري 〕', 'requiredmenu')
     .row()
     .text('🔙 القائمة الرئيسية', 'home');
 }
@@ -103,18 +103,18 @@ export function warningsKeyboard(g) {
     .row()
     .text(`⏱️ مدة الكتم: ${w.duration} دقيقة`, 'warningsduration')
     .row()
-    .text('🚫 إدارة الكلمات الممنوعة', 'badwordsmenu')
+    .text('🚫 الكلمات الممنوعة', 'badwordsmenu')
     .row()
     .text('📋 سجل التحذيرات', 'warningslog')
     .row()
     .text('🧹 تصفير تحذيرات عضو', 'warningsclear')
     .row()
-    .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
+    .text('↩️ العودة إلى إعدادات المجموعة', 'groupsettings');
 }
 
 export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
-    .text('👋 تعديل رسالة الترحيب', 'welcomeedit')
+    .text('👋 تخصيص رسالة الترحيب', 'welcomeedit')
     .row()
     .text(
       `${g.links ? '🟢' : '⚪'} منع الروابط: ${g.links ? 'مفعّل' : 'متوقف'}`,
@@ -133,20 +133,20 @@ export function groupSettingsKeyboard(g) {
     .row()
     .text('🛡️ التحذيرات والعقوبات', 'warningsmenu')
     .row()
-    .text('💬 إدارة الردود التلقائية', 'repliesmenu')
+    .text('╭─〔 💬 إدارة الردود التلقائية 〕─╮', 'repliesmenu')
     .row()
     .text('📊 إحصائيات المجموعة', 'groupstats')
     .row()
-    .text('🔙 الإدارة والحماية', 'managementmenu');
+    .text('↩️ العودة إلى الإدارة والحماية', 'managementmenu');
 }
 
 export function repliesKeyboard() {
   return new InlineKeyboard()
-    .text('➕ إضافة رد', 'replyadd')
+    .text('➕ إضافة رد تلقائي', 'replyadd')
     .row()
-    .text('📋 عرض الردود', 'replylist')
+    .text('📋 قائمة الردود', 'replylist')
     .row()
-    .text('🗑️ حذف رد', 'replydelete')
+    .text('🗑️ حذف رد تلقائي', 'replydelete')
     .row()
-    .text('🔙 رجوع لإعدادات المجموعة', 'groupsettings');
+    .text('↩️ العودة إلى إعدادات المجموعة', 'groupsettings');
 }
