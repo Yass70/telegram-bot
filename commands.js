@@ -607,7 +607,7 @@ export function setupCommands(bot, db, helpers) {
       delete db.customizations[userKey(ctx)];
       clearPending(ctx);
       save();
-      return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationKeyboard() });
+      return answer(ctx, '♻️ تم استعادة النصوص الافتراضية المعتمدة حديثاً لحسابك فقط.\nتخصيصات بقية المستخدمين وبيانات المجموعات لم تتغير.', { reply_markup: customizationKeyboard() });
     }
 
     if (data === 'groupstats') return showGroupStats(ctx);
