@@ -15,7 +15,8 @@ import {
   ownerKeyboard,
   warningsKeyboard,
   groupSettingsKeyboard,
-  repliesKeyboard
+  repliesKeyboard,
+  customizationKeyboard
 } from './keyboards.js';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -25,6 +26,12 @@ if (!TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN environment variable');
 if (!OWNER_ID) console.warn('Warning: BOT_OWNER_ID is not set; owner-only features will be unavailable.');
 
 const bot = new Bot(TOKEN);
+
+// إضافة معالج أخطاء عام لمنع توقف البوت بالكامل عند حدوث أي خطأ مفاجئ
+bot.catch((err) => {
+  console.error(`Error happened in bot catch:`, err);
+});
+
 const freshGroup = () => ({
   id: '', title: '', activated: false, activatedBy: '', admins: [], activatedAt: null,
   links: false, flood: false, welcomeEnabled: true, autoReply: true,
@@ -249,7 +256,6 @@ async function safeEdit(ctx, text, reply_markup) {
   catch { await ctx.reply(text, { reply_markup }); }
 }
 
-// حل مشكلة تكرار السطر الأخير في القائمة الرئيسية
 async function showHome(ctx) {
   const c = getCustomization(ctx);
   await safeEdit(
@@ -571,7 +577,7 @@ bot.on('callback_query:data', async ctx => {
   if (data === 'custommenu') {
     if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
     clearPending(ctx);
-    return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط. تخصيصك ما يأثر على باقي المستخدمين أو رسائل المجموعات.', { reply_markup: customizationMenuKeyboard() });
+    return answer(ctx, '🎨 تخصيص نغنوغ\n\nهنا تگدر تغيّر النصوص اللي تظهر إلك أنت فقط. تخصيصك ما يأثر على باقي المستخدمين أو رسائل المجموعات.', { reply_markup: customizationKeyboard() });
   }
   if (data === 'customstart') {
     pending(ctx, { action: 'custom-start' });
@@ -602,10 +608,9 @@ bot.on('callback_query:data', async ctx => {
     db.customizations[userKey(ctx)] = JSON.parse(JSON.stringify(DEFAULT_CUSTOMIZATION));
     clearPending(ctx);
     save();
-    return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationMenuKeyboard() });
+    return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationKeyboard() });
   }
 
-  // إضافة الأيدي (ID) إلى زر معلومات الحساب
   if (data === 'accountinfo') {
     const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
     const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
