@@ -316,39 +316,47 @@ async function showProfileCard(ctx, g, targetUser = null) {
   const user = targetUser || ctx.message?.reply_to_message?.from || ctx.from;
   if (!user || user.is_bot) return ctx.reply('ما أگدر أطلع بطاقة لهذا الحساب.');
   const id = String(user.id);
-  const name = [user.first_name || user.name, user.last_name].filter(Boolean).join(' ') || 'عضو';
-  const username = user.username ? `@${user.username}` : 'ما عنده يوزر';
   const chatId = String(g?.id || ctx.chat?.id || '');
   const scores = db.groupPoints?.[chatId] || {};
   const points = Number(scores[id] ?? db.points?.[id] ?? 0);
-  const sortedIds = Object.entries(scores).sort((a, b) => Number(b[1]) - Number(a[1])).map(([userId]) => userId);
-  const rank = sortedIds.indexOf(id) >= 0 ? sortedIds.indexOf(id) + 1 : null;
-  const warnings = Number(g?.warnings?.[id]?.count || 0);
   const messages = Number(g?.userStats?.[id]?.messages || 0);
-  const lastSeen = Number(g?.knownMembers?.[id]?.seenAt || 0);
-  const activity = lastSeen && Date.now() - lastSeen < 7 * 24 * 60 * 60 * 1000 ? '🟢 متفاعل خلال آخر 7 أيام' : '⚪ ما رصدنا له تفاعلاً خلال آخر 7 أيام';
+  const sakhakat = Number(g?.userStats?.[id]?.sakhakat || 0);
+
   let groupRole = 'عضو';
   try {
     if (g?.id || ctx.chat?.id) {
       const memberInfo = await ctx.api.getChatMember(g?.id || ctx.chat.id, Number(id));
-      if (memberInfo.status === 'creator') groupRole = '👑 مالك المجموعة';
-      else if (memberInfo.status === 'administrator') groupRole = '🛡️ مشرف تيليگرام';
-      else if (g?.admins?.includes(id)) groupRole = '⚙️ مشرف نغنوغ';
-      else if (memberInfo.status === 'restricted') groupRole = '🔇 عضو مقيّد';
-      else if (memberInfo.status === 'left' || memberInfo.status === 'kicked') groupRole = '🚪 ليس عضواً حالياً';
+      if (memberInfo.status === 'creator') groupRole = 'مالك المجموعة 👑';
+      else if (memberInfo.status === 'administrator') groupRole = 'مشرف 🛡️';
+      else if (g?.admins?.includes(id)) groupRole = 'مشرف نغنوغ ⚙️';
+      else if (memberInfo.status === 'restricted') groupRole = 'عضو مقيّد 🔇';
+      else if (memberInfo.status === 'left' || memberInfo.status === 'kicked') groupRole = 'ليس عضواً حالياً 🚪';
     }
-  } catch { if (g?.admins?.includes(id)) groupRole = '⚙️ مشرف نغنوغ'; }
-  const phrase = PROFILE_PHRASES[Math.floor(Math.random() * PROFILE_PHRASES.length)];
-  const caption = `🐾 بطاقة عضو — نغنوغ\n\n👤 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 Telegram ID: ${id}\n🎖️ الرتبة داخل المجموعة: ${groupRole}\n🏅 الترتيب بالنقاط: ${rank ? `#${rank}` : 'بعده ما دخل قائمة المتصدرين'}\n⭐ نقاط الألعاب بهذه المجموعة: ${points}\n💬 الرسائل التي رصدها البوت: ${messages}\n⚠️ التحذيرات المسجلة: ${warnings}\n📈 التفاعل: ${activity}\n📝 النبذة الشخصية: غير متاحة عبر Telegram Bot API\n\n💬 ${phrase}`;
+  } catch {
+    if (g?.admins?.includes(id)) groupRole = 'مشرف نغنوغ ⚙️';
+  }
+
+  const username = user.username ? `@${user.username}` : 'لا يوجد';
+  const caption = `🐾 بطاقة نغنوغ\n\n-︰ايديك : ❨ ${id} ❩\n\n-︰معرفك : ❨ ${username} ❩\n\n-︰رتبتك : ❨ ${groupRole} ❩\n\n-︰رسائلك : ❨ ${messages} ❩\n\n-︰نقاطك : ❨ ${points} ❩\n\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
+  // زر ثابت يفتح حساب صاحب البوت من بطاقة العضو.
+  const profileLinkKeyboard = new InlineKeyboard().url('𓆩♡ مـشـمـشہ 𓆪', 'https://t.me/llll6llll6');
+
   try {
-    const photos = await bot.api.getUserProfilePhotos(user.id, { limit: 1 });
+    const photos = await ctx.api.getUserProfilePhotos(Number(id), { limit: 1 });
     const fileId = photos.photos?.[0]?.at(-1)?.file_id;
     if (fileId) {
-      await ctx.replyWithPhoto(fileId, { caption, reply_to_message_id: ctx.message.message_id });
+      await ctx.replyWithPhoto(fileId, {
+        caption,
+        has_spoiler: true,
+        reply_markup: profileLinkKeyboard,
+        ...(ctx.message?.message_id ? { reply_to_message_id: ctx.message.message_id } : {})
+      });
       return;
     }
-  } catch {}
-  await ctx.reply(caption, { reply_to_message_id: ctx.message.message_id });
+  } catch (err) {
+    console.warn('[profile-card] Could not send blurred profile photo:', err?.description || err?.message || err);
+  }
+  return ctx.reply(caption, { reply_markup: profileLinkKeyboard, ...(ctx.message?.message_id ? { reply_to_message_id: ctx.message.message_id } : {}) });
 }
 
 async function handleViolation(ctx, g, reason) {
