@@ -1,76 +1,17 @@
-
 import { InlineKeyboard } from 'grammy';
-
-const DEVELOPER_URL = 'https://t.me/llll6llll6';
 
 export function mainKeyboard(ctx, bot) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
 
   return new InlineKeyboard()
-    .url(
-      '➕ أضفني للمجموعة',
-      `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`
-    )
-    .text('⚙️ إعدادات المجموعة', 'groupsettings')
-    .text('👥 مجموعاتي', 'mygroups')
-    .row()
-    .text('🛡️ أوامر الحماية', 'protectionmenu')
-    .text('👑 أوامر المشرفين', 'adminpanel')
-    .row()
-    .text('💬 الأوامر التفاعلية', 'interactive_menu')
-    .text('🎮 الألعاب والتحديات', 'gamesmenu')
-    .row()
+    .url('➕ أضفني للمجموعة', `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`)
+    .text('👥 مجموعاتي', 'mygroups').row()
+    .text('📚 مركز الأوامر', 'publiccommands')
+    .text('⚙️ الإدارة والحماية', 'managementmenu').row()
     .text('📊 النقاط والإحصائيات', 'statsmenu')
-    .text('👤 معلومات حسابي', 'accountinfo')
-    .row()
+    .text('👤 حسابي', 'accountinfo').row()
     .text('🎨 تخصيص البوت', 'custommenu')
-    .row()
-    .url('👨‍💻 المطوّر', DEVELOPER_URL);
-}
-
-export function publicCommandsKeyboard() {
-  return new InlineKeyboard()
-    .text('🎮 الألعاب', 'public_games')
-    .text('💬 الأوامر التفاعلية', 'public_interactive')
-    .row()
-    .text('🛡️ أوامر الحماية', 'public_protection_info')
-    .text('👑 أوامر الإدارة', 'public_admin_info')
-    .row()
-    .url('👨‍💻 المطوّر', DEVELOPER_URL)
-    .text('✖️ إغلاق', 'close_public_commands');
-}
-
-export function publicGamesKeyboard() {
-  return new InlineKeyboard()
-    .text('🐾 معرفة الحيوان', 'public_game_animal')
-    .row()
-    .text('💡 أسئلة عامة', 'public_game_general')
-    .row()
-    .text('🔢 مرّن عقلك', 'public_game_math')
-    .row()
-    .text('🧩 اختيار الجواب الصحيح', 'public_game_choose')
-    .row()
-    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
-}
-
-export function publicInteractiveKeyboard() {
-  return new InlineKeyboard()
-    .text('👤 الملف التعريفي', 'public_profile_info')
-    .row()
-    .text('🧠 أمثلة عشوائية', 'public_confession_info')
-    .row()
-    .text('📜 شعر', 'public_poem_info')
-    .row()
-    .text('🏆 المتصدرين', 'public_top_info')
-    .row()
-    .text('🐈‍⬛ نغنوغ', 'public_noghnogh_info')
-    .row()
-    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
-}
-
-export function publicInfoBackKeyboard() {
-  return new InlineKeyboard()
-    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
+    .text('📖 المساعدة', 'help');
 }
 
 export function customizationKeyboard() {
@@ -115,7 +56,7 @@ export function helpKeyboard() {
     .text('👥 إدارة المجموعات', 'mygroups')
     .row()
     .text('🏠 القائمة الرئيسية', 'home')
-    .url('👨‍💻 حساب المطوّر', DEVELOPER_URL);
+    .url('👤 حساب المطوّر', 'https://t.me/llll6llll6');
 }
 
 export function ownerKeyboard() {
@@ -196,7 +137,7 @@ export function groupSettingsKeyboard(g) {
     .row()
     .text('📊 إحصائيات المجموعة', 'groupstats')
     .row()
-    .text('🔙 رجوع', 'home');
+    .text('🔙 الإدارة والحماية', 'managementmenu');
 }
 
 export function repliesKeyboard() {
