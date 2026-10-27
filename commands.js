@@ -1,6 +1,5 @@
 import { InlineKeyboard } from 'grammy';
 import { GROUP_RULES, NORMAL_MEMBER_RULES_REPLY, findAutoReply } from './autoReplies.js';
-
 import {
   mainKeyboard,
   helpKeyboard,
@@ -10,11 +9,7 @@ import {
   repliesKeyboard,
   customizationKeyboard,
   customizationDescriptionsKeyboard,
-  customizationRepliesKeyboard,
-  publicCommandsKeyboard,
-  publicGamesKeyboard,
-  publicInteractiveKeyboard,
-  publicInfoBackKeyboard
+  customizationRepliesKeyboard
 } from './keyboards.js';
 
 // قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)[cite: 4]
@@ -226,15 +221,10 @@ export function setupCommands(bot, db, helpers) {
   const leaderboardText = chatId => {
     const scores = groupScores(chatId);
     const sorted = Object.entries(scores).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3);
-    if (!sorted.length) {
-      const legacy = Object.entries(db.points || {}).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 3);
-      if (!legacy.length) return '🏆 ماكو نقاط مسجلة بهذه المجموعة لحد الآن. ابدؤوا اللعب!';
-      const medals = ['🥇', '🥈', '🥉'];
-      return '🏆 **النقاط القديمة المحفوظة**\\n' + legacy.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\\n') + '\\n(النقاط القديمة لم تكن مفصولة حسب المجموعة.)';
-    }
+    if (!sorted.length) return '🏆 ماكو نقاط مسجلة بهذه المجموعة لحد الآن. ابدؤوا اللعب!';
     const medals = ['🥇', '🥈', '🥉'];
-    return '🏆 **أبطال نغنوغ — أعلى 3 بهذه المجموعة**\\n\\n' +
-      sorted.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\\n');
+    return '🏆 **أبطال نغنوغ — أعلى 3 بهذه المجموعة**\n\n' +
+      sorted.map(([id, pts], i) => `${medals[i]} ${db.pointNames?.[id] || `عضو ${id}`} — **${pts} نقطة**`).join('\n');
   };
   const protectionKeyboard = g => new InlineKeyboard()
     .text(`${g.linksLock ? '🟢 مفعّل' : '⚪ متوقف'} الروابط`, 'prot_links').row()
@@ -245,7 +235,7 @@ export function setupCommands(bot, db, helpers) {
     .text(`${g.forwardLock ? '🟢 مفعّل' : '⚪ متوقف'} توجيه الرسائل`, 'prot_forward').row()
     .text(`${g.contactsLock ? '🟢 مفعّل' : '⚪ متوقف'} المعرفات وأرقام الهواتف`, 'prot_contacts').row()
     .text('⚡ تفعيل الحماية الشاملة', 'prot_all').row()
-    .text('🔙 رجوع', 'home');
+    .text('🔙 رجوع', 'managementmenu');
 
   // أمر البداية /start[cite: 4]
   bot.command('start', async ctx => {
@@ -267,7 +257,7 @@ export function setupCommands(bot, db, helpers) {
     const target = ctx.message.reply_to_message?.from || ctx.from;
     const lines = [`🆔 Chat ID: ${ctx.chat.id}`, `👤 User ID: ${target?.id ?? 'غير متاح'}`];
     if (target?.username) lines.push(`🔗 Username: @${target.username}`);
-    await ctx.reply(lines.join('\\n'), { reply_to_message_id: ctx.message.message_id });
+    await ctx.reply(lines.join('\n'), { reply_to_message_id: ctx.message.message_id });
   });
 
   bot.command('panel', async ctx => {
@@ -304,41 +294,52 @@ export function setupCommands(bot, db, helpers) {
   });
 
   // أمر عرض الأوامر علناً في المجموعة للجميع (/commands أو الأوامر)
-  
-  // ==========================================
-  // 🐈‍⬛ مركز أوامر نغنوغ — الواجهة الاحترافية
-  // يقبل: /commands ، الأوامر ، الاوامر
-  // ==========================================
+  bot.command(['commands', 'الأوامر'], async ctx => {
+    const publicHelpText = `📋 **قائمة أوامر وميزات بوت (نغنوغ) في المجموعة:**\n\n` +
+      `🎮 **ألعاب التحدي والنقاط:**\n` +
+      `• \`خ\` ➜ لعبة اختر الخيار الصحيح\n` +
+      `• \`ر\` ➜ لعبة الرياضيات السريعة\n` +
+      `• \`ح\` ➜ لعبة معرفة الحيوان من الحرف الأول\n` +
+      `• \`س\` ➜ لعبة أسئلة عامة وثقافية\n` +
+      `• \`توب\` ➜ عرض قائمة أبطال النقاط (أعلى 3)\n\n` +
+      `💬 **الردود والتفاعل اليومي:**\n` +
+      `• \`ا\` ➜ عرض بطاقة ملفك الشخصي ونقاطك\n` +
+      `• \`كت\` ➜ سؤال فضفضة وموقف عشوائي\n` +
+      `• \`ش\` ➜ أبيات شعرية لطيفة\n` +
+      `• \`ن\` أو \`نغنوغ\` ➜ قفشات وردود نغنوغ العراقية\n\n` +
+      `👑 **أوامر الإدارة للمشرفين (بالرد على الرسالة):**\n` +
+      `• \`كتم [الدقائق]\` ➜ كتم العضو (مثال: \`كتم 10\`)\n` +
+      `• \`طرد\` ➜ طرد العضو من المجموعة\n` +
+      `• \`قفل الرسائل\` / \`افتح الرسائل\`\n` +
+      `• \`امسح [العدد]\` ➜ حذف الرسائل (مثال: \`امسح 10\`)\n` +
+      `• \`تفعيل الحماية\` ➜ تشغيل الحماية الشاملة تلقائياً`;
 
-    const sendNoghnoghCommands = async ctx => {
-    const message =
-      '🐈‍⬛「 نَغْنُوغ | مَرْكَز أَوَامِر المَجْمُوعَة 」\n' +
-      '━━━━━━━━━━━━━━━━━━\n\n' +
-      'هَلَا بِيك عَيْنِي ❤️\n' +
-      'اختار القسم اللي تحتاجه من الأزرار أدناه:\n\n' +
-      '🎮「 الألعاب 」 تحدّيات وأسئلة وألغاز\n' +
-      '💬「 الأوامر التفاعلية 」 سوالف وميزات نغنوغ\n' +
-      '🛡️「 الحماية 」 تعليمات حماية المجموعة\n' +
-      '👑「 الإدارة 」 أوامر المشرفين\n\n' +
-      '━━━━━━━━━━━━━━━━━━\n' +
-      '🐾 نَغْنُوغ يخلّي سوالف مجموعتكم أحلى!';
+    await ctx.reply(publicHelpText, { parse_mode: 'Markdown' });
+  });
 
-    return ctx.reply(message, {
-      reply_markup: publicCommandsKeyboard()
-    });
-  };
-  // الأمر /commands
-  bot.command('commands', sendNoghnoghCommands);
+  bot.hears(/^الأوامر$/i, async ctx => {
+    if (!isGroup(ctx)) return;
+    const publicHelpText = `📋 **قائمة أوامر وميزات بوت (نغنوغ) في المجموعة:**\n\n` +
+      `🎮 **ألعاب التحدي والنقاط:**\n` +
+      `• \`خ\` ➜ لعبة اختر الخيار الصحيح\n` +
+      `• \`ر\` ➜ لعبة الرياضيات السريعة\n` +
+      `• \`ح\` ➜ لعبة معرفة الحيوان من الحرف الأول\n` +
+      `• \`س\` ➜ لعبة أسئلة عامة وثقافية\n` +
+      `• \`توب\` ➜ عرض قائمة أبطال النقاط (أعلى 3)\n\n` +
+      `💬 **الردود والتفاعل اليومي:**\n` +
+      `• \`ا\` ➜ عرض بطاقة ملفك الشخصي ونقاطك\n` +
+      `• \`كت\` ➜ سؤال فضفضة وموقف عشوائي\n` +
+      `• \`ش\` ➜ أبيات شعرية لطيفة\n` +
+      `• \`ن\` أو \`نغنوغ\` ➜ قفشات وردود نغنوغ العراقية\n\n` +
+      `👑 **أوامر الإدارة للمشرفين (بالرد على الرسالة):**\n` +
+      `• \`كتم [الدقائق]\` ➜ كتم العضو (مثال: \`كتم 10\`)\n` +
+      `• \`طرد\` ➜ طرد العضو من المجموعة\n` +
+      `• \`قفل الرسائل\` / \`افتح الرسائل\`\n` +
+      `• \`امسح [العدد]\` ➜ حذف الرسائل (مثال: \`امسح 10\`)\n` +
+      `• \`تفعيل الحماية\` ➜ تشغيل الحماية الشاملة تلقائياً`;
 
-  // الكلمات العربية بدون / — مع دعم الهمزة وبدونها
-  bot.hears(/^(?:الأوامر|الاوامر|الأمر|الامر)$/u, async ctx => {
-  if (!isGroup(ctx)) return;
-  return sendNoghnoghCommands(ctx);
-});
-  bot.hears(/^(?:الأوامر|الاوامر|الأمر|الامر)$/u, async ctx => {
-  if (!isGroup(ctx)) return;
-  return sendNoghnoghCommands(ctx);
-});
+    await ctx.reply(publicHelpText, { parse_mode: 'Markdown' });
+  });
 
   // أمر الإذاعة للمالك[cite: 4]
   bot.command('broadcast', async ctx => {
@@ -394,7 +395,16 @@ export function setupCommands(bot, db, helpers) {
   // معالجة كافة الأزرار واللوحات بشمولية تامة لتجنب أي أخطاء أو أزرار لا تستجيب[cite: 3, 4, 5]
   bot.on('callback_query:data', async ctx => {
     ensureUser(ctx);
-    const data = ctx.callbackQuery.data;
+    let data = ctx.callbackQuery.data;
+    const callbackAliases = {
+      public_games: 'gamesmenu',
+      public_game_animal: 'game_an',
+      public_game_general: 'game_ge',
+      public_game_math: 'game_ma',
+      public_game_choose: 'game_ch',
+      publiccommands: 'publiccommands'
+    };
+    data = callbackAliases[data] || data;
 
     if (data.startsWith('gans:')) {
       const [, roundId, rawIndex] = data.split(':');
@@ -422,7 +432,7 @@ export function setupCommands(bot, db, helpers) {
       save();
       try { await ctx.answerCallbackQuery({ text: 'إجابة صحيحة! ربحت نقطة 🎉' }); } catch {}
       try { await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }); } catch {}
-      try { await ctx.reply(`🎉 مبروك ${ctx.from.first_name || 'بطل'}! فزت بالسؤال وربحت نقطة 🏆\\nرصيدك بهذه المجموعة: ${scores[uid]}`); } catch {}
+      try { await ctx.reply(`🎉 مبروك ${ctx.from.first_name || 'بطل'}! فزت بالسؤال وربحت نقطة 🏆\nرصيدك بهذه المجموعة: ${scores[uid]}`); } catch {}
       return;
     }
 
@@ -481,14 +491,36 @@ export function setupCommands(bot, db, helpers) {
     };
 
     if (data === 'home') return showHomeFunc(ctx);
+    if (data === 'publiccommands') {
+      const kb = new InlineKeyboard()
+        .text('🎮 الألعاب والتحديات', 'gamesmenu').row()
+        .text('💬 الأوامر التفاعلية', 'interactive_menu').row()
+        .text('🏆 النقاط والمتصدرون', 'statsmenu').row()
+        .text('📖 شرح أوامر المجموعة', 'showpublichelp').row()
+        .text('🔙 القائمة الرئيسية', 'home');
+      return answer(ctx, '📚 مركز أوامر نغنوغ\n\nهنا تلكه ألعاب المجموعة، والأوامر التفاعلية، والنقاط. الأوامر اللي تحتاج صلاحية موضحة بقسم الإدارة والحماية.', { reply_markup: kb });
+    }
+    if (data === 'showpublichelp') {
+      const kb = new InlineKeyboard().text('🔙 مركز الأوامر', 'publiccommands').row().text('🏠 الرئيسية', 'home');
+      return answer(ctx, '🐾 أوامر المجموعة\n\n🎮 الألعاب: خ، ر، ح، س\n🏆 توب: عرض أعلى ثلاثة أعضاء بالنقاط\n👤 ا: بطاقة العضو، أو ردّ بـ «ا» على رسالة عضو\n🧠 كت: سؤال عشوائي\n📜 ش: شعر قصير\n🐈‍⬛ ن: رد عراقي من نغنوغ\n\nالألعاب متاحة داخل المجموعات المفعّلة.', { reply_markup: kb });
+    }
+    if (data === 'managementmenu') {
+      const kb = new InlineKeyboard()
+        .text('⚙️ إعدادات المجموعة', 'groupsettings').row()
+        .text('🛡️ أوامر الحماية', 'protectionmenu').row()
+        .text('👑 أوامر المشرفين', 'adminpanel').row()
+        .text('🧾 التحذيرات والكلمات الممنوعة', 'warningsmenu').row()
+        .text('🔙 القائمة الرئيسية', 'home');
+      return answer(ctx, '⚙️ الإدارة والحماية\n\nاختار القسم المطلوب. بعض الخيارات تحتاج أن تكون مشرفاً في المجموعة المحددة، وأن يمتلك البوت الصلاحيات اللازمة.', { reply_markup: kb });
+    }
     if (data === 'howto') return answer(ctx, '📖 طريقة الاستخدام — نغنوغ 🐾', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'interactive_menu') {
       const kb = new InlineKeyboard().text('👤 بطاقة العضو (ا)', 'interactive_profile').row()
         .text('🧠 كت', 'interactive_ket').text('📜 شعر (ش)', 'interactive_poem').row()
         .text('🐈‍⬛ نغنوغ (ن)', 'interactive_n').row().text('🏆 توب النقاط', 'game_top').row()
-        .text('🔙 الرئيسية', 'home');
-      return answer(ctx, '💬 الأوامر التفاعلية المتاحة للجميع داخل المجموعة:\\nا — بطاقة العضو (بالرد على رسالة لعرض بطاقته)\\nكت — سؤال عشوائي\\nش — شعر قصير\\nن — رد عراقي من نغنوغ\\nتوب — أفضل ثلاثة أعضاء بالنقاط.', { reply_markup: kb });
+        .text('🔙 مركز الأوامر', 'publiccommands');
+      return answer(ctx, '💬 الأوامر التفاعلية المتاحة للجميع داخل المجموعة:\nا — بطاقة العضو (بالرد على رسالة لعرض بطاقته)\nكت — سؤال عشوائي\nش — شعر قصير\nن — رد عراقي من نغنوغ\nتوب — أفضل ثلاثة أعضاء بالنقاط.', { reply_markup: kb });
     }
     if (data === 'interactive_profile') return answer(ctx, 'اكتب «ا» داخل المجموعة، أو ردّ بها على رسالة عضو لعرض بطاقته.');
     if (data === 'interactive_ket') return answer(ctx, 'اكتب «كت» داخل المجموعة حتى يظهر سؤال عشوائي.');
@@ -496,142 +528,6 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'interactive_n') return answer(ctx, 'اكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
         if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
-    // 🐈‍⬛ معالجات أزرار مركز أوامر نغنوغ
-
-    if (data === 'close_public_commands') {
-      try {
-        await ctx.deleteMessage();
-      } catch {}
-      return;
-    }
-
-    
-if (data === 'publiccommands') {
-  return answer(
-    ctx,
-    '🐈‍⬛「 نَغْنُوغ | مَرْكَز أَوَامِر المَجْمُوعَة 」\n\n' +
-    'هَلَا بِيك عَيْنِي ❤️\n' +
-    'اختار القسم اللي تحتاجه من الأزرار أدناه:',
-    { reply_markup: publicCommandsKeyboard() }
-  );
-}
-if (data === 'public_game_animal') {
-  return answer(
-    ctx,
-    '🐾「 مَعْرِفَة الحَيَوَان 」\n\n' +
-    'خَمِّن الحَيَوَان مِنَ الحَرْف الأَوَّل! ❤️\n\n' +
-    '📌 طريقة اللعب:\n' +
-    'ادخل للمجموعة واكتب: ح\n' +
-    'وبعدها جاوب على اسم الحيوان المطلوب.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-
-if (data === 'public_game_general') {
-  return answer(
-    ctx,
-    '💡「 أَسْئِلَة عَامَّة 」\n\n' +
-    'اختبر معلوماتك وجاوب على الأسئلة! 🧠\n\n' +
-    '📌 طريقة اللعب:\n' +
-    'ادخل للمجموعة واكتب: س\n' +
-    'وبعدها جاوب على السؤال اللي يظهر إلك.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-
-if (data === 'public_game_math') {
-  return answer(
-    ctx,
-    '🔢「 مَرِّن عَقْلَك 」\n\n' +
-    'حل المسائل الحسابية بأسرع وقت! ⚡\n\n' +
-    '📌 طريقة اللعب:\n' +
-    'ادخل للمجموعة واكتب: ر\n' +
-    'وبعدها اكتب جواب المسألة.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-
-if (data === 'public_game_choose') {
-  return answer(
-    ctx,
-    '🧩「 اخْتَر الجَوَاب الصَّحِيح 」\n\n' +
-    'اختار الجواب الصحيح من الخيارات اللي تظهر إلك! ❤️\n\n' +
-    '📌 طريقة اللعب:\n' +
-    'ادخل للمجموعة واكتب: خ\n' +
-    'وبعدها اختار الجواب الصحيح.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-    if (data === 'public_protection_info') {
-  return answer(
-    ctx,
-    '🛡️「 أَوَامِر الحِمَايَة 」\n\n' +
-    '🐈‍⬛ نغنوغ يساعد بإدارة المجموعة وحمايتها.\n\n' +
-    '🔗 منع الروابط: يفعّله مشرف المجموعة من إعدادات الحماية.\n' +
-    '🌊 منع التكرار والإزعاج: حسب إعدادات البوت بالمجموعة.\n' +
-    '👋 الترحيب: لاستقبال الأعضاء الجدد برسالة ترحيب.\n\n' +
-    '📌 ملاحظة: لازم البوت يمتلك الصلاحيات المطلوبة حتى ينفّذ الحماية.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-    if (data === 'public_admin_info') {
-  return answer(
-    ctx,
-    '👮「 أَوَامِر المُشْرِفِين 」\n\n' +
-    '🐈‍⬛ هاي الأوامر مخصصة لمشرفي المجموعة:\n\n' +
-    '🔇 /mute — كتم عضو.\n' +
-    '🔊 /unmute — إلغاء كتم عضو.\n' +
-    '📌 /pin — تثبيت رسالة.\n' +
-    '📍 /unpin — إلغاء تثبيت الرسالة.\n\n' +
-    '📌 بعض الأوامر تحتاج تستخدمها بالرد على رسالة العضو، والبوت لازم يمتلك صلاحيات المشرف.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-    if (data === 'public_top_info') {
-  return answer(
-    ctx,
-    '🏆「 لَوْحَة المُتَصَدِّرِين 」\n\n' +
-    '🐈‍⬛ تريد تعرف منو أكثر الأعضاء نشاطاً؟\n\n' +
-    '📌 ادخل للمجموعة واكتب:\n' +
-    ' /top\n\n' +
-    'حتى تشوف قائمة المتصدرين حسب نظام النقاط بالمجموعة.',
-    { reply_markup: publicInfoBackKeyboard() }
-  );
-}
-    if (data === 'public_interactive') {
-      const keyboard = new InlineKeyboard()
-        .text('👤 بطاقة العضو — ا', 'public_profile_info')
-        .row()
-        .text('🧠 سؤال عشوائي — كت', 'public_confession_info')
-        .row()
-        .text('📜 شعر — ش', 'public_poem_info')
-        .row()
-        .text('🐈‍⬛ ردود نغنوغ — ن', 'public_noghnogh_info')
-        .row()
-        .text('🔙 رجوع', 'publiccommands');
-
-      return answer(
-        ctx,
-        '💬 سوالف نغنوغ\n\nاختار الأمر اللي تريد تعرف طريقة استخدامه:',
-        { reply_markup: keyboard }
-      );
-    }
-
-    if (data === 'public_profile_info') {
-      return answer(ctx, '👤 بطاقة العضو\n\nاكتب «ا» داخل المجموعة، أو ردّ بالحرف على رسالة العضو لعرض بطاقته.');
-    }
-
-    if (data === 'public_confession_info') {
-      return answer(ctx, '🧠 السؤال العشوائي\n\nاكتب «كت» داخل المجموعة حتى يظهر سؤال عشوائي.');
-    }
-
-    if (data === 'public_poem_info') {
-      return answer(ctx, '📜 الشعر\n\nاكتب «ش» داخل المجموعة حتى يظهر شعر قصير.');
-    }
-
-    if (data === 'public_noghnogh_info') {
-      return answer(ctx, '🐈‍⬛ ردود نغنوغ\n\nاكتب «ن» داخل المجموعة حتى يرد نغنوغ باللهجة العراقية.');
-    }
     // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
@@ -910,7 +806,7 @@ if (data === 'public_game_choose') {
       const g = isGroup(ctx) ? groupFor(ctx.chat) : selectedGroup(ctx);
       if (!g) return answer(ctx, '⚠️ اختار مجموعة أولاً من «مجموعاتي».');
       if (!await userCanManage(ctx, g)) return answer(ctx, 'الأمر غير مخصص إلك');
-      return answer(ctx, `🛡️ إعدادات الحماية — ${g.title}\\nالحالة الحالية موضحة على كل زر:`, { reply_markup: protectionKeyboard(g) });
+      return answer(ctx, `🛡️ إعدادات الحماية — ${g.title}\nالحالة الحالية موضحة على كل زر:`, { reply_markup: protectionKeyboard(g) });
     }
 
     if (data.startsWith('prot_')) {
@@ -925,7 +821,7 @@ if (data === 'public_game_choose') {
       } else return answer(ctx, 'خيار حماية غير معروف.');
       save();
       const status = type === 'all' ? 'تم تفعيل جميع خيارات الحماية المحفوظة.' : `الحالة الجديدة: ${g[fieldByType[type]] ? 'مفعّل ✅' : 'متوقف ❌'}`;
-      return answer(ctx, `🛡️ تم تحديث إعداد الحماية.\\n${status}`, { reply_markup: protectionKeyboard(g) });
+      return answer(ctx, `🛡️ تم تحديث إعداد الحماية.\n${status}`, { reply_markup: protectionKeyboard(g) });
     }
 
     // لوحة المشرفين[cite: 4]
@@ -938,7 +834,7 @@ if (data === 'public_game_choose') {
         `• **فتح الدردشة:** كتابة \`افتح الرسائل\`\n` +
         `• **مسح رسائل بعدد:** كتابة \`امسح + الرقم\`\n` +
         `• **مسح الكل:** كتابة \`المسح جميع الرسائل\``;
-      return answer(ctx, adminText, { reply_markup: new InlineKeyboard().text('🔙 رجوع', 'home') });
+      return answer(ctx, adminText, { reply_markup: new InlineKeyboard().text('🔙 الإدارة والحماية', 'managementmenu').row().text('🏠 الرئيسية', 'home') });
     }
 
     // قائمة الألعاب والتحديات[cite: 4]
@@ -955,7 +851,7 @@ if (data === 'public_game_choose') {
         .text('🧩 خيار صحيح (خ)', 'game_ch').text('🔢 رياضيات (ر)', 'game_ma').row()
         .text('🐅 حيوانات (ح)', 'game_an').text('💡 أسئلة عامة (س)', 'game_ge').row()
         .text('🏆 لوحة المتصدرين (توب)', 'game_top').row()
-        .text('🔙 رجوع', 'home');
+        .text('🔙 رجوع لمركز الأوامر', 'publiccommands');
 
       if (ctx.callbackQuery) {
         try { await ctx.editMessageText(gamesText, { reply_markup: gamesKb }); }
@@ -965,14 +861,19 @@ if (data === 'public_game_choose') {
       return answer(ctx, gamesText, { reply_markup: gamesKb });
     }
 
-    if (data === 'game_ch') return ctx.reply("🧩 لبدء لعبة اختر الخيار الصحيح، اكتب حرف (خ) في المجموعة!");
-    if (data === 'game_ma') return ctx.reply("🔢 لبدء لعبة الرياضيات، اكتب حرف (ر) في المجموعة!");
-    if (data === 'game_an') return ctx.reply("🐅 لبدء لعبة معرفة الحيوان، اكتب حرف (ح) في المجموعة!");
-    if (data === 'game_ge') return ctx.reply("💡 لبدء لعبة الأسئلة العامة، اكتب حرف (س) في المجموعة!");
+    if (data === 'game_ch' || data === 'game_ma' || data === 'game_an' || data === 'game_ge') {
+      const details = {
+        game_ch: '🧩 لعبة الخيار الصحيح\nاكتب «خ» داخل المجموعة، واختار الإجابة من الأزرار. أول إجابة صحيحة تربح نقطة.',
+        game_ma: '🔢 لعبة الرياضيات\nاكتب «ر» داخل المجموعة وجاوب بالرقم الصحيح. أول إجابة صحيحة تربح نقطة.',
+        game_an: '🐾 لعبة الحيوان\nاكتب «ح» داخل المجموعة وخمّن اسم الحيوان من أول حرف. أول إجابة صحيحة تربح نقطة.',
+        game_ge: '💡 الأسئلة العامة\nاكتب «س» داخل المجموعة وجاوب عن السؤال. أول إجابة صحيحة تربح نقطة.'
+      };
+      return answer(ctx, details[data], { reply_markup: new InlineKeyboard().text('🎮 رجوع للألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
+    }
     
     if (data === 'game_top') {
       const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
-      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 الألعاب', 'gamesmenu').row().text('🏠 الرئيسية', 'home') });
+      return answer(ctx, leaderboardText(chatId), { reply_markup: new InlineKeyboard().text('🔙 الألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
     }
 
     if (data === 'clearall_confirm') {
@@ -1007,7 +908,7 @@ if (data === 'public_game_choose') {
       const kb = new InlineKeyboard().text('🏆 أفضل 3 أعضاء', 'stats_top').row()
         .text('⭐ نقاطي في هذه المجموعة', 'stats_mine').row()
         .text('🎮 تعليمات الألعاب', 'gamesmenu').row().text('🏠 الرئيسية', 'home');
-      return answer(ctx, `📊 النقاط والإحصائيات${g ? ` — ${g.title}` : ''}\\n\\n👥 أعضاء لديهم نقاط: ${Object.keys(scores).length}\\n⭐ مجموع النقاط الممنوحة: ${total}\\n⭐ نقاطك: ${mine}`, { reply_markup: kb });
+      return answer(ctx, `📊 النقاط والإحصائيات${g ? ` — ${g.title}` : ''}\n\n👥 أعضاء لديهم نقاط: ${Object.keys(scores).length}\n⭐ مجموع النقاط الممنوحة: ${total}\n⭐ نقاطك: ${mine}`, { reply_markup: kb });
     }
     if (data === 'stats_top') {
       const chatId = String(isGroup(ctx) ? ctx.chat.id : (selectedGroup(ctx)?.id || ctx.chat?.id || ''));
@@ -1032,6 +933,7 @@ if (data === 'public_game_choose') {
     ensureUser(ctx);
     const msg = ctx.message;
     const text = msg.text?.trim() || '';
+    const protectionText = [msg.text, msg.caption].filter(Boolean).join('\n');
 
     if (isGroup(ctx)) {
       const g = groupFor(ctx.chat);
@@ -1212,7 +1114,7 @@ if (data === 'public_game_choose') {
         save();
         const kb = new InlineKeyboard().text('🗑️ تأكيد الحذف (آخر 100 رسالة)', 'clearall_confirm')
           .row().text('❌ إلغاء', 'clearall_cancel');
-        await ctx.reply('⚠️ تأكيد عملية الحذف\\nسيحاول البوت حذف آخر 100 رسالة فقط قبل أمر التأكيد. قد تمنع قيود تيليگرام حذف بعض الرسائل القديمة. هل تريد المتابعة؟', { reply_markup: kb });
+        await ctx.reply('⚠️ تأكيد عملية الحذف\nسيحاول البوت حذف آخر 100 رسالة فقط قبل أمر التأكيد. قد تمنع قيود تيليگرام حذف بعض الرسائل القديمة. هل تريد المتابعة؟', { reply_markup: kb });
         return;
       }
 
@@ -1298,7 +1200,7 @@ if (data === 'public_game_choose') {
           db.pointNames ||= {};
           db.pointNames[uid] = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || `عضو ${uid}`;
           save();
-          await ctx.reply(`🎉 مبروك ${msg.from.first_name || 'بطل'}! ربحت نقطة واحدة 🏆\\nرصيدك في هذه المجموعة: ${scores[uid]} نقطة.`, { reply_to_message_id: msg.message_id });
+          await ctx.reply(`🎉 مبروك ${msg.from.first_name || 'بطل'}! ربحت نقطة واحدة 🏆\nرصيدك في هذه المجموعة: ${scores[uid]} نقطة.`, { reply_to_message_id: msg.message_id });
           return;
         }
       }
@@ -1329,9 +1231,9 @@ if (data === 'public_game_choose') {
         }, 60000).unref?.();
 
         const stopKb = new InlineKeyboard().text('🛑 إنهاء السؤال', 'game_stop');
-        let questionText = `🎮 ${game.title}\\n\\n❓ ${chosen.q || `حيوان يبدأ بحرف (${String(answerText).trim()[0] || '?'})` }\\n\\n⏱️ أول إجابة صحيحة خلال 60 ثانية تحصل على نقطة!`;
+        let questionText = `🎮 ${game.title}\n\n❓ ${chosen.q || `حيوان يبدأ بحرف (${String(answerText).trim()[0] || '?'})` }\n\n⏱️ أول إجابة صحيحة خلال 60 ثانية تحصل على نقطة!`;
         if (game.key === 'animals') {
-          questionText = `🐾 خمن اسم الحيوان الذي يبدأ بهذا الحرف:\\n\\n🔤 الحرف: ${Array.from(answerText)[0]}\\n⏱️ أول إجابة صحيحة خلال 60 ثانية تربح نقطة!`;
+          questionText = `🐾 خمن اسم الحيوان الذي يبدأ بهذا الحرف:\n\n🔤 الحرف: ${Array.from(answerText)[0]}\n⏱️ أول إجابة صحيحة خلال 60 ثانية تربح نقطة!`;
         }
         if (game.key === 'choose' && Array.isArray(chosen.options)) {
           const options = chosen.options.slice(0, 8);
@@ -1343,15 +1245,17 @@ if (data === 'public_game_choose') {
           kb.row().text('🛑 إنهاء السؤال', 'game_stop');
           round.options = options;
           db.activeGames[chatId] = round; save();
-          await ctx.reply(questionText + '\\n\\nاختار الإجابة من الأزرار:', { reply_markup: kb });
+          await ctx.reply(questionText + '\n\nاختار الإجابة من الأزرار:', { reply_markup: kb });
         } else {
           await ctx.reply(questionText, { reply_markup: stopKb });
         }
         return;
       }
 
-      if (g.autoReply) {
-        const automaticReply = findAutoReply(text);
+      if (g.autoReply && text) {
+        const normalizedMessage = normalizeAnswer(text);
+        const customReply = (g.replies || []).find(item => normalizeAnswer(item.trigger) === normalizedMessage)?.response;
+        const automaticReply = customReply || findAutoReply(text);
         if (automaticReply) {
           await ctx.reply(automaticReply, { reply_to_message_id: msg.message_id });
           return;
@@ -1420,6 +1324,27 @@ if (data === 'public_game_choose') {
             reply_markup: new InlineKeyboard().text('🎨 قائمة التخصيص', 'custommenu').row().text('🏠 القائمة الرئيسية', 'home')
           });
         }
+        if (p.action === 'reply-trigger') {
+          const g = db.groups[p.groupId];
+          if (!g || !await userCanManage(ctx, g)) { clearPending(ctx); return ctx.reply('عيني، ما عندك صلاحية تعدّل ردود هالمجموعة.'); }
+          if (!text.trim()) return ctx.reply('أرسل عبارة نصية حتى أستخدمها كمحفّز للرد.');
+          pending(ctx, { action: 'reply-response', groupId: p.groupId, trigger: text.trim() });
+          return ctx.reply(`تمام عيني، هسه أرسل الرد اللي تريد نغنوغ يكتبه من يقره «${text.trim()}».`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'repliesmenu') });
+        }
+        if (p.action === 'reply-response') {
+          const g = db.groups[p.groupId];
+          if (!g || !await userCanManage(ctx, g)) { clearPending(ctx); return ctx.reply('عيني، ما عندك صلاحية تعدّل ردود هالمجموعة.'); }
+          if (!text.trim()) return ctx.reply('الرد فارغ، أرسل نصاً حتى ينحفظ.');
+          g.replies ||= [];
+          const trigger = String(p.trigger || '').trim();
+          if (!trigger) { clearPending(ctx); return ctx.reply('ما لكيت عبارة الرد. جرّب الإضافة مرة ثانية.'); }
+          const existing = g.replies.findIndex(r => String(r.trigger).toLocaleLowerCase('ar') === trigger.toLocaleLowerCase('ar'));
+          const entry = { trigger, response: text.trim() };
+          if (existing >= 0) g.replies[existing] = entry; else g.replies.push(entry);
+          save(); clearPending(ctx);
+          return ctx.reply('تمام عيني، انحفظ الرد بنجاح 🐾', { reply_markup: new InlineKeyboard().text('📋 عرض الردود', 'replylist').row().text('💬 إدارة الردود', 'repliesmenu') });
+        }
+
         if (p.action === 'badwordadd') {
           const g = db.groups[p.groupId];
           if (g && await userCanManage(ctx, g)) {
