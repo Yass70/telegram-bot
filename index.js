@@ -45,6 +45,7 @@ const freshGroup = () => ({
 const freshDB = () => ({
   groups: {},
   selected: {},
+  protectionBack: {},
   pending: {},
   users: [],
   privateUsers: [],
@@ -67,7 +68,7 @@ function load() {
     if (!fs.existsSync(DATA_FILE)) return;
     const old = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     db = { ...freshDB(), ...old };
-    db.groups ||= {}; db.selected ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
+    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
     db.groupPoints ||= {};
@@ -76,7 +77,13 @@ function load() {
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
-      if (oldGroup.linksLock === undefined) g.linksLock = !!g.links;
+      // الروابط لها حالة واحدة مشتركة مع الحقل القديم links للتوافق مع البيانات السابقة.
+      g.linksLock = Boolean(oldGroup.linksLock === undefined ? g.links : oldGroup.linksLock);
+      g.links = g.linksLock;
+      // خيار الصوتيات في الواجهة موحّد؛ نحافظ على توافق الحقلين القديمين.
+      const audioEnabled = Boolean(oldGroup.audioLock === undefined ? oldGroup.audioClipsLock : oldGroup.audioLock);
+      g.audioLock = audioEnabled;
+      g.audioClipsLock = audioEnabled;
       g.userStats ||= {};
       g.knownMembers ||= {};
       g.recentMessages ||= [];
