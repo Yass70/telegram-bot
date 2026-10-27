@@ -70,6 +70,8 @@ export function ownerKeyboard() {
     .row()
     .text('👥 المجموعات المفعّلة', 'activatedgroups')
     .row()
+    .text('📢 إذاعة عامة (للمستخدمين)', 'broadcastmenu') // تم إضافة زر الإذاعة هنا
+    .row()
     .text('⚙️ إعدادات البوت', 'botsettings')
     .row()
     .text('🛡️ إعدادات الحماية العامة', 'globalprotection')
