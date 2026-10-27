@@ -31,7 +31,7 @@ export function setupCommands(bot, db, helpers) {
     await ctx.reply(HELP_TEXT, { reply_markup: helpKeyboard() });
   });
 
-  // أمر الإذاعة (Broadcast) للمالك
+  // أمر الإذاعة المباشر (Broadcast) للمالك
   bot.command('broadcast', async ctx => {
     if (!isOwner(ctx)) return ctx.reply('هذا الأمر خاص بمالك البوت فقط.');
     
@@ -130,6 +130,13 @@ export function setupCommands(bot, db, helpers) {
     if (data === 'protection') return answer(ctx, '🛡️ ميزات الحماية', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'help') return answer(ctx, HELP_TEXT, { reply_markup: helpKeyboard() });
     
+    // زر الإذاعة من لوحة المالك
+    if (data === 'broadcastmenu') {
+      if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.');
+      pending(ctx, { action: 'broadcast-message' });
+      return answer(ctx, '📢 **قسم الإذاعة العامة**\n\nأرسل الآن النص أو الرسالة التي تريد إرسالها لجميع المستخدمين في الخاص:', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'ownerpanel') });
+    }
+
     if (data === 'custommenu') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       clearPending(ctx);
@@ -141,7 +148,7 @@ export function setupCommands(bot, db, helpers) {
     }
     if (data === 'customreset') {
       db.customizations ||= {};
-      db.customizations[userKey(ctx)] = JSON.parse(JSON.stringify(db.customizations[userKey(ctx)])); // or default
+      db.customizations[userKey(ctx)] = JSON.parse(JSON.stringify(db.customizations[userKey(ctx)]));
       clearPending(ctx);
       save();
       return answer(ctx, '♻️ رجّعت كل نصوص التخصيص إلى حالتها الأصلية.', { reply_markup: customizationKeyboard() });
@@ -455,6 +462,30 @@ export function setupCommands(bot, db, helpers) {
       // المحادثات الخاصة (الخاص)
       const p = db.pending[userKey(ctx)];
       if (p) {
+        // استقبال نص الإذاعة عبر الزر
+        if (p.action === 'broadcast-message') {
+          clearPending(ctx);
+          const users = db.privateUsers || [];
+          if (users.length === 0) {
+            return answer(ctx, '⚠️ ماكو أي مستخدم مسجل بالخاص حالياً.', { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+          }
+
+          let successCount = 0;
+          let failCount = 0;
+          await ctx.reply(`📢 جاري إرسال الإذاعة إلى ${users.length} مستخدم... انتظر قليلاً.`);
+
+          for (const userId of users) {
+            try {
+              await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${text}`, { parse_mode: 'Markdown' });
+              successCount++;
+              await new Promise(resolve => setTimeout(resolve, 50));
+            } catch (e) {
+              failCount++;
+            }
+          }
+          return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n\n📤 تم الإرسال إلى: ${successCount}\n❌ فشل الإرسال (حظروا البوت): ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+        }
+
         if (['custom-start', 'custom-description', 'custom-reply'].includes(p.action)) {
           if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
           if (text.length > 2500) return ctx.reply('❌ النص طويل جداً. الحد الأقصى 2500 حرف.');
