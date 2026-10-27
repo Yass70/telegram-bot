@@ -1,4 +1,7 @@
+
 import { InlineKeyboard } from 'grammy';
+
+const DEVELOPER_URL = 'https://t.me/llll6llll6';
 
 export function mainKeyboard(ctx, bot) {
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
@@ -22,7 +25,52 @@ export function mainKeyboard(ctx, bot) {
     .row()
     .text('🎨 تخصيص البوت', 'custommenu')
     .row()
-    .text('📖 المساعدة', 'help');
+    .url('👨‍💻 المطوّر', DEVELOPER_URL);
+}
+
+export function publicCommandsKeyboard() {
+  return new InlineKeyboard()
+    .text('🎮 الألعاب', 'public_games')
+    .text('💬 الأوامر التفاعلية', 'public_interactive')
+    .row()
+    .text('🛡️ أوامر الحماية', 'public_protection_info')
+    .text('👑 أوامر الإدارة', 'public_admin_info')
+    .row()
+    .url('👨‍💻 المطوّر', DEVELOPER_URL)
+    .text('✖️ إغلاق', 'close_public_commands');
+}
+
+export function publicGamesKeyboard() {
+  return new InlineKeyboard()
+    .text('🐾 معرفة الحيوان', 'public_game_animal')
+    .row()
+    .text('💡 أسئلة عامة', 'public_game_general')
+    .row()
+    .text('🔢 مرّن عقلك', 'public_game_math')
+    .row()
+    .text('🧩 اختيار الجواب الصحيح', 'public_game_choose')
+    .row()
+    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
+}
+
+export function publicInteractiveKeyboard() {
+  return new InlineKeyboard()
+    .text('👤 الملف التعريفي', 'public_profile_info')
+    .row()
+    .text('🧠 أمثلة عشوائية', 'public_confession_info')
+    .row()
+    .text('📜 شعر', 'public_poem_info')
+    .row()
+    .text('🏆 المتصدرين', 'public_top_info')
+    .row()
+    .text('🐈‍⬛ نغنوغ', 'public_noghnogh_info')
+    .row()
+    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
+}
+
+export function publicInfoBackKeyboard() {
+  return new InlineKeyboard()
+    .text('🔙 رجوع إلى مركز الأوامر', 'publiccommands');
 }
 
 export function customizationKeyboard() {
@@ -67,7 +115,7 @@ export function helpKeyboard() {
     .text('👥 إدارة المجموعات', 'mygroups')
     .row()
     .text('🏠 القائمة الرئيسية', 'home')
-    .url('👤 حساب المطوّر', 'https://t.me/llll6llll6');
+    .url('👨‍💻 حساب المطوّر', DEVELOPER_URL);
 }
 
 export function ownerKeyboard() {
