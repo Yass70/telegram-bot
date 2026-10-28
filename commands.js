@@ -177,9 +177,8 @@ ${link}
     const value = ctx.message.text.replace(/^\/setwelcome(?:@\w+)?\s*/i, '').trim();
     if (!value) return ctx.reply('أرسل نص الترحيب بعد الأمر. المتغيرات المتاحة: {name} و{title}.\nمثال: /setwelcome أهلاً {name} في {title}');
     g.welcomeText = value;
-    g.welcomeEnabled = true;
     save();
-    return ctx.reply('✅ تم حفظ رسالة الترحيب وتفعيلها.');
+    return ctx.reply(`✅ تم حفظ نص الترحيب.\nحالة الترحيب التلقائي: ${g.welcomeEnabled ? '🟢 يعمل' : '⚪ متوقف'}.\nتگدر تغيّر الحالة من لوحة إعدادات المجموعة.`);
   });
 
   bot.on('message:new_chat_members', async ctx => {
@@ -194,11 +193,12 @@ ${link}
       const username = member.username ? `@${member.username}` : 'ما عنده يوزر';
       const welcomeLine = String(g.welcomeText || 'ولك هلا بيك يا {name}، نورت مجموعة {title} ❤️🐾')
         .replaceAll('{name}', name).replaceAll('{title}', ctx.chat.title || 'المجموعة');
-      const caption = `🐈‍⬛ هلا وغلا بنجمنا الجديد! 🐾\n\n👤 الاسم: ${name}\n🔗 المعرف: ${username}\n🆔 الآيدي: ${member.id}\n📝 البايو: غير متاح عبر تيليگرام بوت API\n\n💌 ${welcomeLine}\n\n❤️ نورتنا، خلي وجودك حلو مثل قلبك!`;
+      const caption = `🐈‍⬛ هلا وغلا بنجمنا الجديد! 🐾\n\n👤 الاسم :      ( ${name} )\n🔗 المعرف:    ( ${username} )\n🪪 الآيدي:      ( ${member.id} )\n\n💌 ${welcomeLine}\n\n❤️ نورتنا، خلي وجودك حلو مثل قلبك!🔥`;
       try {
         const photos = await ctx.api.getUserProfilePhotos(member.id, { limit: 1 });
         const photoId = photos.photos?.[0]?.at(-1)?.file_id;
-        if (photoId) await ctx.replyWithPhoto(photoId, { caption });
+        // has_spoiler يجعل صورة العضو مغبّشة، وتنكشف عند الضغط عليها في تيليگرام.
+        if (photoId) await ctx.replyWithPhoto(photoId, { caption, has_spoiler: true });
         else await ctx.reply(caption);
         g.stats.welcomed = Number(g.stats.welcomed || 0) + 1;
       } catch {
