@@ -1,4 +1,6 @@
 import { InlineKeyboard } from 'grammy';
+import { UI_TEXT_CATALOG } from '../uiTextCatalog.js';
+import { replaceByRules } from '../globalTextOverrides.js';
 import { handleActiveGameCallback } from '../games/callbacks.js';
 import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard } from '../keyboards.js';
 import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
@@ -305,18 +307,105 @@ export function registerCallbacks(bot, shared) {
 
     if (data === 'groupstats') return showGroupStats(ctx);
 
+    // محرر كتالوج النصوص: تصفح هرمي مع زر تعديل مستقل لكل عنصر.
+    if (data === 'globaltextcatalog') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      clearPending(ctx);
+      const categories = [...new Set(UI_TEXT_CATALOG.map(item => item.category))];
+      const kb = new InlineKeyboard();
+      categories.forEach((category, index) => kb.text(category.slice(0, 40), `globaltextcategory:${index}:0`).row());
+      kb.text('🔙 توحيد النصوص', 'globaltextmenu').text('👑 لوحة المالك', 'ownerpanel');
+      return answer(ctx, `╭━━━〔 🗂️ فهرس نصوص نغنوغ 〕━━━╮
+
+هذا الفهرس يجمع ${UI_TEXT_CATALOG.length} عنصراً قابلاً للتحرير من ملفات النسخة الحالية. اختَر القسم، وبعدها يظهر كل عنصر وبجانبه زر «✏️ تعديل».
+
+✦ أسماء الأزرار تتغير من دون تغيير callback_data.
+✦ التعديل على نص متكرر حرفياً قد ينعكس على كل مكان يستخدم النص نفسه.
+╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
+    }
+
+    if (data.startsWith('globaltextcategory:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      clearPending(ctx);
+      const [, rawCategory, rawPage] = data.split(':');
+      const categories = [...new Set(UI_TEXT_CATALOG.map(item => item.category))];
+      const categoryIndex = Number(rawCategory);
+      if (!Number.isInteger(categoryIndex) || !categories[categoryIndex]) return answer(ctx, 'القسم المطلوب غير موجود.', { reply_markup: new InlineKeyboard().text('🗂️ الفهرس', 'globaltextcatalog') });
+      const category = categories[categoryIndex];
+      const items = UI_TEXT_CATALOG.map((item, index) => ({ ...item, index })).filter(item => item.category === category);
+      const pageSize = 5;
+      const pages = Math.max(1, Math.ceil(items.length / pageSize));
+      const page = Math.min(pages - 1, Math.max(0, Number(rawPage) || 0));
+      const shown = items.slice(page * pageSize, (page + 1) * pageSize);
+      const currentValue = item => {
+        const overrides = db.globalTextOverrides || {};
+        if (item.kind === 'button' && item.callback && overrides.buttonCallbacks?.[item.callback]) return overrides.buttonCallbacks[item.callback].to;
+        return replaceByRules(item.from, item.kind === 'button' ? (overrides.buttons || []) : (overrides.texts || []));
+      };
+      const short = value => [...String(value).replace(/\s+/g, ' ').trim()].slice(0, 14).join('');
+      const safeButtonLabel = value => {
+        let out = '';
+        for (const char of String(value)) {
+          if (Buffer.byteLength(out + char, 'utf8') > 60) break;
+          out += char;
+        }
+        return out;
+      };
+      const kb = new InlineKeyboard();
+      for (const item of shown) {
+        const shownName = short(currentValue(item)) || '(فارغ)';
+        const rowNo = page * pageSize + shown.indexOf(item) + 1;
+        kb.text(safeButtonLabel(`${item.kind === 'button' ? '🔘' : '📝'} ${rowNo}. ${shownName}`), `globaltextview:${item.index}:${page}`).text('✏️ تعديل', `globaltextselect:${item.index}:${page}`).row();
+      }
+      if (page > 0) kb.text('⬅️ السابقة', `globaltextcategory:${categoryIndex}:${page - 1}`);
+      if (page + 1 < pages) kb.text('📂 المزيد ➡️', `globaltextcategory:${categoryIndex}:${page + 1}`);
+      kb.row().text('🗂️ الأقسام', 'globaltextcatalog').text('🔙 توحيد النصوص', 'globaltextmenu');
+      const body = shown.map((item, i) => `${page * pageSize + i + 1}. ${item.kind === 'button' ? '🔘 زر' : '📝 نص'} — ${short(currentValue(item)) || '(فارغ)'}\nالمصدر: ${item.source}`).join('\n\n');
+      return answer(ctx, `╭━━━〔 ${category} 〕━━━╮\nالعناصر ${page * pageSize + 1}-${page * pageSize + shown.length} من ${items.length} | صفحة ${page + 1}/${pages}\n\n${body}\n\nاضغط زر العنصر للعرض، أو «✏️ تعديل» لتغييره مباشرة.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
+    }
+
+    if (data.startsWith('globaltextview:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const [, rawIndex, rawPage] = data.split(':');
+      const index = Number(rawIndex);
+      const item = UI_TEXT_CATALOG[index];
+      if (!item) return answer(ctx, 'العنصر غير موجود.', { reply_markup: new InlineKeyboard().text('🗂️ الفهرس', 'globaltextcatalog') });
+      const overrides = db.globalTextOverrides || {};
+      const current = item.kind === 'button' && item.callback && overrides.buttonCallbacks?.[item.callback]
+        ? overrides.buttonCallbacks[item.callback].to
+        : replaceByRules(item.from, item.kind === 'button' ? (overrides.buttons || []) : (overrides.texts || []));
+      const value = String(current ?? item.from);
+      return answer(ctx, `╭━━━〔 👁️ تفاصيل العنصر 〕━━━╮\n\nالنوع: ${item.kind === 'button' ? 'زر' : 'نص / وصف'}\nالقسم: ${item.category}\nالمصدر: ${item.source}\n\nالقيمة الحالية:\n${value.slice(0, 2200)}\n\n${item.kind === 'button' ? 'تغيير الاسم لا يغيّر وظيفة الزر الداخلية.' : 'سيتم تطبيق النص الجديد على العبارة المطابقة في رسائل الواجهة.'}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('✏️ تعديل هذا العنصر', `globaltextselect:${index}:${Math.max(0, Number(rawPage) || 0)}`).row().text('🔙 رجوع للقائمة', `globaltextcategory:${[...new Set(UI_TEXT_CATALOG.map(x => x.category))].indexOf(item.category)}:${Math.floor(Math.max(0, Number(rawPage) || 0))}`).row().text('🗂️ الأقسام', 'globaltextcatalog') });
+    }
+
+    if (data.startsWith('globaltextselect:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const [, rawIndex, rawPage] = data.split(':');
+      const index = Number(rawIndex);
+      const item = UI_TEXT_CATALOG[index];
+      if (!item) return answer(ctx, 'العنصر غير موجود.', { reply_markup: new InlineKeyboard().text('🗂️ الفهرس', 'globaltextcatalog') });
+      clearPending(ctx);
+      const overrides = db.globalTextOverrides || {};
+      const current = item.kind === 'button' && item.callback && overrides.buttonCallbacks?.[item.callback]
+        ? overrides.buttonCallbacks[item.callback].to
+        : replaceByRules(item.from, item.kind === 'button' ? (overrides.buttons || []) : (overrides.texts || []));
+      pending(ctx, { action: 'global-catalog-new', kind: item.kind, catalogIndex: index, catalogPage: Math.max(0, Number(rawPage) || 0), catalogCategory: item.category, catalogCallback: item.callback || null, catalogOriginal: item.from, from: String(current ?? item.from) });
+      return answer(ctx, `${item.kind === 'button' ? '🔘 تعديل اسم زر' : '📝 تعديل نص / وصف'}\n\nالقسم: ${item.category}\nالمصدر: ${item.source}\n\nالقيمة الحالية:\n${String(current ?? item.from).slice(0, 1500)}\n\nأرسل القيمة الجديدة. لن يُحفظ شيء قبل المعاينة والتأكيد.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel').row().text('🔙 رجوع للقائمة', `globaltextcategory:${[...new Set(UI_TEXT_CATALOG.map(x => x.category))].indexOf(item.category)}:${Math.max(0, Number(rawPage) || 0)}`) });
+    }
+
     // توحيد النصوص: تعديلات عامة على نصوص الواجهات وأسماء الأزرار لكل المستخدمين.
     if (data === 'globaltextmenu') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       // لا نسمح لبقايا خطوة سابقة (خصوصاً الإذاعة) بالتقاط النص الذي سيُرسل في هذا القسم.
       clearPending(ctx);
       const kb = new InlineKeyboard()
-        .text('📝 توحيد نص أو وصف', 'globaltextedit:text')
-        .text('🔘 توحيد اسم زر', 'globaltextedit:button').row()
+        .text('🗂️ تصفح كل نصوص وأزرار البوت', 'globaltextcatalog').row()
+        .text('📝 تعديل عبارة يدوياً', 'globaltextedit:text')
+        .text('🔘 تعديل اسم زر يدوياً', 'globaltextedit:button').row()
         .text('📋 عرض التعديلات', 'globaltextlist:0')
         .text('♻️ مسح تعديلات التوحيد', 'globaltextclear').row()
         .text('↩️ لوحة المالك', 'ownerpanel');
-      return answer(ctx, '╭━━━〔 📝 توحيد النصوص | نغنوغ 〕━━━╮\n\nمن هنا تغيّر نصوص وأوصاف القوائم أو أسماء الأزرار بشكل عام، ويظهر التغيير لكل مستخدمي البوت.\n\n١. اختَر نوع التعديل.\n٢. أرسل النص القديم أو العبارة القديمة كما تظهر في البوت. تگدر ترسل جزءاً من الوصف حتى يتغير بكل مكان يظهر بيه.\n٣. أرسل النص الجديد.\n\n✦ معرفات الأزرار الداخلية تبقى نفسها، لذلك تظل الأزرار تعمل بعد تغيير أسمائها.\n✦ زر «استعادة النصوص الافتراضية» في تخصيص نغنوغ يمسح هذه التعديلات العامة أيضاً لجميع المستخدمين.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
+      return answer(ctx, '╭━━━〔 📝 توحيد النصوص | نغنوغ 〕━━━╮\n\nمن هنا تكدر تتصفح فهرس النصوص والأزرار المستخرجة من ملفات البوت وتعدّل كل عنصر من مكانه، أو تستخدم التعديل اليدوي للعبارات غير المدرجة.\n\n١. افتح «تصفح كل نصوص وأزرار البوت».\n٢. اختَر القسم، ثم العنصر، واضغط «✏️ تعديل».\n٣. راجع المعاينة واعتمد التغيير حتى يظهر للجميع.\n\n✦ معرفات الأزرار الداخلية تبقى نفسها، لذلك تظل الأزرار تعمل بعد تغيير أسمائها.\n✦ استعادة التخصيص الشخصي ترجع واجهة المستخدم إلى الافتراضات العامة، ولا تمسح تعديلات المالك المحفوظة.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
 
     if (data.startsWith('globaltextedit:')) {
@@ -342,7 +431,7 @@ export function registerCallbacks(bot, shared) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       const p = db.pending?.[userKey(ctx)];
       if (!p || p.action !== 'global-ui-confirm') return answer(ctx, 'انتهت جلسة التعديل. ابدأ من جديد من «توحيد النصوص».', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu') });
-      pending(ctx, { action: 'global-ui-new', kind: p.kind === 'button' ? 'button' : 'text', from: p.from });
+      pending(ctx, { ...p, action: 'global-ui-new', kind: p.kind === 'button' ? 'button' : 'text', from: p.from });
       return answer(ctx, `✏️ أرسل النص الجديد مرة ثانية.\n\nالنص القديم:\n${String(p.from || '').slice(0, 1500)}\n\nراح أعرض لك معاينة جديدة قبل الحفظ.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel') });
     }
 
@@ -360,9 +449,41 @@ export function registerCallbacks(bot, shared) {
         clearPending(ctx);
         return answer(ctx, 'لم يُحفظ التعديل لأن النص القديم والجديد فارغان أو متطابقان.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu') });
       }
-      db.globalTextOverrides ||= { texts: [], buttons: [] };
+      db.globalTextOverrides ||= { texts: [], buttons: [], buttonCallbacks: {} };
       db.globalTextOverrides.texts ||= [];
       db.globalTextOverrides.buttons ||= [];
+      db.globalTextOverrides.buttonCallbacks ||= {};
+
+      // عند اختيار عنصر من الفهرس نحدّث العنصر المحدد، مع تخصيص الزر بواسطة callback_data متى توفر.
+      if (Number.isInteger(p.catalogIndex) && UI_TEXT_CATALOG[p.catalogIndex]) {
+        const item = UI_TEXT_CATALOG[p.catalogIndex];
+        const baseFrom = String(item.from || '');
+        if (item.kind === 'button' && item.callback) {
+          const existing = db.globalTextOverrides.buttonCallbacks[item.callback];
+          db.globalTextOverrides.buttonCallbacks[item.callback] = {
+            from: existing?.from || baseFrom,
+            to,
+            catalogIndex: p.catalogIndex,
+            updatedAt: Date.now()
+          };
+        } else {
+          const catalogRules = item.kind === 'button' ? db.globalTextOverrides.buttons : db.globalTextOverrides.texts;
+          let existing = catalogRules.find(rule => rule.from === baseFrom);
+          if (!existing && p.from !== baseFrom) existing = catalogRules.find(rule => rule.to === p.from);
+          if (existing) { existing.to = to; existing.updatedAt = Date.now(); }
+          else catalogRules.push({ from: baseFrom, to, catalogIndex: p.catalogIndex, createdAt: Date.now() });
+        }
+        // إذا كان للزر callback_data معروف، نغيّر هذا الزر فقط ولا نلمس تسميات أخرى متشابهة.
+        const affectedDefaults = item.kind === 'button' && item.callback
+          ? 0
+          : applyGlobalCustomizationChange(item.kind, baseFrom, to);
+        save();
+        clearPending(ctx);
+        const categoryIndex = [...new Set(UI_TEXT_CATALOG.map(x => x.category))].indexOf(item.category);
+        const page = Math.max(0, Number(p.catalogPage) || 0);
+        return answer(ctx, `✅ تم حفظ تعديل العنصر المحدد.\n\nالقسم: ${item.category}\nالنوع: ${item.kind === 'button' ? 'زر' : 'نص / وصف'}\n\nقبل:\n${String(p.from || baseFrom).slice(0, 500)}\n\nبعد:\n${to.slice(0, 500)}\n\n🔒 بقيت وظائف الأزرار كما هي، والتغيير محفوظ في قاعدة البيانات.\nعدد قيم التخصيص الافتراضية المتأثرة: ${affectedDefaults}`, { reply_markup: new InlineKeyboard().text('✏️ تعديل عنصر آخر', `globaltextcategory:${categoryIndex}:${page}`).row().text('🗂️ فهرس الأقسام', 'globaltextcatalog').text('🔙 توحيد النصوص', 'globaltextmenu') });
+      }
+
       const rules = kind === 'button' ? db.globalTextOverrides.buttons : db.globalTextOverrides.texts;
       let updated = false;
       for (const rule of rules) {
@@ -404,9 +525,13 @@ export function registerCallbacks(bot, shared) {
 
     if (data.startsWith('globaltextlist:')) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const textRules = db.globalTextOverrides?.texts || [];
+      const buttonRules = db.globalTextOverrides?.buttons || [];
+      const callbackRules = Object.entries(db.globalTextOverrides?.buttonCallbacks || {}).map(([callback, rule]) => ({ ...rule, callback }));
       const allRules = [
-        ...(db.globalTextOverrides?.texts || []).map((rule, index) => ({ ...rule, kind: 'text', index })),
-        ...(db.globalTextOverrides?.buttons || []).map((rule, index) => ({ ...rule, kind: 'button', index: (db.globalTextOverrides?.texts || []).length + index }))
+        ...textRules.map((rule, index) => ({ ...rule, kind: 'text', index })),
+        ...buttonRules.map((rule, index) => ({ ...rule, kind: 'button', index: textRules.length + index })),
+        ...callbackRules.map((rule, index) => ({ ...rule, kind: 'callback', index: textRules.length + buttonRules.length + index }))
       ];
       if (!allRules.length) return answer(ctx, '📋 ماكو تعديلات عامة محفوظة حالياً.', { reply_markup: new InlineKeyboard().text('🔙 توحيد النصوص', 'globaltextmenu') });
       const pageSize = 6;
@@ -414,9 +539,14 @@ export function registerCallbacks(bot, shared) {
       const pages = Math.max(1, Math.ceil(allRules.length / pageSize));
       const shown = allRules.slice(page * pageSize, (page + 1) * pageSize);
       const kb = new InlineKeyboard();
+      const short = value => String(value).replace(/\s+/g, ' ').slice(0, 8);
+      const safeButtonLabel = value => {
+        let out = '';
+        for (const char of String(value)) { if (Buffer.byteLength(out + char, 'utf8') > 60) break; out += char; }
+        return out;
+      };
       for (const rule of shown) {
-        const short = value => String(value).replace(/\s+/g, ' ').slice(0, 18);
-        kb.text(`🗑️ ${rule.kind === 'text' ? 'نص' : 'زر'}: ${short(rule.from)} ← ${short(rule.to)}`, `globaltextdel:${rule.index}:${page}`).row();
+        kb.text(safeButtonLabel(`🗑️ ${rule.kind === 'text' ? 'نص' : rule.kind === 'callback' ? 'زر خاص' : 'زر'}: ${short(rule.from)} ← ${short(rule.to)}`), `globaltextdel:${rule.index}:${page}`).row();
       }
       if (page > 0) kb.text('⬅️ السابق', `globaltextlist:${page - 1}`);
       if (page + 1 < pages) kb.text('التالي ➡️', `globaltextlist:${page + 1}`);
@@ -431,11 +561,13 @@ export function registerCallbacks(bot, shared) {
       const index = Number(rawIndex);
       const textCount = (db.globalTextOverrides?.texts || []).length;
       const buttonCount = (db.globalTextOverrides?.buttons || []).length;
-      if (!Number.isInteger(index) || index < 0 || index >= textCount + buttonCount) {
+      const callbackEntries = Object.keys(db.globalTextOverrides?.buttonCallbacks || {});
+      if (!Number.isInteger(index) || index < 0 || index >= textCount + buttonCount + callbackEntries.length) {
         return answer(ctx, 'التعديل المطلوب غير موجود أو تم حذفه مسبقاً.', { reply_markup: new InlineKeyboard().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
       }
       if (index < textCount) db.globalTextOverrides.texts.splice(index, 1);
-      else db.globalTextOverrides.buttons.splice(index - textCount, 1);
+      else if (index < textCount + buttonCount) db.globalTextOverrides.buttons.splice(index - textCount, 1);
+      else delete db.globalTextOverrides.buttonCallbacks[callbackEntries[index - textCount - buttonCount]];
       save();
       return answer(ctx, '🗑️ تم حذف التعديل المحدد.', { reply_markup: new InlineKeyboard().text('📋 بقية التعديلات', `globaltextlist:${Math.max(0, Number(rawPage) || 0)}`).row().text('🔙 توحيد النصوص', 'globaltextmenu') });
     }
@@ -447,7 +579,7 @@ export function registerCallbacks(bot, shared) {
 
     if (data === 'globaltextclearconfirm') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
-      db.globalTextOverrides = { texts: [], buttons: [] };
+      db.globalTextOverrides = { texts: [], buttons: [], buttonCallbacks: {} };
       save();
       return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية للجميع.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').text('👑 لوحة المالك', 'ownerpanel') });
     }
