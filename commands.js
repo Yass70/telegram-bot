@@ -287,3 +287,4 @@ ${link}
   registerCallbacks(bot, commandShared);
   registerMessages(bot, commandShared);
 }
+
