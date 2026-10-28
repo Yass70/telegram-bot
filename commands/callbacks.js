@@ -35,7 +35,7 @@ export function registerCallbacks(bot, shared) {
 
     if (await handleActiveGameCallback(ctx, shared, data)) return;
 
-    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu', 'broadcastsend', 'broadcastcancel', 'musicadd', 'musiccancel'];
+    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
     if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:') || data.startsWith('globaltext')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
@@ -89,46 +89,15 @@ export function registerCallbacks(bot, shared) {
       clearPending(ctx);
       db.touchSessions ||= {};
       delete db.touchSessions[userKey(ctx)];
-      return answer(ctx, '╭━━━〔 🔥🐈‍⬛ لمسات نغنوغ 〕━━━╮\n\nاختَر اللمسة اللي تريدها من هنا. ❤️‍🔥\n\n✦ زخرفة عربية وإنجليزية قابلة للنسخ، ومكتبة أغاني تشغّل المقاطع المضافة.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: touchesMenuKeyboard() });
+      return answer(ctx, '╭━━━〔 🔥🐈‍⬛ لمسات نغنوغ 〕━━━╮\n\nاختَر اللمسة اللي تريدها من هنا. ❤️‍🔥\n\n✦ زخرفة عربية تغيّر مظهر الحروف، وزخرفة إنجليزية، والنسخ بلمسة على الاسم نفسه.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: touchesMenuKeyboard() });
     }
     if (data === 'touchesdecorate') {
       clearPending(ctx);
       return answer(ctx, '✨ زخرفة الأسماء\n\nاختَر لغة الاسم أولاً:', { reply_markup: touchesLanguageKeyboard() });
     }
-    if (data === 'touchesmusic') {
-      db.musicTracks ||= [];
-      const kb = new InlineKeyboard();
-      db.musicTracks.forEach((track, index) => kb.text(`▶️ ${String(track.title || `مقطع ${index + 1}`).slice(0, 48)}`, `musicplay:${index}`).row());
-      if (isOwner(ctx)) kb.text('➕ إضافة أغنية', 'musicadd').row();
-      kb.text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
-      const desc = db.musicTracks.length ? `🎵 مكتبة الأغاني\n\nاختَر المقطع الذي تريد تشغيله.\n\nعدد المقاطع: ${db.musicTracks.length}` : '🎵 مكتبة الأغاني\n\nماكو مقاطع مضافة حالياً.';
-      return answer(ctx, desc, { reply_markup: kb });
-    }
-    if (data === 'musicadd') {
-      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'إضافة الأغاني متاحة للمالك من الخاص فقط.');
-      pending(ctx, { action: 'music-add' });
-      return answer(ctx, '🎵 أرسل ملف أغنية كصوت أو ملف صوتي، ويمكنك كتابة اسمها في التعليق.\n\nسيتم حفظ معرّف تيليغرام فقط داخل قاعدة بيانات البوت.', { reply_markup: new InlineKeyboard().text('❌ إلغاء الإضافة', 'musiccancel').row().text('↩️ مكتبة الأغاني', 'touchesmusic') });
-    }
-    if (data === 'musiccancel') {
-      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'إلغاء إضافة الأغاني متاح للمالك من الخاص فقط.');
+    if (data === 'touchesvocal') {
       clearPending(ctx);
-      db.musicTracks ||= [];
-      const kb = new InlineKeyboard();
-      db.musicTracks.forEach((track, index) => kb.text(`▶️ ${String(track.title || `مقطع ${index + 1}`).slice(0, 48)}`, `musicplay:${index}`).row());
-      kb.text('➕ إضافة أغنية', 'musicadd').row().text('↩️ لمسة نغنوغ', 'touchesmenu');
-      return answer(ctx, `🎵 مكتبة الأغاني\n\nعدد المقاطع: ${db.musicTracks.length}`, { reply_markup: kb });
-    }
-    if (data.startsWith('musicplay:')) {
-      const index = Number(data.split(':')[1]);
-      const track = (db.musicTracks || [])[index];
-      if (!track?.fileId) return answer(ctx, 'هذا المقطع غير متاح حالياً. حدّث قائمة الأغاني.');
-      try {
-        await ctx.api.sendAudio(ctx.chat.id, track.fileId, { title: track.title || 'أغنية من مكتبة نغنوغ' });
-        return;
-      } catch (err) {
-        console.warn('[musicplay] تعذر إرسال المقطع:', err?.description || err?.message || err);
-        return answer(ctx, 'تعذر إرسال المقطع حالياً. جرّب مرة ثانية لاحقاً.');
-      }
+      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('↩️ لمسات نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home') });
     }
     if (data === 'touchescancel') {
       clearPending(ctx);
@@ -708,7 +677,7 @@ export function registerCallbacks(bot, shared) {
       if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة التحذيرات متاحة لمشرفي المجموعة فقط.');
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       save();
-      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰المجموعة : ❨ ${g.title} ❩\n\n-︰التحذيرات :\n❨ 1 ❩، ❨ 2 ❩، ❨ 3 ❩، ❨ 4 ❩، ❨ 5 ❩،\n❨ 7 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 20 ❩\n\n-︰مدد الكتم بالدقائق :\n❨ 3 ❩، ❨ 5 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 30 ❩، ❨ 60 ❩\n\n-︰طريقة الاستخدام : ❨ اضغط على الأزرار لتغيير الخيارات بالتتابع ❩\n-︰التفعيل : ❨ فعّل النظام من الزر الأول ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰المجموعة : ❨ ${g.title} ❩\n\n-︰التحذيرات :\n❨ 1 ❩، ❨ 2 ❩، ❨ 3 ❩، ❨ 4 ❩، ❨ 5 ❩،\n❨ 7 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 20 ❩\n\n-︰مدد الكتم بالدقائق :\n❨ 5 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 20 ❩، ❨ 30 ❩،\n❨ 45 ❩، ❨ 60 ❩، ❨ 90 ❩، ❨ 120 ❩،\n❨ 180 ❩، ❨ 360 ❩، ❨ 720 ❩، ❨ 1440 ❩\n\n-︰طريقة الاستخدام : ❨ اضغط على الأزرار لتغيير الخيارات بالتتابع ❩\n-︰التفعيل : ❨ فعّل النظام من الزر الأول ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningstoggle') {
@@ -744,7 +713,7 @@ export function registerCallbacks(bot, shared) {
     if (data === 'warningsduration') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      const durations = [3, 5, 10, 15, 30, 60];
+      const durations = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 360, 720, 1440];
       const currentDuration = Number(g.warningSettings?.duration) || 10;
       const durationIndex = durations.indexOf(currentDuration);
       g.warningSettings.duration = durations[durationIndex < 0 ? 0 : (durationIndex + 1) % durations.length];
@@ -1076,41 +1045,23 @@ export function registerCallbacks(bot, shared) {
     if (data === 'broadcastsend') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'الإذاعة متاحة للمالك من الخاص فقط.');
       const p = db.pending?.[userKey(ctx)];
-      if (!p || p.action !== 'broadcast-confirm' || (!String(p.text || '').trim() && !Number(p.sourceMessageId))) {
+      if (!p || p.action !== 'broadcast-confirm' || !String(p.text || '').trim()) {
         clearPending(ctx);
         return answer(ctx, 'ماكو إذاعة بانتظار التأكيد. افتح الإذاعة من لوحة المالك وابدأ من جديد.', { reply_markup: new InlineKeyboard().text('📢 إرسال إشعار عام', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
       }
-      const draft = String(p.text || '').trim();
-      const sourceChatId = p.sourceChatId || ctx.chat.id;
-      const sourceMessageId = Number(p.sourceMessageId || 0);
+      const draft = String(p.text).trim();
       clearPending(ctx);
       const users = [...new Set((db.privateUsers || []).map(String).filter(id => /^\d+$/.test(id)))];
       let successCount = 0, failCount = 0;
-      const statusChatId = ctx.chat.id;
-      const statusMessageId = ctx.callbackQuery.message?.message_id;
-      const updateStatus = async (done, final = false) => {
-        if (!statusMessageId) return;
-        const text = final
-          ? `✅ انتهت الإذاعة\n\n👥 المستهدفون: ${users.length}\n📤 استلموا الرسالة بنجاح: ${successCount}\n❌ تعذّر الإرسال: ${failCount}\n📊 نسبة النجاح: ${users.length ? Math.round(successCount / users.length * 100) : 0}%`
-          : `📢 الإذاعة قيد الإرسال\n\n👥 المستهدفون: ${users.length}\n✅ تم الإرسال: ${successCount}\n❌ تعذّر الإرسال: ${failCount}\n⏳ تمت معالجة: ${done} من ${users.length}`;
-        try { await bot.api.editMessageText(statusChatId, statusMessageId, text, final ? { reply_markup: new InlineKeyboard().text('📢 إذاعة أخرى', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') } : undefined); } catch {}
-      };
-      await updateStatus(0);
-      for (let i = 0; i < users.length; i++) {
-        const userId = users[i];
+      const status = await answer(ctx, `📢 جاري إرسال الإذاعة المؤكدة إلى ${users.length} مستخدم…`);
+      for (const userId of users) {
         try {
-          if (sourceMessageId) {
-            await bot.api.copyMessage(Number(userId), sourceChatId, sourceMessageId);
-          } else {
-            await bot.api.sendMessage(Number(userId), `📢 إشعار من الإدارة:\n\n${draft}`);
-          }
+          await bot.api.sendMessage(Number(userId), `📢 إشعار من الإدارة:\n\n${draft}`);
           successCount++;
+          await new Promise(resolve => setTimeout(resolve, 45));
         } catch { failCount++; }
-        if ((i + 1) % 10 === 0 || i === users.length - 1) await updateStatus(i + 1);
-        await new Promise(resolve => setTimeout(resolve, 45));
       }
-      await updateStatus(users.length, true);
-      return;
+      return answer(ctx, `✅ انتهت الإذاعة المؤكدة.\n\n📤 تم الإرسال: ${successCount}\n❌ تعذّر الإرسال: ${failCount}`, { reply_markup: new InlineKeyboard().text('📢 إذاعة أخرى', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
     }
 
     return answer(ctx, '⚠️ 〔 خيار غير معروف 〕\nجرّب الرجوع إلى القائمة السابقة واختيار أحد الأزرار المتاحة.');
