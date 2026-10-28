@@ -59,17 +59,17 @@ export function setupCommands(bot, db, helpers) {
   };
   const protectionBackTarget = ctx => db.protectionBack?.[userKey(ctx)] || (isGroup(ctx) ? 'publiccommands' : 'managementmenu');
   const protectionKeyboard = (g, back = 'managementmenu') => new InlineKeyboard()
-    .text(`${g.closedMessages ? '🔒 الدردشة مقفلة' : '🔓 الدردشة مفتوحة'}`, 'prot_chat').row()
+    .text(`${g.closedMessages ? '🔒' : '🔓'} ${g.closedMessages ? 'الدردشة مقفلة' : 'الدردشة مفتوحة'}`, 'prot_chat').row()
     .text(`${g.linksLock ? '🟢' : '⚪'} الروابط`, 'prot_links')
     .text(`${g.flood ? '🟢' : '⚪'} منع السبام`, 'prot_flood').row()
     .text(`${g.mediaLock ? '🟢' : '⚪'} الوسائط والملفات`, 'prot_media')
-    .text(`${g.badWordsLock ? '🟢' : '⚪'} كلمات الفشار`, 'prot_badwords').row()
+    .text(`${g.badWordsLock ? '🟢' : '⚪'} الكلمات الممنوعة`, 'prot_badwords').row()
     .text(`${g.audioLock || g.audioClipsLock ? '🟢' : '⚪'} الصوتيات`, 'prot_audio')
     .text(`${g.forwardLock ? '🟢' : '⚪'} توجيه الرسائل`, 'prot_forward').row()
     .text(`${g.contactsLock ? '🟢' : '⚪'} المعرفات والأرقام`, 'prot_contacts').row()
     .text('⚡ تفعيل الحماية الشاملة', 'prot_all')
     .text('🛑 إيقاف الحماية الشاملة', 'prot_none').row()
-    .text('🔙 رجوع للقائمة السابقة', back);
+    .text('↩️ رجوع للقائمة السابقة', back);
 
   // أمر البداية /start[cite: 4]
   const ensureReferralData = () => {
@@ -97,13 +97,10 @@ export function setupCommands(bot, db, helpers) {
     const link = referralLinkFor(userId);
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('🐈‍⬛ تعال جرّب بوت نغنوغ ❤️')}`;
     return new InlineKeyboard()
-      .add({ text: '📋 نسخ رابط المشاركة', copy_text: { text: link } })
-      .row()
-      .url('📤 مشاركة الرابط', shareUrl)
-      .row()
-      .text('🔄 تحديث الإحصائيات', 'referralrefresh')
-      .row()
-      .text('↩️ رجوع إلى ستار', 'starmenu')
+      .add({ text: '📋 نسخ رابط المشاركة', copy_text: { text: link } }).row()
+      .url('📤 مشاركة الرابط', shareUrl).row()
+      .text('🔄 تحديث الإحصائيات', 'referralrefresh').row()
+      .text('↩️ ستار', 'starmenu')
       .text('🏠 الرئيسية', 'home');
   };
   const showReferralLink = async ctx => {
@@ -210,12 +207,12 @@ ${link}
 
   // لوحة الأوامر التفاعلية: تظهر كأزرار داخل المجموعة وتُحدّث الرسالة نفسها عند الاختيار.
   const publicCommandsKeyboard = () => new InlineKeyboard()
-    .text('🎮  الألعاب ', 'gamesmenu').row()
-    .text('💬 الأوامر التفاعلية', 'interactive_menu').row()
-    .text('🛡️ أوامر الحماية', 'protectionmenu').row()
-    .text('👑 أوامر المشرفين', 'adminpanel').row()
+    .text('🎮 الألعاب', 'gamesmenu')
+    .text('💬 التفاعلية', 'interactive_menu').row()
+    .text('🛡️ الحماية', 'protectionmenu')
+    .text('👑 المشرفون', 'adminpanel').row()
     .text('🏆 المتصدرون والنقاط', 'statsmenu').row()
-    .url('👨🏻‍💻  المطوّر ', 'https://t.me/llll6llll6');
+    .url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
   const sendPublicCommands = async ctx => {
     if (!isGroup(ctx)) return ctx.reply('🐾 〔 تنبيه 〕 افتح «الأوامر» داخل المجموعة حتى تظهر لك لوحة نغنوغ التفاعلية.');
     return ctx.reply('╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين مخصّصة للمخوّلين فقط.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
@@ -287,4 +284,3 @@ ${link}
   registerCallbacks(bot, commandShared);
   registerMessages(bot, commandShared);
 }
-
