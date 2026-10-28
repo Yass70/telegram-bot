@@ -179,6 +179,33 @@ ${link}
     return ctx.reply('✅ تم حفظ رسالة الترحيب وتفعيلها.');
   });
 
+  const RANDOM_WELCOME_MESSAGES = [
+    '🐈‍⬛ هلااا بـ{name}، نورتنا ونوّرت المجموعة كلها ❤️ #نورتنا_{tag}',
+    '🎀 وصل الحلو {name}! نغنوغ يرحّب بيك ويگول لا تستحي من أهلنا 🐾 #أهلاً_{tag}',
+    '💌 يا مية هلا بـ{name}، خلي سوالفك الحلوة تملأ المكان 🌹 #ضيفنا_{tag}',
+    '😻 المجموعة صارت أحلى من دخل {name}! نورت يا ورد ❤️ #نورتنا_{tag}',
+    '🐾 نغنوغ يعلن وصول {name} رسمياً… استقبلوه بالقلوب مو بالتحقيق 😂 #هلا_{tag}',
+    '🌷 أهلاً وسهلاً بـ{name}، نتمنى لك أيام حلوة وضحكات أكثر 🫶🏻 #أهلاً_{tag}',
+    '🌚 منو وصل؟ {name} وصل! يلا ورّونا الترحيب العراقي الأصيل 😂❤️ #وصل_{tag}',
+    '🖤🐈‍⬛ هلا بالوجه الجديد {name}، نورت المكان يا طيب #نغنوغ_يرحب_{tag}',
+    '✨ يا هلا بـ{name}، اعتبر نفسك بين أهلك وناسك 🤍 #أهلنا_{tag}',
+    '😼 نغنوغ استقبل {name} بابتسامة وشوارب مرتبة… نورت يا حلو 🎀 #نورتنا_{tag}',
+    '❤️ أهلاً بـ{name}! خلي الاحترام والمحبة عنوان وجودك ويانه 🐾 #ضيفنا_{tag}',
+    '🎉 وصل {name}، زيدوا الوناسة وخلو الترحيب يليق بيه 🌹 #هلا_{tag}',
+    '🥹 نورتنا {name}، نغنوغ يتمنى تشوف هنا سوالف تفرّح گلبك ❤️ #نورتنا_{tag}',
+    '🐈‍⬛ تنبيه لطيف: انضم {name} إلى عائلتنا، لا أحد يبخل عليه بالترحيب 😻 #أهلاً_{tag}',
+    '💗 هلا بـ{name}، جيت بوقت حلو لأن نغنوغ موجود 😂🐾 #هلا_{tag}',
+    '🌙 أهلاً وسهلاً بـ{name}، نتمنى لك راحة ووناسة بيناتنا 🤍 #ضيفنا_{tag}',
+    '😹 نغنوغ فتح الباب ودخل {name}… هسه منو يقدّم الشاي؟ ☕ #نورتنا_{tag}',
+    '🫶🏻 يا مرحبا بـ{name}، وجودك إضافة حلوة للمجموعة ❤️ #أهلنا_{tag}',
+    '💐 استقبلوا {name} بالورد والكلام الطيب، نورتنا يا غالي 🐾 #هلا_{tag}',
+    '🐾 آخر الأخبار: {name} صار واحد من جماعتنا! هلا بيك ونورت ❤️ #نورتنا_{tag}'
+  ];
+  const makeMemberTag = (name, id) => {
+    const clean = String(name || `عضو${id}`).trim().replace(/[^\p{L}\p{N}_]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    return clean || `عضو${id}`;
+  };
+
   bot.on('message:new_chat_members', async ctx => {
     if (!isGroup(ctx)) return;
     const g = groupFor(ctx.chat);
@@ -187,19 +214,33 @@ ${link}
     for (const member of ctx.message.new_chat_members || []) {
       if (member.is_bot) continue;
       const name = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'صديقنا';
-      g.knownMembers[String(member.id)] = { id: member.id, name, username: member.username || '', seenAt: Date.now() };
+      const memberId = String(member.id);
+      g.knownMembers[memberId] = { id: member.id, name, username: member.username || '', seenAt: Date.now() };
       const username = member.username ? `@${member.username}` : 'ما عنده يوزر';
-      const welcomeLine = String(g.welcomeText || 'ولك هلا بيك يا {name}، نورت مجموعة {title} ❤️🐾')
+      const groupRole = 'عضو';
+      const messages = Number(g.userStats?.[memberId]?.messages || 0);
+      const points = Number(db.groupPoints?.[String(ctx.chat.id)]?.[memberId] ?? db.points?.[memberId] ?? 0);
+      const sakhakat = Number(g.userStats?.[memberId]?.sakhakat || 0);
+      const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${name} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰ايديك : ❨ ${member.id} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
+      const welcomeLine = String(g.welcomeText || 'أهلاً بيك {name} ❤️ نورت مجموعة {title}، نتمنى لك وقتاً ممتعاً ويانه!')
         .replaceAll('{name}', name).replaceAll('{title}', ctx.chat.title || 'المجموعة');
-      const caption = `🐈‍⬛ هلا وغلا بنجمنا الجديد! 🐾\n\n👤 الاسم: ${name}\n🔗 المعرف: ${username}\n🆔 الآيدي: ${member.id}\n📝 البايو: غير متاح عبر تيليگرام بوت API\n\n💌 ${welcomeLine}\n\n❤️ نورتنا، خلي وجودك حلو مثل قلبك!`;
+      const randomWelcome = RANDOM_WELCOME_MESSAGES[Math.floor(Math.random() * RANDOM_WELCOME_MESSAGES.length)]
+        .replaceAll('{name}', name)
+        .replaceAll('{tag}', makeMemberTag(name, member.id));
       try {
         const photos = await ctx.api.getUserProfilePhotos(member.id, { limit: 1 });
         const photoId = photos.photos?.[0]?.at(-1)?.file_id;
-        if (photoId) await ctx.replyWithPhoto(photoId, { caption });
+        if (photoId) await ctx.replyWithPhoto(photoId, { caption, has_spoiler: true });
         else await ctx.reply(caption);
-        g.stats.welcomed = Number(g.stats.welcomed || 0) + 1;
-      } catch {
+      } catch (err) {
+        console.warn('[welcome-card] Could not send blurred profile photo:', err?.description || err?.message || err);
         try { await ctx.reply(caption); } catch {}
+      }
+      try {
+        await ctx.reply(`${randomWelcome}\n\n💌 ${welcomeLine}`);
+        g.stats.welcomed = Number(g.stats.welcomed || 0) + 1;
+      } catch (err) {
+        console.warn('[welcome-message] Could not send second welcome message:', err?.description || err?.message || err);
       }
     }
     save();
