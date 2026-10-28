@@ -121,3 +121,5 @@ export function findAutoReply(text = '') {
     }
   }
 
+  return null;
+}
