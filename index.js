@@ -46,6 +46,7 @@ const freshDB = () => ({
   groups: {},
   selected: {},
   protectionBack: {},
+  menuBack: {},
   pending: {},
   users: [],
   privateUsers: [],
@@ -71,7 +72,7 @@ function load() {
     if (!fs.existsSync(DATA_FILE)) return;
     const old = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     db = { ...freshDB(), ...old };
-    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
+    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.menuBack ||= {}; db.pending ||= {}; db.users ||= []; db.privateUsers ||= []; db.requiredChats ||= [];
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
     db.groupPoints ||= {};
@@ -144,11 +145,11 @@ function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); 
 const DEFAULT_CUSTOMIZATION = {
   labels: { groups: '👥 مجموعاتي', addBot: '➕ أضفني للمجموعة', management: '⚙️ الإدارة', profile: '👤 ملفي الشخصي', customize: '🎨 تخصيص نغنوغ', help: '📖 المساعدة', back: '↩️ رجوع', home: '🏠 الرئيسية', cancel: '❌ إلغاء' },
   helpText: '',
-  uiTexts: { management: '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️', groups: '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾', customMenu: '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯' },
-  startText: '🐈‍⬛ أهلاً بيك! أني بوت نغنوغ 🐾❤️\n\n🤖 وظيفتي أساعدك بحماية وإداره مجموعتك،\n\n🛡️ حماية المجموعة من السبام والمخالفات.\n⚙️ أدوات إدارة حسب الصلاحيات الممنوحة إليّ.\n🎮 ألعاب وتحديات ترفيهية.\n🏆 نظام نقاط وإحصائيات للأعضاء.\n⚠️ تحذيرات وعقوبات للمخالفين.\n💬 ردود تلقائية ومخصصة حسب رغبتكم.\n\n━━━━━━━━━━━━━━━━━━\n\n🎁 بالمناسبة، أني مجاني بالكامل، هدية من المطوّر إلكم! ❤️‍🔥\n\nإختر القسم اللي تحتاجه من الإسفل، وخلي الباقي عليّ! 🐈‍⬛🐾',
+  uiTexts: { management: '╭━━━〔 ⚙️ قسم الإدارة | نغنوغ 🐈‍⬛ 〕━━━╮\n\n-︰🎮 الألعاب : ❨ ألعاب وتحدّيات داخل المجموعة ❩\n-︰💬 الأوامر التفاعلية : ❨ بطاقة العضو والردود والعبارات الشعرية ❩\n-︰👑 أوامر المشرفين : ❨ أدوات الإدارة حسب الصلاحيات ❩\n-︰⚠️ التحذيرات والعقوبات : ❨ إعدادات التعامل مع المخالفات ❩\n\n✦ اختَر القسم المطلوب من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯', groups: '╭━━━〔 👥 مجموعاتي | نغنوغ 🐈‍⬛ 〕━━━╮\n\n✦ هنا تظهر المجموعات المفعّلة المرتبطة بحسابك.\n\n-︰اختَر المجموعة : ❨ لعرض التفاصيل وإدارة الإعدادات المتاحة ❩\n\n👇🏻 اضغط على اسم المجموعة من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯', customMenu: '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯' },
+  startText: '╭━━━〔 🐈‍⬛ أهلاً بيك بنغنوغ 🐾 〕━━━╮\n\n-︰🛡️ الحماية : ❨ أدوات للحد من السبام والمخالفات ❩\n-︰⚙️ الإدارة : ❨ خيارات حسب الصلاحيات المتاحة ❩\n-︰🎮 الترفيه : ❨ ألعاب وتحدّيات للأعضاء ❩\n-︰🏆 النقاط : ❨ إحصائيات ونقاط للأنشطة المدعومة ❩\n-︰💬 التفاعل : ❨ ردود تلقائية ومخصّصة ❩\n\n✦ اختَر القسم اللي تحتاجه من الأزرار أدناه.\n\n🎁 نغنوغ هدية من المطوّر إلكم ❤️\n╰━━━━━━━━━━━━━━━━━━━━╯',
   descriptions: {
-    settings: '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️',
-    groups: '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الإسفل. 🐾',
+    settings: 'اختَر الإعداد الذي تريد تغييره من الأزرار أدناه.',
+    groups: '╭━━━〔 👥 مجموعاتي | نغنوغ 🐈‍⬛ 〕━━━╮\n\n✦ هنا تظهر المجموعات المفعّلة المرتبطة بحسابك.\n\n-︰اختَر المجموعة : ❨ لعرض التفاصيل وإدارة الإعدادات المتاحة ❩\n\n👇🏻 اضغط على اسم المجموعة من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯',
     account: '👤 〔 ملفّي الشخصي 〕\nعرض معلومات حسابك والبيانات المتاحة عنك.',
     replies: '💬 〔 الردود التلقائية 〕\nإدارة الردود التي يتفاعل بها نغنوغ مع رسائل المجموعة.'
   },
@@ -173,6 +174,11 @@ function getCustomization(ctx) {
     if (typeof saved.helpText !== 'string') saved.helpText = '';
     saved.labels = { ...DEFAULT_CUSTOMIZATION.labels, ...saved.labels };
     saved.uiTexts = { ...DEFAULT_CUSTOMIZATION.uiTexts, ...saved.uiTexts };
+    if (saved.uiTexts.management === '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') saved.uiTexts.management = DEFAULT_CUSTOMIZATION.uiTexts.management;
+    if (saved.uiTexts.groups === '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾') saved.uiTexts.groups = DEFAULT_CUSTOMIZATION.uiTexts.groups;
+    if (saved.descriptions.groups === '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الإسفل. 🐾') saved.descriptions.groups = DEFAULT_CUSTOMIZATION.descriptions.groups;
+    if (saved.descriptions.settings === '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') saved.descriptions.settings = DEFAULT_CUSTOMIZATION.descriptions.settings;
+    if (saved.startText === '🐈‍⬛ أهلاً بيك! أني بوت نغنوغ 🐾❤️\n\n🤖 وظيفتي أساعدك بحماية وإداره مجموعتك،\n\n🛡️ حماية المجموعة من السبام والمخالفات.\n⚙️ أدوات إدارة حسب الصلاحيات الممنوحة إليّ.\n🎮 ألعاب وتحديات ترفيهية.\n🏆 نظام نقاط وإحصائيات للأعضاء.\n⚠️ تحذيرات وعقوبات للمخالفين.\n💬 ردود تلقائية ومخصصة حسب رغبتكم.\n\n━━━━━━━━━━━━━━━━━━\n\n🎁 بالمناسبة، أني مجاني بالكامل، هدية من المطوّر إلكم! ❤️‍🔥\n\nإختر القسم اللي تحتاجه من الإسفل، وخلي الباقي عليّ! 🐈‍⬛🐾') saved.startText = DEFAULT_CUSTOMIZATION.startText;
     if (typeof saved.startText !== 'string' || saved.startText === '╭━━━〔 🐈‍⬛ نَغْنُوغ 🐾 〕━━━╮\n\nأهلاً وسهلاً بيك بعالم نغنوغ ❤️\nمساعدك الذكي لإدارة المجموعة وتنظيمها وحمايتها.\n\n✦ اختَر القسم المناسب من القائمة أدناه للبدء.\n\n╰━━━━━━━━━━━━━━━━━━╯') saved.startText = DEFAULT_CUSTOMIZATION.startText;
   }
   return db.customizations[id];
@@ -185,7 +191,7 @@ function customText(ctx, section, key) {
   if (section === 'labels' || section === 'uiTexts') return c[section]?.[key];
   return c[section]?.[key];
 }
-function uiText(ctx, key, fallback) { const value = getCustomization(ctx).uiTexts?.[key]; return typeof value === 'string' && value.trim() ? value : fallback; }
+function uiText(ctx, key, fallback) { const value = getCustomization(ctx).uiTexts?.[key]; if (key === 'management' && value === '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') return fallback; return typeof value === 'string' && value.trim() ? value : fallback; }
 
 function getHomeKeyboard(ctx) {
   const kb = mainKeyboard(ctx, bot, getCustomization(ctx));
@@ -280,7 +286,7 @@ async function showGroupSettings(ctx, g = selectedGroup(ctx)) {
   if (!g) return answer(ctx, 'اختار مجموعتك أولاً.');
   if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة هذه المجموعة متاحة لمشرفيها فقط.');
   setSelected(ctx, g.id);
-  return answer(ctx, `⚙️ إعدادات مجموعة: ${g.title}\n\n${customText(ctx, 'descriptions', 'settings') || ''}`, { reply_markup: groupSettingsKeyboard(g) });
+  return answer(ctx, `╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n\n${customText(ctx, 'descriptions', 'settings') || 'اختَر الإعداد الذي تريد تغييره من الأزرار أدناه.'}\n\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: groupSettingsKeyboard(g) });
 }
 
 async function showGroupStats(ctx, g = selectedGroup(ctx)) {
@@ -289,7 +295,7 @@ async function showGroupStats(ctx, g = selectedGroup(ctx)) {
   let members = 'غير متاح';
   try { members = String(await bot.api.getChatMemberCount(g.id)); } catch {}
   const s = g.stats;
-  const text = `📊 إحصائيات ${g.title}\n\n👥 الأعضاء: ${members}\n💬 الرسائل: ${s.messages}`;
+  const text = `╭━━━〔 📊 إحصائيات المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n-︰عدد الأعضاء : ❨ ${members} ❩\n-︰عدد الرسائل : ❨ ${s.messages} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`;
   return answer(ctx, text, { reply_markup: new InlineKeyboard().text('🔄 تحديث', 'groupstats').row().text('🔙 إعدادات المجموعة', 'groupsettings') });
 }
 
