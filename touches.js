@@ -49,6 +49,58 @@ function mapFont(value, map) {
   return [...value].map(char => map[char] || char).join('');
 }
 
+// Arabic has no complete Unicode "font alphabet" comparable to Latin math alphabets.
+// These transformations change the visible lettering with kashida and restrained tashkeel,
+// rather than relying only on symbols placed around the name.
+function elongateArabic(value, step = 2, count = 1, offset = 0) {
+  const chars = [...value];
+  let out = '';
+  for (let i = 0; i < chars.length; i++) {
+    out += chars[i];
+    const isArabicLetter = /[\u0621-\u064A\u0671-\u06D3]/u.test(chars[i]);
+    const nextIsArabic = i + 1 < chars.length && /[\u0621-\u064A\u0671-\u06D3]/u.test(chars[i + 1]);
+    if (isArabicLetter && nextIsArabic && (i + offset) % step === 0) out += 'ـ'.repeat(count);
+  }
+  return out;
+}
+
+function addArabicMarks(value, positions, mark) {
+  const chars = [...value];
+  let letterIndex = 0;
+  return chars.map(char => {
+    if (/[\u0621-\u064A\u0671-\u06D3]/u.test(char)) {
+      const current = letterIndex++;
+      return positions.includes(current) ? `${char}${mark}` : char;
+    }
+    return char;
+  }).join('');
+}
+
+const ARABIC_STYLES = [
+  name => name,
+  name => elongateArabic(name, 2, 1, 0),
+  name => elongateArabic(name, 2, 1, 1),
+  name => elongateArabic(name, 3, 1, 0),
+  name => elongateArabic(name, 3, 1, 1),
+  name => elongateArabic(name, 3, 1, 2),
+  name => elongateArabic(name, 2, 2, 0),
+  name => elongateArabic(name, 2, 2, 1),
+  name => elongateArabic(name, 4, 1, 0),
+  name => elongateArabic(name, 4, 1, 1),
+  name => elongateArabic(name, 4, 1, 2),
+  name => addArabicMarks(name, [0], '\u064e'), // فتحة خفيفة على أول حرف
+  name => addArabicMarks(name, [0], '\u0650'), // كسرة خفيفة على أول حرف
+  name => addArabicMarks(name, [0], '\u064f'), // ضمة خفيفة على أول حرف
+  name => addArabicMarks(name, [1], '\u0651'), // شدة على الحرف الثاني
+  name => addArabicMarks(name, [0, 2], '\u064e'),
+  name => addArabicMarks(name, [1, 3], '\u0650'),
+  name => addArabicMarks(name, [0, 2], '\u0651'),
+  name => addArabicMarks(name, [1], '\u064e'),
+  name => addArabicMarks(name, [2], '\u064f'),
+  name => addArabicMarks(name, [0, 1], '\u064e'),
+  name => addArabicMarks(name, [0, 2, 4], '\u064e'),
+];
+
 function shuffled(items) {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -58,21 +110,66 @@ function shuffled(items) {
   return copy;
 }
 
+function uniqueSafe(values, previous = []) {
+  const used = new Set(previous);
+  const seen = new Set();
+  return values.filter(value => {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    // Telegram inline keyboard button labels are limited to 64 characters.
+    if ([...value].length > 64) return false;
+    if (seen.has(value) || used.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
 export function makeNameBatch(name, language, previous = []) {
-  const frames = language === 'en' ? ENGLISH_FRAMES : ARABIC_FRAMES;
+  const isEnglish = language === 'en';
+  const frames = isEnglish ? ENGLISH_FRAMES : ARABIC_FRAMES;
+  const used = [...previous];
+
+  if (!isEnglish) {
+    // Prioritize Arabic letter styling in the first results; frames are secondary.
+    const letterStyles = shuffled(ARABIC_STYLES.map(style => style(name)));
+    const primary = uniqueSafe(letterStyles, used);
+    const results = primary.slice(0, 10);
+
+    if (results.length < 10) {
+      const decorated = [];
+      for (const style of shuffled(ARABIC_STYLES)) {
+        const styledName = style(name);
+        for (const frame of shuffled(frames)) decorated.push(frame(styledName));
+      }
+      for (const frame of shuffled(frames)) decorated.push(frame(name));
+      const extras = uniqueSafe(shuffled(decorated), [...used, ...results]);
+      results.push(...extras.slice(0, 10 - results.length));
+    }
+
+    // Very short or non-Arabic input can produce fewer unique transformations.
+    if (results.length < 10) {
+      const backup = [];
+      for (const style of ARABIC_STYLES) {
+        const styledName = style(name);
+        backup.push(styledName, ...frames.map(frame => frame(styledName)));
+      }
+      results.push(...uniqueSafe(backup, results).slice(0, 10 - results.length));
+    }
+
+    return shuffled(results).slice(0, 10);
+  }
+
+  const fontMaps = shuffled(FONT_MAPS);
   const candidates = [];
-  const fontMaps = language === 'en' ? shuffled(FONT_MAPS) : [null];
+  for (const map of fontMaps) candidates.push(mapFont(name, map));
   for (const frame of shuffled(frames)) {
     candidates.push(frame(name));
-    if (language === 'en') {
-      for (const map of fontMaps) candidates.push(frame(mapFont(name, map)));
-    }
+    for (const map of fontMaps) candidates.push(frame(mapFont(name, map)));
   }
-  const used = new Set(previous);
-  const unique = [...new Set(candidates)].filter(value => !used.has(value));
-  // إذا استنفد المستخدم كل الأشكال المتاحة، نبدأ مجموعة جديدة من دون تكرار داخل الدفعة.
-  const pool = unique.length >= 10 ? unique : [...new Set(candidates)];
-  return shuffled(pool).slice(0, 10);
+  let results = uniqueSafe(shuffled(candidates), used).slice(0, 10);
+  if (results.length < 10) {
+    results.push(...uniqueSafe(candidates, results).slice(0, 10 - results.length));
+  }
+  return results.slice(0, 10);
 }
 
 export function touchesMenuKeyboard() {
@@ -85,13 +182,19 @@ export function touchesLanguageKeyboard() {
 
 export function touchesBatchKeyboard(results) {
   const kb = new InlineKeyboard();
-  results.forEach((result, index) => {
-    kb.add({ text: `📋 نسخ ${index + 1}`, copy_text: { text: result } }).row();
+  results.forEach(result => {
+    // The button itself shows the decorated name and copies that exact text when tapped.
+    // Keep a small safe fallback for unexpected long results, though makeNameBatch filters them.
+    const label = [...result].length <= 64 ? result : [...result].slice(0, 64).join('');
+    kb.add({ text: label, copy_text: { text: result } }).row();
   });
   return kb.text('🔄 دفعة جديدة (10)', 'touchesmore').row().text('🔙 رجوع', 'touchesmenu').text('🏠 الرئيسية', 'home');
 }
 
 export function touchesBatchText(name, language, results, batchNumber = 1) {
   const heading = language === 'en' ? '🇬🇧 English' : '🇮🇶 عربي';
-  return `🔥🐈‍⬛ لمسات نغنوغ | زخرفة الأسماء\n\nالاسم: ${name}\nاللغة: ${heading}\nالدفعة: ${batchNumber}\n\n${results.map((value, i) => `${i + 1}. ${value}`).join('\n\n')}\n\n📋 اضغط زر «نسخ» بجانب النتيجة المطلوبة. الزخارف تتغير مع كل دفعة.`;
+  const instruction = language === 'en'
+    ? '👆 Tap the decorated name button below to copy it.'
+    : '👆 المس على الاسم المزخرف بالأسفل حتى ينسخ عندك. ماكو أرقام للنسخ؛ المس الاسم نفسه.';
+  return `🔥🐈‍⬛ لمسات نغنوغ | زخرفة الأسماء\n\nالاسم الأصلي: ${name}\nاللغة: ${heading}\nالدفعة: ${batchNumber}\n\n${instruction}\n\n${results.map((value, i) => `${i + 1}. ${value}`).join('\n\n')}\n\n✦ كل زر يحمل الاسم المزخرف نفسه؛ المسه لنسخه. اضغط «دفعة جديدة» للمزيد.`;
 }
