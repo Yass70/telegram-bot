@@ -1,4 +1,3 @@
-
  // قوانين نغنوغ 🐈‍⬛❤️
 export const GROUP_RULES = [
   '╭━━━〔 📜 قوانين نغنوغ 🐈‍⬛ 〕━━━╮',
@@ -122,5 +121,3 @@ export function findAutoReply(text = '') {
     }
   }
 
-  return null;
-}
