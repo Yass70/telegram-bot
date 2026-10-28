@@ -34,7 +34,7 @@ export function registerCallbacks(bot, shared) {
     if (await handleActiveGameCallback(ctx, shared, data)) return;
 
     const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu'];
-    if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:')) {
+    if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:') || data.startsWith('globaltext')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
         return;
@@ -46,7 +46,7 @@ export function registerCallbacks(bot, shared) {
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
       'toggleforward', 'togglecontacts', 'enableallprotection', 'mygroups', 
       'groupstats', 'userreplies', 'repliesmenu', 'groupoverview',
-      'welcomeedit', 'welcometoggle', 'toggleflood', 'togglereplies',
+      'welcomeedit', 'toggleflood', 'togglereplies',
       'warningslimit', 'warningsaction', 'warningsduration', 'warningslog', 'warningsclear'
     ];
 
@@ -93,6 +93,10 @@ export function registerCallbacks(bot, shared) {
       clearPending(ctx);
       return answer(ctx, '✨ زخرفة الأسماء\n\nاختَر لغة الاسم أولاً:', { reply_markup: touchesLanguageKeyboard() });
     }
+    if (data === 'touchesvocal') {
+      clearPending(ctx);
+      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('🔙 رجوع إلى لمسات', 'touchesmenu').row().text('🏠 القائمة الرئيسية', 'home') });
+    }
     if (data === 'touchescancel') {
       clearPending(ctx);
       db.touchSessions ||= {};
@@ -131,8 +135,10 @@ export function registerCallbacks(bot, shared) {
         .text('🎮 الألعاب', 'gamesmenu').row()
         .text('💬 الأوامر التفاعلية', 'interactive_menu').row()
         .text('👑 أوامر المشرفين', 'adminpanel').row()
-        .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row()
-        .text('🔙 القائمة الرئيسية', 'home');
+        .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row();
+      // نقل مدخل الإعدادات العامة خارج لوحة المالك، مع إبقائه خاصاً بالمالك.
+      if (isOwner(ctx)) kb.text('⚙️ إعدادات البوت العامة', 'botsettings').row();
+      kb.text('🔙 القائمة الرئيسية', 'home');
       const managementText = `╭━━━〔 ⚙️ قسم الإدارة | نغنوغ 🐈‍⬛ 〕━━━╮
 
 -︰🎮 الألعاب : ❨ ألعاب وتحدّيات داخل المجموعة ❩
@@ -291,12 +297,93 @@ export function registerCallbacks(bot, shared) {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       db.customizations ||= {};
       delete db.customizations[userKey(ctx)];
+      // حسب نظام توحيد النصوص: الاستعادة من أي حساب تعيد الافتراضيات العامة لكل المستخدمين.
+      db.globalTextOverrides = { texts: [], buttons: [] };
       clearPending(ctx);
       save();
-      return answer(ctx, '♻️ تم استعادة النصوص الافتراضية المعتمدة حديثاً لحسابك فقط.\nتخصيصات بقية المستخدمين وبيانات المجموعات لم تتغير.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
+      return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية المعتمدة من المطوّر.\nتم مسح تخصيصك الشخصي وتعديلات توحيد النصوص العامة؛ لذلك ترجع النصوص العامة للافتراضي عند الجميع، بينما تبقى التخصيصات الشخصية لبقية المستخدمين خاصة بهم.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
     }
 
     if (data === 'groupstats') return showGroupStats(ctx);
+
+    // توحيد النصوص: تعديلات عامة على نصوص الواجهات وأسماء الأزرار لكل المستخدمين.
+    if (data === 'globaltextmenu') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const kb = new InlineKeyboard()
+        .text('📝 توحيد نص أو وصف قائمة', 'globaltextedit:text').row()
+        .text('🔘 توحيد اسم زر', 'globaltextedit:button').row()
+        .text('📋 عرض التعديلات الحالية', 'globaltextlist:0').row()
+        .text('♻️ مسح كل تعديلات التوحيد', 'globaltextclear').row()
+        .text('🔙 العودة إلى لوحة المالك', 'ownerpanel');
+      return answer(ctx, '╭━━━〔 📝 توحيد النصوص | نغنوغ 〕━━━╮\n\nمن هنا تغيّر نصوص وأوصاف القوائم أو أسماء الأزرار بشكل عام، ويظهر التغيير لكل مستخدمي البوت.\n\n١. اختَر نوع التعديل.\n٢. أرسل النص القديم أو العبارة القديمة كما تظهر في البوت. تگدر ترسل جزءاً من الوصف حتى يتغير بكل مكان يظهر بيه.\n٣. أرسل النص الجديد.\n\n✦ معرفات الأزرار الداخلية تبقى نفسها، لذلك تظل الأزرار تعمل بعد تغيير أسمائها.\n✦ زر «استعادة النصوص الافتراضية» في تخصيص نغنوغ يمسح هذه التعديلات العامة أيضاً لجميع المستخدمين.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
+    }
+
+    if (data.startsWith('globaltextedit:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const kind = data.split(':')[1];
+      if (!['text', 'button'].includes(kind)) return answer(ctx, 'نوع التعديل غير معروف.');
+      pending(ctx, { action: 'global-ui-old', kind });
+      return answer(ctx, kind === 'button'
+        ? '🔘 أرسل اسم الزر القديم كما يظهر في أي قائمة. سيُطبّق الاسم الجديد على كل زر يحمل العبارة نفسها، مع بقاء وظيفة الزر كما هي.\n\nأرسل /cancel للإلغاء.'
+        : '📝 أرسل النص القديم أو جزءاً منه كما يظهر في القوائم أو الأوصاف. سيُستبدل في كل رسالة واجهة تحتوي على العبارة نفسها.\n\nأرسل /cancel للإلغاء.',
+        { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel').row().text('🔙 رجوع', 'globaltextmenu') });
+    }
+
+    if (data === 'globaltextcancel') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      clearPending(ctx);
+      return answer(ctx, 'تم إلغاء التعديل.', { reply_markup: new InlineKeyboard().text('🔙 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+    }
+
+    if (data.startsWith('globaltextlist:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const allRules = [
+        ...(db.globalTextOverrides?.texts || []).map((rule, index) => ({ ...rule, kind: 'text', index })),
+        ...(db.globalTextOverrides?.buttons || []).map((rule, index) => ({ ...rule, kind: 'button', index: (db.globalTextOverrides?.texts || []).length + index }))
+      ];
+      if (!allRules.length) return answer(ctx, '📋 ماكو تعديلات عامة محفوظة حالياً.', { reply_markup: new InlineKeyboard().text('🔙 توحيد النصوص', 'globaltextmenu') });
+      const pageSize = 6;
+      const page = Math.max(0, Number(data.split(':')[1]) || 0);
+      const pages = Math.max(1, Math.ceil(allRules.length / pageSize));
+      const shown = allRules.slice(page * pageSize, (page + 1) * pageSize);
+      const kb = new InlineKeyboard();
+      for (const rule of shown) {
+        const short = value => String(value).replace(/\s+/g, ' ').slice(0, 18);
+        kb.text(`🗑️ ${rule.kind === 'text' ? 'نص' : 'زر'}: ${short(rule.from)} ← ${short(rule.to)}`, `globaltextdel:${rule.index}:${page}`).row();
+      }
+      if (page > 0) kb.text('⬅️ السابق', `globaltextlist:${page - 1}`);
+      if (page + 1 < pages) kb.text('التالي ➡️', `globaltextlist:${page + 1}`);
+      kb.row().text('🔙 توحيد النصوص', 'globaltextmenu');
+      const body = shown.map((rule, i) => `${page * pageSize + i + 1}. ${rule.kind === 'text' ? '📝 نص' : '🔘 زر'}\nقديم: ${String(rule.from).slice(0, 90)}\nجديد: ${String(rule.to).slice(0, 90)}`).join('\n\n');
+      return answer(ctx, `📋 التعديلات العامة (${page + 1}/${pages})\n\n${body}\n\nاضغط على أي تعديل لحذفه.`, { reply_markup: kb });
+    }
+
+    if (data.startsWith('globaltextdel:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const [, rawIndex, rawPage] = data.split(':');
+      const index = Number(rawIndex);
+      const textCount = (db.globalTextOverrides?.texts || []).length;
+      const buttonCount = (db.globalTextOverrides?.buttons || []).length;
+      if (!Number.isInteger(index) || index < 0 || index >= textCount + buttonCount) {
+        return answer(ctx, 'التعديل المطلوب غير موجود أو تم حذفه مسبقاً.', { reply_markup: new InlineKeyboard().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
+      }
+      if (index < textCount) db.globalTextOverrides.texts.splice(index, 1);
+      else db.globalTextOverrides.buttons.splice(index - textCount, 1);
+      save();
+      return answer(ctx, '🗑️ تم حذف التعديل المحدد.', { reply_markup: new InlineKeyboard().text('📋 بقية التعديلات', `globaltextlist:${Math.max(0, Number(rawPage) || 0)}`).row().text('🔙 توحيد النصوص', 'globaltextmenu') });
+    }
+
+    if (data === 'globaltextclear') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      return answer(ctx, '⚠️ هل تريد مسح جميع تعديلات توحيد النصوص؟ سيعود البوت إلى النصوص والأزرار الافتراضية للجميع.', { reply_markup: new InlineKeyboard().text('✅ نعم، امسحها', 'globaltextclearconfirm').row().text('❌ إلغاء', 'globaltextmenu') });
+    }
+
+    if (data === 'globaltextclearconfirm') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      db.globalTextOverrides = { texts: [], buttons: [] };
+      save();
+      return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية للجميع.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+    }
 
     // لوحة المالك والاشتراك الإجباري[cite: 4, 5]
     if (data === 'ownerpanel') return showOwnerPanel(ctx);
@@ -346,7 +433,18 @@ export function registerCallbacks(bot, shared) {
       } catch (e) { console.warn('Could not create/open group invite link:', e?.description || e?.message || e); }
       return answer(ctx, 'ما كدرت أجيب رابط المجموعة. إذا كانت خاصة، لازم نغنوغ يكون مشرفاً ويملك صلاحية إنشاء روابط الدعوة.', { reply_markup: new InlineKeyboard().text('🔙 تفاصيل المجموعة', `activegroup:${id}`) });
     }
-    if (data === 'botsettings') return answer(ctx, '╭─〔 ⚙️ إعدادات البوت العامة 〕─╮\nتُدار إعدادات البوت من هذه اللوحة.', { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+    if (data === 'botsettings') {
+      if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
+      const kb = new InlineKeyboard()
+        .text('📊 إحصائيات نغنوغ', 'botstats').row()
+        .text('👥 المجموعات النشطة', 'activatedgroups').row()
+        .text('📢 إرسال إشعار عام', 'broadcastmenu').row()
+        .text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu').row()
+        .text('🛡️ إعدادات حماية المجموعات', 'mygroups').row()
+        .text('↩️ رجوع إلى قسم الإدارة', 'managementmenu').row()
+        .text('🏠 القائمة الرئيسية', 'home');
+      return answer(ctx, '╭━━━〔 ⚙️ إعدادات البوت العامة 〕━━━╮\n\nمن هنا توصل إلى إعدادات وإدارة البوت العامة: الإحصائيات، المجموعات، الإشعارات، والاشتراك الإجباري.\n\nأما حماية كل مجموعة فتدخل إلها من «مجموعاتي» ثم إعدادات المجموعة.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
+    }
     if (data === 'globalprotection') {
       const g = selectedGroup(ctx);
       if (!g) return answer(ctx, 'اختَر مجموعة من «مجموعاتي» أولاً، ثم افتح الحماية الموحدة من إعداداتها.', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 لوحة المالك', 'ownerpanel') });
@@ -440,17 +538,7 @@ export function registerCallbacks(bot, shared) {
       return answer(ctx, `╭━━━〔 🧹 تصفير التحذيرات 〕━━━╮\n\n-︰النتيجة : ❨ تم تصفير تحذيرات أعضاء المجموعة بنجاح ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
     }
 
-    // تشغيل/إيقاف الترحيب تلقائياً من لوحة إعدادات المجموعة.
-    if (data === 'welcometoggle') {
-      const g = selectedGroup(ctx);
-      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
-      g.welcomeEnabled = !g.welcomeEnabled;
-      save();
-      const status = g.welcomeEnabled ? '🟢 تم تشغيل الترحيب التلقائي.' : '⚪ تم إيقاف الترحيب التلقائي.';
-      return answer(ctx, `${status}\n\nالمجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
-    }
-
-    // تخصيص نص الترحيب من الخاص فقط؛ هذا لا يغيّر حالة التشغيل والإيقاف.
+    // إعدادات المجموعة المتقدمة[cite: 3, 5]
     if (data === 'welcomeedit') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
@@ -741,4 +829,3 @@ export function registerCallbacks(bot, shared) {
     return answer(ctx, '⚠️ 〔 خيار غير معروف 〕\nجرّب الرجوع إلى القائمة السابقة واختيار أحد الأزرار المتاحة.');
   });
 }
-
