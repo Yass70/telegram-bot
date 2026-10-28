@@ -155,8 +155,8 @@ ${link}
 
   bot.command('id', async ctx => {
     const target = ctx.message.reply_to_message?.from || ctx.from;
-    const lines = [`🆔 ايدي المجموعة: ${ctx.chat.id}`, `👤 ايدي المستخدم: ${target?.id ?? 'غير متاح'}`];
-    if (target?.username) lines.push(`🔗 المعرف: @${target.username}`);
+    const lines = [`🆔 Chat ID: ${ctx.chat.id}`, `👤 User ID: ${target?.id ?? 'غير متاح'}`];
+    if (target?.username) lines.push(`🔗 Username: @${target.username}`);
     await ctx.reply(lines.join('\n'), { reply_to_message_id: ctx.message.message_id });
   });
 
@@ -177,17 +177,6 @@ ${link}
     g.welcomeEnabled = true;
     save();
     return ctx.reply('✅ تم حفظ رسالة الترحيب وتفعيلها.');
-  });
-  bot.hears(/^تغيير الترحيب\s+([\s\S]+)$/i, async ctx => {
-    if (!isGroup(ctx)) return ctx.reply('🐾 أرسل «تغيير الترحيب» متبوعاً بالنص داخل المجموعة.');
-    if (!await userIsAdmin(ctx.chat.id, ctx.from.id) && !isOwner(ctx)) return ctx.reply('⚠️ هذا الخيار لمشرفي المجموعة فقط.');
-    const value = String(ctx.match?.[1] || '').trim();
-    if (!value) return ctx.reply('أرسل النص بعد «تغيير الترحيب». المتغيرات المتاحة: {name} و{title}.');
-    const g = groupFor(ctx.chat);
-    g.welcomeText = value;
-    g.welcomeEnabled = true;
-    save();
-    return ctx.reply('✅ تم حفظ رسالة الترحيب العربية وتفعيلها.');
   });
 
   const RANDOM_WELCOME_MESSAGES = [
@@ -232,7 +221,7 @@ ${link}
       const messages = Number(g.userStats?.[memberId]?.messages || 0);
       const points = Number(db.groupPoints?.[String(ctx.chat.id)]?.[memberId] ?? db.points?.[memberId] ?? 0);
       const sakhakat = Number(g.userStats?.[memberId]?.sakhakat || 0);
-      const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${name} ❩\n-︰ايديك : ❨ ${member.id} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
+      const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${name} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰ايديك : ❨ ${member.id} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
       const welcomeLine = String(g.welcomeText || 'أهلاً بيك {name} ❤️ نورت مجموعة {title}، نتمنى لك وقتاً ممتعاً ويانه!')
         .replaceAll('{name}', name).replaceAll('{title}', ctx.chat.title || 'المجموعة');
       const randomWelcome = RANDOM_WELCOME_MESSAGES[Math.floor(Math.random() * RANDOM_WELCOME_MESSAGES.length)]
@@ -309,52 +298,20 @@ ${link}
     }
   });
 
-  const activateGroup = async ctx => {
-    if (!isGroup(ctx)) return ctx.reply('🐾 افتح المجموعة وأرسل «تفعيل نغنوغ» هناك.');
+  bot.hears(/^تفعيل$/i, async ctx => {
+    if (!isGroup(ctx)) return ctx.reply('🐾 أرسل كلمة «تفعيل» داخل المجموعة.');
+    if (!await userIsAdmin(ctx.chat.id, ctx.from.id)) return ctx.reply('⚠️ لازم تكون مشرفاً.');
     const g = groupFor(ctx.chat);
-    // يتطلب فحص رتبة المستخدم أن يكون البوت مشرفاً في المجموعة وفق ضمانات Telegram Bot API.
-    let botStatus = 'unknown';
-    try { botStatus = (await ctx.api.getChatMember(ctx.chat.id, bot.botInfo.id)).status; } catch {}
-    if (!['administrator', 'creator'].includes(botStatus)) {
-      return ctx.reply('⚠️ حتى يشتغل نغنوغ داخل المجموعة بصورة صحيحة، أضفه مشرفاً أولاً وامنحه الصلاحيات المطلوبة، خصوصاً حذف الرسائل وتقييد الأعضاء. بعدها أرسل «تفعيل نغنوغ» من حساب مشرف بالمجموعة.');
-    }
-    if (!await userIsAdmin(ctx.chat.id, ctx.from.id) && !isOwner(ctx)) return ctx.reply('⚠️ التفعيل متاح لمشرفي المجموعة فقط.');
-    if (g.activated) return ctx.reply('🐾 نغنوغ مفعّل بالفعل بهذه المجموعة ❤️');
+    if (g.activated) return ctx.reply('🐾 نغنوغ يعمل حالياً في هذه المجموعة ❤️');
+
     g.activated = true;
     g.activatedBy = userKey(ctx);
     g.title = ctx.chat.title || g.title;
     if (!g.admins.includes(userKey(ctx))) g.admins.push(userKey(ctx));
-    g.activatedAt = new Date().toISOString();
+    g.activatedAt ||= new Date().toISOString();
     save();
-    return ctx.reply('🐾 تم تفعيل نغنوغ بنجاح!\n\n🛡️ تذكّر: ميزات الحذف والكتم والعقوبات تحتاج بقاء البوت مشرفاً مع الصلاحيات المناسبة.');
-  };
-  bot.hears(/^(?:تفعيل|تفعيل نغنوغ|شغل نغنوغ|تشغيل نغنوغ)$/i, activateGroup);
-  // أوامر تيليغرام المائلة تقبل أسماء لاتينية فقط؛ نوفر بديلاً عربياً كنص عادي.
-  bot.command('activate', activateGroup);
-  bot.hears(/^(?:مساعدة|المساعدة|شرح البوت)$/i, async ctx => {
-    ensureUser(ctx);
-    if (isPrivate(ctx) && !await subscriptionGate(ctx)) return;
-    return ctx.reply(customText(ctx, 'helpText') || HELP_TEXT, { reply_markup: helpKeyboard(getCustomization(ctx)) });
+    return ctx.reply('🐾 نغنوغ — تم التفعيل بنجاح!');
   });
-  bot.hears(/^(?:لوحة|لوحة التحكم|القائمة|الرئيسية)$/i, async ctx => {
-    ensureUser(ctx);
-    if (isPrivate(ctx) && !await subscriptionGate(ctx)) return;
-    return ctx.reply(getCustomization(ctx).startText, { reply_markup: getHomeKeyboard(ctx) });
-  });
-  bot.hears(/^(?:ايدي|آيدي|معرفي|رقمي)$/i, async ctx => {
-    const target = ctx.message.reply_to_message?.from || ctx.from;
-    return ctx.reply(`🆔 ايدي المجموعة: ${ctx.chat.id}\n👤 ايديك: ${target?.id ?? 'غير متاح'}${target?.username ? `\n🔗 معرفك: @${target.username}` : ''}`, { reply_to_message_id: ctx.message.message_id });
-  });
-  // أسماء الأوامر في قائمة Telegram لاتينية تقنياً، لكن أوصافها عربية.
-  bot.api.setMyCommands([
-    { command: 'start', description: 'بدء استخدام نغنوغ' },
-    { command: 'help', description: 'شرح ميزات البوت' },
-    { command: 'panel', description: 'فتح القائمة الرئيسية' },
-    { command: 'activate', description: 'تفعيل نغنوغ داخل المجموعة' },
-    { command: 'commands', description: 'عرض لوحة أوامر المجموعة' },
-    { command: 'id', description: 'معرفة المعرّف الرقمي' },
-    { command: 'setwelcome', description: 'تخصيص رسالة الترحيب' }
-  ]).catch(err => console.warn('[setMyCommands] تعذر تحديث قائمة الأوامر:', err?.description || err?.message || err));
 
   // معالجة كافة الأزرار واللوحات بشمولية تامة لتجنب أي أخطاء أو أزرار لا تستجيب[cite: 3, 4, 5]
   const commandShared = {
