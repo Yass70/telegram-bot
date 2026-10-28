@@ -211,6 +211,35 @@ export function setupCommands(bot, db, helpers) {
   db.activeGames ||= {};
   db.groupPoints ||= {};
   db.customizations ||= {};
+  db.menuBack ||= {};
+
+  // نحفظ القائمة التي دخل المستخدم منها إلى الألعاب أو التحذيرات، حتى يعود إليها فعلاً.
+  const inferMenuBack = (ctx, kind) => {
+    const text = String(ctx.callbackQuery?.message?.text || '');
+    const keyboard = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+    const callbacks = keyboard.flat().map(button => button.callback_data).filter(Boolean);
+    const previous = db.menuBack?.[userKey(ctx)]?.[kind];
+    if (kind === 'games' && (text.includes('لعبة الخيار') || text.includes('لعبة الرياضيات') || text.includes('لعبة الحيوان') || text.includes('الأسئلة العامة') || text.includes('أبطال نغنوغ'))) {
+      return previous || (isGroup(ctx) ? 'publiccommands' : 'managementmenu');
+    }
+    if (kind === 'warnings' && (text.includes('التحذيرات والعقوبات') || text.includes('سجل التحذيرات') || text.includes('إدارة الكلمات الممنوعة'))) {
+      return previous || (isGroup(ctx) ? 'publiccommands' : 'groupsettings');
+    }
+    if (text.includes('لوحة مالك')) return 'ownerpanel';
+    if (text.includes('قسم الإدارة') || (callbacks.includes('gamesmenu') && callbacks.includes('adminpanel'))) return 'managementmenu';
+    if (text.includes('إعدادات مجموعة') || (callbacks.includes('groupstats') && callbacks.includes('groupoverview'))) return 'groupsettings';
+    if (text.includes('مركز أوامر نغنوغ') || callbacks.includes('showpublichelp')) return 'publiccommands';
+    if (text.includes('تفاصيل المجموعة') || text.includes('نظرة عامة على المجموعة')) return 'groupoverview';
+    return isGroup(ctx) ? 'publiccommands' : (kind === 'warnings' && selectedGroup(ctx) ? 'groupsettings' : 'managementmenu');
+  };
+  const rememberMenuBack = (ctx, kind) => {
+    db.menuBack ||= {};
+    db.menuBack[userKey(ctx)] ||= {};
+    db.menuBack[userKey(ctx)][kind] = inferMenuBack(ctx, kind);
+    save();
+  };
+  const menuBackTarget = (ctx, kind) => db.menuBack?.[userKey(ctx)]?.[kind] || (isGroup(ctx) ? 'publiccommands' : (kind === 'warnings' ? 'groupsettings' : 'managementmenu'));
+
   const normalizeAnswer = value => String(value ?? '').trim().toLocaleLowerCase('ar')
     .replace(/[ًٌٍَُِّْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه').replace(/\s+/g, ' ');
@@ -282,15 +311,14 @@ export function setupCommands(bot, db, helpers) {
     const link = referralLinkFor(uid);
     const text = `╭━━━〔 🔗 رابط المشاركة 〕━━━╮
 
-🐈‍⬛ هذا رابطك الخاص في نغنوغ:
-
+-︰رابطك الخاص :
 ${link}
 
-👥 عدد الأشخاص المنضمين برابطك: ${stats.joinedCount}
-⭐ نقاط الجوائز من الإحالات: ${stats.rewardPoints}
+-︰الأشخاص المنضمّون برابطك : ❨ ${stats.joinedCount} ❩
+-︰نقاط الجوائز : ❨ ${stats.rewardPoints} ❩
 
-📌 كل مستخدم جديد يبدأ البوت من رابطك يُحتسب مرة واحدة فقط.
-╰━━━━━━━━━━━━━━━━━━╯`;
+✦ يُحتسب المستخدم الجديد مرة واحدة فقط عند بدء البوت عبر رابطك.
+╰━━━━━━━━━━━━━━━━━━━━╯`;
     return answer(ctx, text, { reply_markup: referralLinkKeyboard(uid) });
   };
 
@@ -564,7 +592,16 @@ ${link}
         .text('👑 أوامر المشرفين', 'adminpanel').row()
         .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row()
         .text('🔙 القائمة الرئيسية', 'home');
-      return answer(ctx, uiText ? uiText(ctx, 'management', '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') : '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️', { reply_markup: kb });
+      const managementText = `╭━━━〔 ⚙️ قسم الإدارة | نغنوغ 🐈‍⬛ 〕━━━╮
+
+-︰🎮 الألعاب : ❨ ألعاب وتحدّيات داخل المجموعة ❩
+-︰💬 الأوامر التفاعلية : ❨ بطاقة العضو والردود والعبارات الشعرية ❩
+-︰👑 أوامر المشرفين : ❨ أدوات الإدارة حسب الصلاحيات ❩
+-︰⚠️ التحذيرات والعقوبات : ❨ إعدادات التعامل مع المخالفات ❩
+
+✦ اختَر القسم المطلوب من الأزرار أدناه.
+╰━━━━━━━━━━━━━━━━━━━━╯`;
+      return answer(ctx, uiText ? uiText(ctx, 'management', managementText) : managementText, { reply_markup: kb });
     }
     if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
     if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
@@ -595,13 +632,13 @@ ${link}
         ? new Date(Number(meta.firstSeenAt)).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
         : 'غير متاح للحسابات المسجلة قبل إضافة الميزة';
       const referralStats = referralStatsFor(userId);
-      const text = `👤 ملفي الشخصي 🐈‍⬛\n\n🪪 معلومات الحساب\n\nالاسم: ${name}\nالمعرّف: ${username}\nايدي: ${userId}\nتاريخ الانضمام للبوت: ${joinedAt}\nعدد نقاط الجوائز: ${referralStats.rewardPoints}\nعدد الأشخاص المنضمين برابطي: ${referralStats.joinedCount}`;
+      const text = `╭━━━〔 👤 بطاقة نغنوغ الشخصية 〕━━━╮\n\n-︰الاسم : ❨ ${name} ❩\n\n-︰معرّفك : ❨ ${username} ❩\n\n-︰ايديك : ❨ ${userId} ❩\n\n-︰تاريخ انضمامك : ❨ ${joinedAt} ❩\n\n-︰نقاط الجوائز : ❨ ${referralStats.rewardPoints} ❩\n\n-︰الأشخاص المنضمّون برابطك : ❨ ${referralStats.joinedCount} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`;
       return answer(ctx, text, { reply_markup: new InlineKeyboard().text('⭐ ستار', 'starmenu').row().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
     }
 
     if (data === 'starmenu') {
       const stats = referralStatsFor(String(ctx.from.id));
-      return answer(ctx, `╭━━━〔 ⭐ ستار | نغنوغ 🐈‍⬛ 〕━━━╮\n\nاجمع نقاط الجوائز من خلال دعوة أشخاص جدد إلى نغنوغ.\n\n👥 الأشخاص المنضمون برابطك: ${stats.joinedCount}\n⭐ نقاط الجوائز: ${stats.rewardPoints}\n\nاضغط على رابط المشاركة حتى تحصل على رابطك الخاص وتشوف إحصائياتك.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: referralMenuKeyboard() });
+      return answer(ctx, `╭━━━〔 ⭐ ستار | نغنوغ 🐈‍⬛ 〕━━━╮\n\n-︰طريقة جمع الجوائز : ❨ ادعُ أشخاصاً جدد إلى نغنوغ عبر رابطك ❩\n\n-︰المنضمّون برابطك : ❨ ${stats.joinedCount} ❩\n-︰نقاط الجوائز : ❨ ${stats.rewardPoints} ❩\n\n✦ اضغط على «رابط مشاركة» حتى تحصل على رابطك الخاص وتتابع إحصائياتك.\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: referralMenuKeyboard() });
     }
 
     if (data === 'referrallink' || data === 'referralrefresh') {
@@ -636,7 +673,7 @@ ${link}
         .text('📊 إحصائيات المجموعة', 'groupstats').row()
         .text('👥 اختيار مجموعة أخرى', 'mygroups').row()
         .text('🔙 القائمة الرئيسية', 'home');
-      return answer(ctx, `👥 ${g.title}\n\nاختار شنو تريد تدير بهالمجموعة. 🐾`, { reply_markup: kb });
+      return answer(ctx, `╭━━━〔 👥 بطاقة المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n\n✦ اختَر الخدمة اللي تريد تديرها من الأزرار أدناه. 🐾\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
 
     if (data === 'groupoverview') return showSelectedGroupMenu(ctx);
@@ -726,7 +763,7 @@ ${link}
       const totalUsers = db.users?.length || 0;
       const privateUsers = db.privateUsers?.length || 0;
       const groupsCount = Object.keys(db.groups || {}).length;
-      return answer(ctx, `╭━━━〔 📊 إحصائيات نغنوغ 〕━━━╮\n\n👥 إجمالي المستخدمين: ${totalUsers}\n💬 مستخدمو المحادثة الخاصة: ${privateUsers}\n🏘️ المجموعات المسجّلة: ${groupsCount}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
+      return answer(ctx, `╭━━━〔 📊 إحصائيات نغنوغ 〕━━━╮\n\n-︰إجمالي المستخدمين : ❨ ${totalUsers} ❩\n-︰مستخدمو الخاص : ❨ ${privateUsers} ❩\n-︰المجموعات المسجّلة : ❨ ${groupsCount} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 لوحة المالك', 'ownerpanel') });
     }
     if (data === 'activatedgroups') {
       if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
@@ -734,7 +771,7 @@ ${link}
       const kb = new InlineKeyboard();
       for (const g of activeGroups) kb.text(`👥 ${String(g.title || g.id).slice(0, 45)}`, `activegroup:${g.id}`).row();
       kb.text('🔙 لوحة المالك', 'ownerpanel');
-      const text = `👥 المجموعات النشطة\n\n📊 العدد الكلي: ${activeGroups.length} مجموعة\n\nاختار مجموعة حتى تشوف تفاصيلها وتفتح خيارات إدارتها.`;
+      const text = `╭━━━〔 👥 المجموعات النشطة 〕━━━╮\n\n-︰العدد الكلي : ❨ ${activeGroups.length} مجموعة ❩\n\n✦ اختَر مجموعة لعرض تفاصيلها وخيارات إدارتها.\n╰━━━━━━━━━━━━━━━━━━━━╯`;
       return answer(ctx, text, { reply_markup: kb });
     }
     if (data.startsWith('activegroup:')) {
@@ -748,7 +785,7 @@ ${link}
         .text('🔙 المجموعات النشطة', 'activatedgroups');
       let members = 'غير متاح';
       try { members = String(await bot.api.getChatMemberCount(g.id)); } catch {}
-      return answer(ctx, `👥 تفاصيل المجموعة\n\n📌 الاسم: ${g.title || 'بدون اسم'}\n🆔 المعرّف: ${g.id}\n👤 عدد الأعضاء: ${members}\n🟢 الحالة: مفعّلة`, { reply_markup: kb });
+      return answer(ctx, `╭━━━〔 👥 تفاصيل المجموعة 〕━━━╮\n\n-︰الاسم : ❨ ${g.title || 'بدون اسم'} ❩\n-︰المعرّف : ❨ ${g.id} ❩\n-︰عدد الأعضاء : ❨ ${members} ❩\n-︰الحالة : ❨ 🟢 مفعّلة ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
     if (data.startsWith('activegroupinvite:')) {
       if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
@@ -796,12 +833,13 @@ ${link}
 
     // التحذيرات والعقوبات[cite: 3, 5]
     if (data === 'warningsmenu') {
+      rememberMenuBack(ctx, 'warnings');
       const g = selectedGroup(ctx);
       if (!g) { const { entries } = selectedGroupKeyboard(ctx); if (entries.length) return showGroups(ctx); return answer(ctx, 'ما عندك مجموعة مفعّلة بعد. أضف نغنوغ لمجموعتك وفعّله، وبعدها تگدر تدير التحذيرات والعقوبات.'); }
       if (!await userCanManage(ctx, g)) return answer(ctx, 'إدارة التحذيرات متاحة لمشرفي المجموعة فقط.');
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       save();
-      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\nالمجموعة: «${g.title}»\n\nاضغط على الأزرار لتغيير الخيارات بالتتابع.\nالتحذيرات: 1، 2، 3، 4، 5، 7، 10، 15، 20.\nمدد الكتم بالدقائق: 5، 10، 15، 20، 30، 45، 60، 90، 120، 180، 360، 720، 1440.\nبعدها فعّل النظام من الزر الأول.`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰المجموعة : ❨ ${g.title} ❩\n\n-︰التحذيرات :\n❨ 1 ❩، ❨ 2 ❩، ❨ 3 ❩، ❨ 4 ❩، ❨ 5 ❩،\n❨ 7 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 20 ❩\n\n-︰مدد الكتم بالدقائق :\n❨ 5 ❩، ❨ 10 ❩، ❨ 15 ❩، ❨ 20 ❩، ❨ 30 ❩،\n❨ 45 ❩، ❨ 60 ❩، ❨ 90 ❩، ❨ 120 ❩،\n❨ 180 ❩، ❨ 360 ❩، ❨ 720 ❩، ❨ 1440 ❩\n\n-︰طريقة الاستخدام : ❨ اضغط على الأزرار لتغيير الخيارات بالتتابع ❩\n-︰التفعيل : ❨ فعّل النظام من الزر الأول ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningstoggle') {
@@ -810,7 +848,7 @@ ${link}
       g.warningSettings ||= { enabled: false, limit: 3, action: 'mute', duration: 10 };
       g.warningSettings.enabled = !g.warningSettings.enabled;
       save();
-      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\nالحالة: ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰الحالة : ❨ ${g.warningSettings.enabled ? '🟢 مفعّل' : '⚪ متوقف'} ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningslimit') {
@@ -821,7 +859,7 @@ ${link}
       const limitIndex = limits.indexOf(currentLimit);
       g.warningSettings.limit = limits[limitIndex < 0 ? 0 : (limitIndex + 1) % limits.length];
       save();
-      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث عدد التحذيرات إلى: ${g.warningSettings.limit}`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰عدد التحذيرات : ❨ ${g.warningSettings.limit} ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningsaction') {
@@ -831,7 +869,7 @@ ${link}
       const currentIndex = actions.indexOf(g.warningSettings.action);
       g.warningSettings.action = actions[(currentIndex + 1) % actions.length];
       save();
-      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث العقوبة إلى: ${{ mute: 'كتم', kick: 'طرد', ban: 'حظر', none: 'بدون إجراء' }[g.warningSettings.action]}.`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰العقوبة : ❨ ${{ mute: 'كتم', kick: 'طرد', ban: 'حظر', none: 'بدون إجراء' }[g.warningSettings.action]} ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningsduration') {
@@ -842,7 +880,7 @@ ${link}
       const durationIndex = durations.indexOf(currentDuration);
       g.warningSettings.duration = durations[durationIndex < 0 ? 0 : (durationIndex + 1) % durations.length];
       save();
-      return answer(ctx, `🛡️ التحذيرات والعقوبات\n\nتم تحديث مدة الكتم إلى: ${g.warningSettings.duration} دقيقة`, { reply_markup: warningsKeyboard(g) });
+      return answer(ctx, `╭━━━〔 🛡️ التحذيرات والعقوبات 〕━━━╮\n\n-︰مدة الكتم : ❨ ${g.warningSettings.duration} دقيقة ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: warningsKeyboard(g, menuBackTarget(ctx, 'warnings')) });
     }
 
     if (data === 'warningslog') {
@@ -858,7 +896,7 @@ ${link}
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.warnings = {};
       save();
-      return answer(ctx, `🧹 تم تصفير جميع تحذيرات أعضاء المجموعة بنجاح!`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
+      return answer(ctx, `╭━━━〔 🧹 تصفير التحذيرات 〕━━━╮\n\n-︰النتيجة : ❨ تم تصفير تحذيرات أعضاء المجموعة بنجاح ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
     }
 
     // إعدادات المجموعة المتقدمة[cite: 3, 5]
@@ -888,7 +926,7 @@ ${link}
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
       g.autoReply = !g.autoReply;
       save();
-      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\nالمجموعة: «${g.title}»`, { reply_markup: groupSettingsKeyboard(g) });
+      return ctx.editMessageText(`╭━━━〔 ⚙️ إعدادات المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n\n✦ اختَر الإعداد الذي تريد تغييره من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: groupSettingsKeyboard(g) });
     }
 
     if (data === 'badwordsmenu') {
@@ -1058,6 +1096,7 @@ ${link}
 
     // قائمة الألعاب والتحديات[cite: 4]
     if (data === 'gamesmenu' || data === 'games_list') {
+      rememberMenuBack(ctx, 'games');
       const gamesText = `╭━━━〔 🎮 ألعاب نغنوغ وتحدّياته 〕━━━╮\n\n` +
         `✦ اكتب الرمز المطلوب داخل المجموعة لبدء اللعب:\n\n` +
         `🧩 (خ) ➜ لعبة اختر الخيار الصحيح\n` +
@@ -1070,7 +1109,7 @@ ${link}
         .text('🧩 الاختيار الصحيح: خ', 'game_ch').text('🔢 الرياضيات: ر', 'game_ma').row()
         .text('🐅 معرفة الحيوان: ح', 'game_an').text('💡 أسئلة عامة: س', 'game_ge').row()
         .text('🏆 المتصدرون: توب', 'game_top').row()
-        .text('🔙 رجوع لمركز الأوامر', 'publiccommands');
+        .text(menuBackTarget(ctx, 'games') === 'managementmenu' ? '↩️ رجوع للإدارة' : menuBackTarget(ctx, 'games') === 'ownerpanel' ? '↩️ رجوع للمالك' : menuBackTarget(ctx, 'games') === 'groupsettings' ? '↩️ إعدادات المجموعة' : '🔙 رجوع لمركز الأوامر', menuBackTarget(ctx, 'games'));
 
       if (ctx.callbackQuery) {
         try { await ctx.editMessageText(gamesText, { reply_markup: gamesKb }); }
@@ -1082,10 +1121,10 @@ ${link}
 
     if (data === 'game_ch' || data === 'game_ma' || data === 'game_an' || data === 'game_ge') {
       const details = {
-        game_ch: '🧩 لعبة الخيار الصحيح\nاكتب «خ» داخل المجموعة، واختار الإجابة من الأزرار. أول إجابة صحيحة تربح نقطة.',
-        game_ma: '🔢 لعبة الرياضيات\nاكتب «ر» داخل المجموعة وجاوب بالرقم الصحيح. أول إجابة صحيحة تربح نقطة.',
-        game_an: '🐾 لعبة الحيوان\nاكتب «ح» داخل المجموعة وخمّن اسم الحيوان من أول حرف. أول إجابة صحيحة تربح نقطة.',
-        game_ge: '💡 الأسئلة العامة\nاكتب «س» داخل المجموعة وجاوب عن السؤال. أول إجابة صحيحة تربح نقطة.'
+        game_ch: '╭━━━〔 🧩 لعبة الخيار الصحيح 〕━━━╮\n\n-︰طريقة اللعب : ❨ اكتب «خ» داخل المجموعة، ثم اختَر الإجابة من الأزرار ❩\n-︰الجائزة : ❨ نقطة واحدة للإجابة الصحيحة الأولى ❩\n╰━━━━━━━━━━━━━━━━━━━━╯',
+        game_ma: '╭━━━〔 🔢 لعبة الرياضيات 〕━━━╮\n\n-︰طريقة اللعب : ❨ اكتب «ر» داخل المجموعة وأجب بالرقم الصحيح ❩\n-︰الجائزة : ❨ نقطة واحدة للإجابة الصحيحة الأولى ❩\n╰━━━━━━━━━━━━━━━━━━━━╯',
+        game_an: '╭━━━〔 🐾 لعبة الحيوان 〕━━━╮\n\n-︰طريقة اللعب : ❨ اكتب «ح» داخل المجموعة وخمّن الحيوان من الحرف الأول ❩\n-︰الجائزة : ❨ نقطة واحدة للإجابة الصحيحة الأولى ❩\n╰━━━━━━━━━━━━━━━━━━━━╯',
+        game_ge: '╭━━━〔 💡 الأسئلة العامة 〕━━━╮\n\n-︰طريقة اللعب : ❨ اكتب «س» داخل المجموعة وأجب عن السؤال ❩\n-︰الجائزة : ❨ نقطة واحدة للإجابة الصحيحة الأولى ❩\n╰━━━━━━━━━━━━━━━━━━━━╯'
       };
       return answer(ctx, details[data], { reply_markup: new InlineKeyboard().text('↩️ العودة إلى الألعاب', 'gamesmenu').row().text('📚 مركز الأوامر', 'publiccommands') });
     }
