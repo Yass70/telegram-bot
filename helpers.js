@@ -264,7 +264,8 @@ async function showProfileCard(ctx, g, targetUser = null) {
   }
 
   const username = user.username ? `@${user.username}` : 'لا يوجد';
-  const caption = `🐾 بطاقة نغنوغ\n\n-︰ايديك : ❨ ${id} ❩\n\n-︰معرفك : ❨ ${username} ❩\n\n-︰رتبتك : ❨ ${groupRole} ❩\n\n-︰رسائلك : ❨ ${messages} ❩\n\n-︰نقاطك : ❨ ${points} ❩\n\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
+  const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || 'غير متاح';
+  const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${displayName} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰ايديك : ❨ ${id} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
   // زر ثابت يفتح حساب صاحب البوت من بطاقة العضو.
   const profileLinkKeyboard = new InlineKeyboard().url('𓆩♡ مـشـمـشہ 𓆪', 'https://t.me/llll6llll6');
 
