@@ -175,7 +175,7 @@ export function makeNameBatch(name, language, previous = []) {
 export function touchesMenuKeyboard() {
   return new InlineKeyboard()
     .text('✨ زخرفة الأسماء', 'touchesdecorate')
-    .text('🎵 مكتبة الأغاني', 'touchesmusic').row()
+    .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
     .text('🏠 القائمة الرئيسية', 'home');
 }
 
