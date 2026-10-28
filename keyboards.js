@@ -9,6 +9,7 @@ export function mainKeyboard(ctx, bot, ui = {}) {
     .url(label('addBot', '➕ أضفني للمجموعة'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
     .text(label('management', '⚙️ الإدارة'), 'managementmenu').row()
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
+    .text('⭐ ستار', 'starmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
     .text(label('help', '📖 المساعدة'), 'help');
   return kb;
