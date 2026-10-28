@@ -173,7 +173,10 @@ export function makeNameBatch(name, language, previous = []) {
 }
 
 export function touchesMenuKeyboard() {
-  return new InlineKeyboard().text('✨ الزخرفة', 'touchesdecorate').row().text('🔙 رجوع', 'home');
+  return new InlineKeyboard()
+    .text('✨ الزخرفة', 'touchesdecorate')
+    .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
+    .text('🔙 رجوع', 'home');
 }
 
 export function touchesLanguageKeyboard() {
@@ -192,9 +195,9 @@ export function touchesBatchKeyboard(results) {
 }
 
 export function touchesBatchText(name, language, results, batchNumber = 1) {
-  const decorationType = language === 'en' ? '🇬🇧 زخرفة إنجليزية' : '🇮🇶 زخرفة عربية';
+  const heading = language === 'en' ? '🇬🇧 English' : '🇮🇶 عربي';
   const instruction = language === 'en'
-    ? '👆 Tap a decorated name button below to copy it.'
-    : '👆 المس الاسم المزخرف من الأزرار بالأسفل حتى تنسخه.';
-  return `🔥🐈‍⬛ لمسات نغنوغ | زخرفة الأسماء\n\n✅ تمت زخرفة الاسم: ${name}\n🎨 نوع الزخرفة: ${decorationType}\n\n${instruction}\n\n✦ اختَر الاسم من الأزرار أدناه، أو اضغط «دفعة جديدة» للمزيد.`;
+    ? '👆 Tap the decorated name button below to copy it.'
+    : '👆 المس على الاسم المزخرف بالأسفل حتى ينسخ عندك. ماكو أرقام للنسخ؛ المس الاسم نفسه.';
+  return `🔥🐈‍⬛ لمسات نغنوغ | زخرفة الأسماء\n\nالاسم الأصلي: ${name}\nاللغة: ${heading}\nالدفعة: ${batchNumber}\n\n${instruction}\n\n${results.map((value, i) => `${i + 1}. ${value}`).join('\n\n')}\n\n✦ كل زر يحمل الاسم المزخرف نفسه؛ المسه لنسخه. اضغط «دفعة جديدة» للمزيد.`;
 }
