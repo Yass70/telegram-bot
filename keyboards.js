@@ -80,19 +80,14 @@ export function helpKeyboard(ui = {}) {
 }
 
 export function ownerKeyboard() {
+  // توزيع أزرار لوحة المالك على صفوف متوازنة بدل القائمة الطويلة.
   return new InlineKeyboard()
     .text('📊 إحصائيات نغنوغ', 'botstats')
-    .row()
-    .text('👥 المجموعات النشطة', 'activatedgroups')
-    .row()
+    .text('👥 المجموعات النشطة', 'activatedgroups').row()
     .text('📢 إرسال إشعار عام', 'broadcastmenu')
-    .row()
-    .text('⚙️ إعدادات البوت العامة', 'botsettings')
-    .row()
+    .text('⚙️ إعدادات البوت العامة', 'botsettings').row()
     .text('🛡️ حماية المجموعة المحددة', 'globalprotection')
-    .row()
-    .text('🔐 الاشتراك الإجباري', 'requiredmenu')
-    .row()
+    .text('🔐 الاشتراك الإجباري', 'requiredmenu').row()
     .text('🔙 القائمة الرئيسية', 'home');
 }
 
@@ -103,7 +98,7 @@ const WARNING_ACTION_NAMES = Object.freeze({
   ban: 'حظر'
 });
 
-export function warningsKeyboard(g = {}) {
+export function warningsKeyboard(g = {}, back = 'groupsettings') {
   const settings = g?.warningSettings || {};
   const enabled = settings.enabled === true;
   const limit = Number.isInteger(Number(settings.limit)) && Number(settings.limit) > 0
@@ -134,7 +129,7 @@ export function warningsKeyboard(g = {}) {
     .row()
     .text('🧹 تصفير جميع التحذيرات', 'warningsclear')
     .row()
-    .text('↩️ العودة إلى إعدادات المجموعة', 'groupsettings');
+    .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
 }
 
 export function groupSettingsKeyboard(g) {
@@ -152,7 +147,7 @@ export function groupSettingsKeyboard(g) {
     .text('🔙 العودة للمجموعة', 'groupoverview');
 }
 
-export function repliesKeyboard() {
+export function repliesKeyboard(back = 'groupsettings') {
   return new InlineKeyboard()
     .text('➕ إضافة رد تلقائي', 'replyadd')
     .row()
@@ -160,5 +155,5 @@ export function repliesKeyboard() {
     .row()
     .text('🗑️ حذف رد تلقائي', 'replydelete')
     .row()
-    .text('↩️ العودة إلى إعدادات المجموعة', 'groupsettings');
+    .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
 }
