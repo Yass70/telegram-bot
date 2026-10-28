@@ -89,3 +89,4 @@ test('poll labels and inline captions are transformed without moving parameters'
   assert.equal(bot.calls[0].args[2][0], 'جديد');
   assert.equal(bot.calls[1].args[1].caption, 'جديد');
 });
+
