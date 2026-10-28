@@ -16,7 +16,7 @@ export function registerMessages(bot, shared) {
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
     ensureReferralData, referralLinkFor, referralStatsFor, referralMenuKeyboard,
     referralLinkKeyboard, showReferralLink, publicCommandsKeyboard,
-    QUESTIONS_DB, SHUAR_LIST, KET_LIST, N_PHRASES
+    QUESTIONS_DB, SHUAR_LIST, KET_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES
   } = shared;
 
   bot.on('message', async ctx => {
@@ -107,7 +107,7 @@ export function registerMessages(bot, shared) {
 
 
       // عدّ السحكات للرسائل العادية فقط، واستثناء كل الأوامر النصية وأوامر الألعاب.
-      const sakhakaCommandAliases = new Set(['ا', 'ش', 'ن', 'نغنوغ', 'كت', 'توب', 'خ', 'ر', 'ح', 'س', 'انهاء اللعبة', 'إنهاء اللعبة']);
+      const sakhakaCommandAliases = new Set(['ا', 'ش', 'ن', 'نغنوغ', 'كت', 'اسئلني', 'اسألني', 'اسالني', 'توب', 'اختيارات', 'رياضيات', 'حيوان', 'معاني', 'عكس', 'تفكيك', 'س', 'انهاء اللعبة', 'إنهاء اللعبة']);
       const isSakhakaCommand = text.startsWith('/') || isAdminCommand || sakhakaCommandAliases.has(text.trim());
       if (text && !isSakhakaCommand) {
         g.userStats[uid].sakhakat = Number(g.userStats[uid].sakhakat || 0) + 1;
@@ -417,8 +417,8 @@ export function registerMessages(bot, shared) {
       }
 
       if (text === 'كت') {
-        const randomKet = KET_LIST[Math.floor(Math.random() * KET_LIST.length)];
-        await ctx.reply(`🧠 **سؤال كت (فضفضة):**\n\n${randomKet}`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
+        const randomPersonalQuestion = PERSONAL_QUESTIONS_LIST[Math.floor(Math.random() * PERSONAL_QUESTIONS_LIST.length)];
+        await ctx.reply(`🎯 **كت — سؤال شخصي:**\n\n${randomPersonalQuestion}\n\n💬 جاوب عليه إذا تحب، وخلي الأعضاء يشاركونك آراءهم.`, { reply_to_message_id: msg.message_id, parse_mode: 'Markdown' });
         return;
       }
 
