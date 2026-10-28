@@ -206,7 +206,7 @@ async function showGroupStats(ctx, g = selectedGroup(ctx)) {
   try { members = String(await bot.api.getChatMemberCount(g.id)); } catch {}
   const s = g.stats;
   const text = `╭━━━〔 📊 إحصائيات المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n-︰عدد الأعضاء : ❨ ${members} ❩\n-︰عدد الرسائل : ❨ ${s.messages} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`;
-  return answer(ctx, text, { reply_markup: new InlineKeyboard().text('🔄 تحديث', 'groupstats').row().text('🔙 إعدادات المجموعة', 'groupsettings') });
+  return answer(ctx, text, { reply_markup: new InlineKeyboard().text('🔄 تحديث', 'groupstats').text('⚙️ إعدادات المجموعة', 'groupsettings') });
 }
 
 async function showReplyList(ctx, g = selectedGroup(ctx)) {
@@ -222,13 +222,13 @@ function clearPending(ctx) { delete db.pending[userKey(ctx)]; save(); }
 
 async function ownerRequiredMenu(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
-  const kb = new InlineKeyboard().text('➕ إضافة قناة أو مجموعة', 'requiredadd').row().text('📋 عرض القنوات والمجموعات', 'requiredlist').row().text('🔙 لوحة المالك', 'ownerpanel');
+  const kb = new InlineKeyboard().text('➕ إضافة قناة/مجموعة', 'requiredadd').text('📋 عرض المضاف', 'requiredlist').row().text('↩️ لوحة المالك', 'ownerpanel');
   return answer(ctx, `📢 إدارة الاشتراك الإجباري\n\nالقنوات والمجموعات المضافة: ${db.requiredChats.length}`, { reply_markup: kb });
 }
 
 async function showRequiredList(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
-  if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات أو مجموعات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu') });
+  if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات أو مجموعات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').text('↩️ رجوع', 'requiredmenu') });
   const kb = new InlineKeyboard();
   db.requiredChats.forEach((ch, i) => kb.text(`🗑️ حذف ${ch.title || ch.username || ch.id}`, `reqdel:${i}`).row());
   kb.text('➕ إضافة قناة أخرى', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu');
