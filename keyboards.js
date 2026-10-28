@@ -10,6 +10,7 @@ export function mainKeyboard(ctx, bot, ui = {}) {
     .text(label('management', '⚙️ الإدارة'), 'managementmenu').row()
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
     .text('⭐ ستار', 'starmenu').row()
+    .text('🔥🐈‍⬛ لمسات', 'touchesmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
     .text(label('help', '📖 المساعدة'), 'help');
   return kb;
@@ -156,4 +157,3 @@ export function repliesKeyboard(back = 'groupsettings') {
     .text('🗑️ حذف رد تلقائي', 'replydelete')
     .row()
     .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
-}
