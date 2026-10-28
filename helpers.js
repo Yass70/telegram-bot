@@ -7,6 +7,7 @@ import {
   repliesKeyboard,
   customizationKeyboard
 } from './keyboards.js';
+import { cloneValue, getCustomizationDefaults, applyGlobalCustomizationChange, applyGlobalDefaultsToCustomization } from './globalCustomizationDefaults.js';
 
 // تجميع الخدمات المشتركة في مكان واحد حتى تبقى ملفات التشغيل والأوامر واضحة.
 export function createHelpers({ bot, db, save, freshGroup, OWNER_ID }) {
@@ -64,29 +65,34 @@ const DEFAULT_CUSTOMIZATION = {
   }
 };
 
+
 function getCustomization(ctx) {
   const id = userKey(ctx);
   db.customizations ||= {};
+  db.globalCustomizationDefaults ||= {};
+  const defaults = getCustomizationDefaults(db, DEFAULT_CUSTOMIZATION);
   if (!db.customizations[id]) {
-    db.customizations[id] = JSON.parse(JSON.stringify(DEFAULT_CUSTOMIZATION));
+    db.customizations[id] = cloneValue(defaults);
   } else {
     const saved = db.customizations[id];
     saved.descriptions ||= {};
     saved.replies ||= {};
     saved.labels ||= {};
     saved.uiTexts ||= {};
-    if (typeof saved.helpText !== 'string') saved.helpText = '';
-    saved.labels = { ...DEFAULT_CUSTOMIZATION.labels, ...saved.labels };
-    saved.uiTexts = { ...DEFAULT_CUSTOMIZATION.uiTexts, ...saved.uiTexts };
-    if (saved.uiTexts.management === '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') saved.uiTexts.management = DEFAULT_CUSTOMIZATION.uiTexts.management;
-    if (saved.uiTexts.groups === '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾') saved.uiTexts.groups = DEFAULT_CUSTOMIZATION.uiTexts.groups;
-    if (saved.descriptions.groups === '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الإسفل. 🐾') saved.descriptions.groups = DEFAULT_CUSTOMIZATION.descriptions.groups;
-    if (saved.descriptions.settings === '⚙️ قسم الإدارة 🐈‍⬛\n\nهنا تكدر تتعرّف على أوامر نغنوغ، والألعاب المتوفرة، والردود التفاعلية، وطريقة استخدامها داخل المجموعة. ❤️') saved.descriptions.settings = DEFAULT_CUSTOMIZATION.descriptions.settings;
-    if (saved.startText === '🐈‍⬛ أهلاً بيك! أني بوت نغنوغ 🐾❤️\n\n🤖 وظيفتي أساعدك بحماية وإداره مجموعتك،\n\n🛡️ حماية المجموعة من السبام والمخالفات.\n⚙️ أدوات إدارة حسب الصلاحيات الممنوحة إليّ.\n🎮 ألعاب وتحديات ترفيهية.\n🏆 نظام نقاط وإحصائيات للأعضاء.\n⚠️ تحذيرات وعقوبات للمخالفين.\n💬 ردود تلقائية ومخصصة حسب رغبتكم.\n\n━━━━━━━━━━━━━━━━━━\n\n🎁 بالمناسبة، أني مجاني بالكامل، هدية من المطوّر إلكم! ❤️‍🔥\n\nإختر القسم اللي تحتاجه من الإسفل، وخلي الباقي عليّ! 🐈‍⬛🐾') saved.startText = DEFAULT_CUSTOMIZATION.startText;
-    if (typeof saved.startText !== 'string' || saved.startText === '╭━━━〔 🐈‍⬛ نَغْنُوغ 🐾 〕━━━╮\n\nأهلاً وسهلاً بيك بعالم نغنوغ ❤️\nمساعدك الذكي لإدارة المجموعة وتنظيمها وحمايتها.\n\n✦ اختَر القسم المناسب من القائمة أدناه للبدء.\n\n╰━━━━━━━━━━━━━━━━━━╯') saved.startText = DEFAULT_CUSTOMIZATION.startText;
+    if (typeof saved.helpText !== 'string') saved.helpText = defaults.helpText;
+    saved.labels = { ...defaults.labels, ...saved.labels };
+    saved.uiTexts = { ...defaults.uiTexts, ...saved.uiTexts };
+    saved.descriptions = { ...defaults.descriptions, ...saved.descriptions };
+    saved.replies = { ...defaults.replies, ...saved.replies };
+    if (typeof saved.startText !== 'string') saved.startText = defaults.startText;
+
+    // التعديلات العامة التي يعتمدها المالك هي المرجع الافتراضي؛ لا يجوز أن تلغيها
+    // تخصيصات قديمة محفوظة لحساب المستخدم.
+    applyGlobalDefaultsToCustomization(saved, db);
   }
   return db.customizations[id];
 }
+
 
 function customText(ctx, section, key) {
   const c = getCustomization(ctx);
@@ -328,7 +334,7 @@ async function handleViolation(ctx, g, reason) {
 
   return {
     isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor,
-    selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard,
+    selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange: (kind, from, to) => applyGlobalCustomizationChange(db, DEFAULT_CUSTOMIZATION, kind, from, to), customText, getHomeKeyboard,
     HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
     showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList,
