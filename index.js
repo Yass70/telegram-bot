@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import { setupCommands } from './commands.js';
 import { db, save, freshGroup } from './database.js';
 import { createHelpers } from './helpers.js';
+import { installGlobalTextOverrides } from './globalTextOverrides.js';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
@@ -14,6 +15,8 @@ bot.catch((err) => {
 });
 
 const helpers = createHelpers({ bot, db, save, freshGroup, OWNER_ID });
+installGlobalTextOverrides(bot, db);
 setupCommands(bot, db, helpers);
 
 bot.start();
+
