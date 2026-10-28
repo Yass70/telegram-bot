@@ -6,11 +6,11 @@ export function mainKeyboard(ctx, bot, ui = {}) {
   // واجهة الخاص الأساسية موحّدة للمالك والمستخدم، مع أزرار المالك الإضافية من index.js.
   const kb = new InlineKeyboard()
     .text(label('groups', '👥 مجموعاتي'), 'mygroups')
-    .url(label('addBot', '➕ أضفني للمجموعة'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
-    .text(label('management', '⚙️ الإدارة'), 'managementmenu').row()
+    .url(label('addBot', '➕ أضف نغنوغ'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
+    .text(label('management', '⚙️ الإدارة'), 'managementmenu')
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
-    .text('⭐ ستار', 'starmenu').row()
-    .text('🔥🐈‍⬛ لمسات', 'touchesmenu').row()
+    .text('⭐ ستار', 'starmenu')
+    .text('✨ لمسات نغنوغ', 'touchesmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
     .text(label('help', '📖 المساعدة'), 'help');
   return kb;
@@ -19,55 +19,43 @@ export function mainKeyboard(ctx, bot, ui = {}) {
 export function customizationKeyboard(ui = {}) {
   const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   return new InlineKeyboard()
-    .text('👋 تعديل رسالة البداية', 'customstart')
-    .row()
-    .text('📝 تعديل شروحات الأقسام', 'customdescmenu')
-    .row()
-    .text('🔘 تعديل أسماء أزرار القوائم', 'customuimenu')
-    .row()
-    .text('📖 تعديل نص المساعدة', 'customhelp')
-    .row()
-    .text('♻️ استعادة النصوص الافتراضية', 'customreset')
-    .row()
-    .text(label('home', '↩️ العودة إلى القائمة الرئيسية'), 'home');
+    .text('👋 رسالة البداية', 'customstart')
+    .text('📝 شروحات الأقسام', 'customdescmenu').row()
+    .text('🔘 أسماء الأزرار', 'customuimenu')
+    .text('📖 نص المساعدة', 'customhelp').row()
+    .text('♻️ استعادة الافتراضي', 'customreset').row()
+    .text(label('home', '↩️ القائمة الرئيسية'), 'home');
 }
 
 export function customizationUILabelsKeyboard(ui = {}) {
   const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   return new InlineKeyboard()
-    .text('👥 زر مجموعاتي', 'customlabel:groups').row()
-    .text('➕ زر إضافة البوت', 'customlabel:addBot').row()
-    .text('⚙️ زر الإدارة', 'customlabel:management').row()
-    .text('👤 زر الملف الشخصي', 'customlabel:profile').row()
-    .text('🎨 زر التخصيص', 'customlabel:customize').row()
-    .text('📖 زر المساعدة', 'customlabel:help').row()
-    .text('↩️ زر الرجوع', 'customlabel:back').row()
-    .text('🏠 زر الرئيسية', 'customlabel:home').row()
-    .text('❌ زر الإلغاء', 'customlabel:cancel').row()
+    .text('👥 مجموعاتي', 'customlabel:groups')
+    .text('➕ إضافة البوت', 'customlabel:addBot').row()
+    .text('⚙️ الإدارة', 'customlabel:management')
+    .text('👤 الملف الشخصي', 'customlabel:profile').row()
+    .text('🎨 التخصيص', 'customlabel:customize')
+    .text('📖 المساعدة', 'customlabel:help').row()
+    .text('↩️ الرجوع', 'customlabel:back')
+    .text('🏠 الرئيسية', 'customlabel:home').row()
+    .text('❌ الإلغاء', 'customlabel:cancel').row()
     .text(label('back', '↩️ العودة إلى التخصيص'), 'custommenu');
 }
 
 export function customizationDescriptionsKeyboard() {
   return new InlineKeyboard()
-    .text('⚙️ شرح إعدادات المجموعة', 'customdesc:settings')
-    .row()
-    .text('👥 شرح قسم مجموعاتي', 'customdesc:groups')
-    .row()
-    .text('👤 شرح الملف الشخصي', 'customdesc:account')
-    .row()
-    .text('💬 شرح الردود التلقائية', 'customdesc:replies')
-    .row()
+    .text('⚙️ إعدادات المجموعة', 'customdesc:settings')
+    .text('👥 مجموعاتي', 'customdesc:groups').row()
+    .text('👤 الملف الشخصي', 'customdesc:account')
+    .text('💬 الردود التلقائية', 'customdesc:replies').row()
     .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
 export function customizationRepliesKeyboard() {
   return new InlineKeyboard()
     .text('👤 نص الملف الشخصي', 'customreply:account')
-    .row()
-    .text('💬 نص الردود التلقائية', 'customreply:replies')
-    .row()
-    .text('👥 نص عدم وجود مجموعات', 'customreply:nogroups')
-    .row()
+    .text('💬 نص الردود التلقائية', 'customreply:replies').row()
+    .text('👥 نص عدم وجود مجموعات', 'customreply:nogroups').row()
     .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
@@ -75,7 +63,6 @@ export function helpKeyboard(ui = {}) {
   const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   return new InlineKeyboard()
     .text(label('groups', '👥 مجموعاتي'), 'mygroups')
-    .row()
     .text(label('home', '🏠 الرئيسية'), 'home').row()
     .url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
 }
@@ -83,12 +70,12 @@ export function helpKeyboard(ui = {}) {
 export function ownerKeyboard() {
   // لوحة المالك تعرض أدوات الإدارة المركزية فقط؛ الحماية وإعدادات البوت لها مدخل مستقل.
   return new InlineKeyboard()
-    .text('📊 إحصائيات نغنوغ', 'botstats')
+    .text('📊 الإحصائيات', 'botstats')
     .text('👥 المجموعات النشطة', 'activatedgroups').row()
-    .text('📢 إرسال إشعار عام', 'broadcastmenu')
+    .text('📢 الإشعار العام', 'broadcastmenu')
     .text('🔐 الاشتراك الإجباري', 'requiredmenu').row()
     .text('📝 توحيد النصوص', 'globaltextmenu').row()
-    .text('🔙 القائمة الرئيسية', 'home');
+    .text('🏠 القائمة الرئيسية', 'home');
 }
 
 const WARNING_ACTION_NAMES = Object.freeze({
@@ -113,47 +100,32 @@ export function warningsKeyboard(g = {}, back = 'groupsettings') {
 
   return new InlineKeyboard()
     .text(
-      `${enabled ? '🟢' : '⚪'} نظام التحذيرات: ${enabled ? 'مفعّل' : 'متوقف'}`,
+      `${enabled ? '🟢' : '⚪'} التحذيرات: ${enabled ? 'مفعّلة' : 'متوقفة'}`,
       'warningstoggle'
-    )
-    .row()
+    ).row()
     .text(`🔢 عدد التحذيرات: ${limit}`, 'warningslimit')
-    .row()
-    .text(`⚖️ العقوبة: ${WARNING_ACTION_NAMES[action]}`, 'warningsaction')
-    .row()
+    .text(`⚖️ العقوبة: ${WARNING_ACTION_NAMES[action]}`, 'warningsaction').row()
     .text(`⏱️ مدة الكتم: ${duration} دقيقة`, 'warningsduration')
-    .row()
-    .text('🚫 الكلمات الممنوعة', 'badwordsmenu')
-    .row()
+    .text('🚫 الكلمات الممنوعة', 'badwordsmenu').row()
     .text('📋 سجل التحذيرات', 'warningslog')
-    .row()
-    .text('🧹 تصفير جميع التحذيرات', 'warningsclear')
-    .row()
-    .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
+    .text('🧹 تصفير التحذيرات', 'warningsclear').row()
+    .text(back === 'managementmenu' ? '↩️ الإدارة' : back === 'ownerpanel' ? '↩️ لوحة المالك' : back === 'publiccommands' ? '↩️ مركز الأوامر' : '↩️ إعدادات المجموعة', back);
 }
 
 export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
-    .text('👋 رسالة الترحيب', 'welcomeedit')
-    .row()
-    .text('🛡️ الحماية الموحدة', 'protectionmenu')
-    .row()
-    .text('⚠️ التحذيرات والعقوبات', 'warningsmenu')
-    .row()
-    .text('💬 الردود التلقائية', 'repliesmenu')
-    .row()
-    .text('📊 إحصائيات المجموعة', 'groupstats')
-    .row()
-    .text('🔙 العودة للمجموعة', 'groupoverview');
+    .text('👋 الترحيب', 'welcomeedit')
+    .text('🛡️ الحماية', 'protectionmenu').row()
+    .text('⚠️ التحذيرات', 'warningsmenu')
+    .text('💬 الردود التلقائية', 'repliesmenu').row()
+    .text('📊 إحصائيات المجموعة', 'groupstats').row()
+    .text('↩️ العودة للمجموعة', 'groupoverview');
 }
 
 export function repliesKeyboard(back = 'groupsettings') {
   return new InlineKeyboard()
-    .text('➕ إضافة رد تلقائي', 'replyadd')
-    .row()
-    .text('📋 قائمة الردود', 'replylist')
-    .row()
-    .text('🗑️ حذف رد تلقائي', 'replydelete')
-    .row()
-    .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
+    .text('➕ إضافة رد', 'replyadd')
+    .text('📋 قائمة الردود', 'replylist').row()
+    .text('🗑️ حذف رد', 'replydelete').row()
+    .text(back === 'managementmenu' ? '↩️ الإدارة' : back === 'ownerpanel' ? '↩️ لوحة المالك' : back === 'publiccommands' ? '↩️ مركز الأوامر' : '↩️ إعدادات المجموعة', back);
 }
