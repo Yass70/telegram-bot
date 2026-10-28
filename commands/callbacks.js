@@ -95,7 +95,7 @@ export function registerCallbacks(bot, shared) {
     }
     if (data === 'touchesvocal') {
       clearPending(ctx);
-      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('🔙 رجوع إلى لمسات', 'touchesmenu').row().text('🏠 القائمة الرئيسية', 'home') });
+      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('↩️ لمسات نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home') });
     }
     if (data === 'touchescancel') {
       clearPending(ctx);
@@ -109,7 +109,7 @@ export function registerCallbacks(bot, shared) {
       pending(ctx, { action: 'touches-name', language });
       return answer(ctx, language === 'en'
         ? '🇬🇧 Send the English name you want to decorate.\n\nI will give you 10 different styles per batch.'
-        : '🇮🇶 دزلي الاسم العربي اللي تريد تزخرفه.\n\nراح أطيك 10 زخارف مختلفة بكل دفعة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel').row().text('🔙 رجوع للغة', 'touchesdecorate') });
+        : '🇮🇶 دزلي الاسم العربي اللي تريد تزخرفه.\n\nراح أطيك 10 زخارف مختلفة بكل دفعة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel').text('↩️ اختيار اللغة', 'touchesdecorate') });
     }
     if (data === 'touchesmore') {
       db.touchSessions ||= {};
@@ -127,18 +127,18 @@ export function registerCallbacks(bot, shared) {
       return answer(ctx, '╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين تتطلب صلاحيات مناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
     }
     if (data === 'showpublichelp') {
-      const kb = new InlineKeyboard().text('↩️ العودة إلى مركز الأوامر', 'publiccommands').row().text('🏠 القائمة الرئيسية', 'home');
+      const kb = new InlineKeyboard().text('↩️ مركز الأوامر', 'publiccommands').text('🏠 الرئيسية', 'home');
       return answer(ctx, '╭━━━〔 📚 دليل أوامر المجموعة 〕━━━╮\n\n🎮 〔 الألعاب 〕 خ — ر — ح — س\n🏆 〔 توب 〕 عرض الأعضاء الأعلى نقاطاً.\n👤 〔 ا 〕 بطاقة العضو؛ ويمكن الرد بالرمز على رسالة العضو.\n🧠 〔 كت 〕 سؤال أو موقف عشوائي.\n📜 〔 ش 〕 أبيات وعبارات شعرية.\n🐈‍⬛ 〔 ن 〕 ردود نغنوغ العراقية.\n\n✦ تعمل الألعاب داخل المجموعات المفعّلة.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
     if (data === 'managementmenu') {
       const kb = new InlineKeyboard()
-        .text('🎮 الألعاب', 'gamesmenu').row()
-        .text('💬 الأوامر التفاعلية', 'interactive_menu').row()
-        .text('👑 أوامر المشرفين', 'adminpanel').row()
-        .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row();
-      // نقل مدخل الإعدادات العامة خارج لوحة المالك، مع إبقائه خاصاً بالمالك.
+        .text('🎮 الألعاب', 'gamesmenu')
+        .text('💬 التفاعلية', 'interactive_menu').row()
+        .text('👑 المشرفون', 'adminpanel')
+        .text('⚠️ التحذيرات', 'warningsmenu').row();
+      // تبقى إعدادات البوت العامة خاصة بالمالك وضمن القائمة نفسها.
       if (isOwner(ctx)) kb.text('⚙️ إعدادات البوت العامة', 'botsettings').row();
-      kb.text('🔙 القائمة الرئيسية', 'home');
+      kb.text('🏠 القائمة الرئيسية', 'home');
       const managementText = `╭━━━〔 ⚙️ قسم الإدارة | نغنوغ 🐈‍⬛ 〕━━━╮
 
 -︰🎮 الألعاب : ❨ ألعاب وتحدّيات داخل المجموعة ❩
@@ -150,18 +150,18 @@ export function registerCallbacks(bot, shared) {
 ╰━━━━━━━━━━━━━━━━━━━━╯`;
       return answer(ctx, uiText ? uiText(ctx, 'management', managementText) : managementText, { reply_markup: kb });
     }
-    if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
-    if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 إدارة مجموعتي', 'mygroups').row().text('🔙 الرئيسية', 'home') });
+    if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').text('🏠 الرئيسية', 'home') });
+    if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').text('🏠 الرئيسية', 'home') });
     if (data === 'interactive_menu') {
       const kb = new InlineKeyboard().text('👤 بطاقة العضو: ا', 'interactive_profile').row()
-        .text('🧠 كت', 'interactive_ket').text('📜 الشعر: ش', 'interactive_poem').row()
-        .text('🐈‍⬛ نغنوغ: ن', 'interactive_n').row().text('🏆 المتصدرون: توب', 'game_top').row()
+        .text('🧠 السؤال: كت', 'interactive_ket').text('📜 الشعر: ش', 'interactive_poem').row()
+        .text('🐈‍⬛ نغنوغ: ن', 'interactive_n').text('🏆 المتصدرون: توب', 'game_top').row()
         .text('↩️ العودة إلى قائمة الأوامر', 'publiccommands');
       return answer(ctx, '╭━━━〔 💬 الأوامر التفاعلية 〕━━━╮\n\n👤 〔 ا 〕 بطاقة العضو — أرسل الرمز أو ردّ به على رسالة العضو.\n🧠 〔 كت 〕 سؤال أو موقف عشوائي.\n📜 〔 ش 〕 أبيات وعبارات شعرية.\n🐈‍⬛ 〔 ن 〕 تفاعل باللهجة العراقية من نغنوغ.\n🏆 〔 توب 〕 قائمة الأعضاء المتصدرين بالنقاط.\n\n✦ هذه الأوامر متاحة لجميع الأعضاء.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
     const interactiveDetailKeyboard = () => new InlineKeyboard()
-      .text('🔙 رجوع للأوامر التفاعلية', 'interactive_menu').row()
-      .text('📚 رجوع لقائمة الأوامر', 'publiccommands');
+      .text('↩️ الأوامر التفاعلية', 'interactive_menu')
+      .text('📚 مركز الأوامر', 'publiccommands');
     if (data === 'interactive_profile') return answer(ctx, `╭━━━〔 👤 بطاقة العضو 〕━━━╮\n\nاكتب «ا» داخل المجموعة، أو ردّ بالرمز على رسالة العضو لعرض المعلومات المتاحة عنه.\n\n✦ ستظهر البيانات التي يتيحها تيليگرام فقط.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
     if (data === 'interactive_ket') return answer(ctx, `╭━━━〔 🧠 أمثلة عشوائية 〕━━━╮\n\nاكتب «كت» داخل المجموعة حتى يرسل نغنوغ سؤالاً أو موقفاً عشوائياً للنقاش.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
     if (data === 'interactive_poem') return answer(ctx, `╭━━━〔 📜 قسم الشعر 〕━━━╮\n\nاكتب «ش» داخل المجموعة حتى يشاركك نغنوغ بيتاً أو عبارة شعرية.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: interactiveDetailKeyboard() });
@@ -213,13 +213,13 @@ export function registerCallbacks(bot, shared) {
     async function showSelectedGroupMenu(ctx, g = selectedGroup(ctx)) {
       if (!g) return showGroups(ctx);
       const kb = new InlineKeyboard()
-        .text('⚙️ إعدادات المجموعة', 'groupsettings').row()
-        .text('⚠️ التحذيرات والعقوبات', 'warningsmenu').row()
-        .text('🛡️ الحماية الموحدة', 'protectionmenu').row()
+        .text('⚙️ الإعدادات', 'groupsettings')
+        .text('⚠️ التحذيرات', 'warningsmenu').row()
+        .text('🛡️ الحماية الموحدة', 'protectionmenu')
         .text('💬 الردود التلقائية', 'repliesmenu').row()
-        .text('📊 إحصائيات المجموعة', 'groupstats').row()
-        .text('👥 اختيار مجموعة أخرى', 'mygroups').row()
-        .text('🔙 القائمة الرئيسية', 'home');
+        .text('📊 إحصائيات المجموعة', 'groupstats')
+        .text('👥 مجموعة أخرى', 'mygroups').row()
+        .text('🏠 القائمة الرئيسية', 'home');
       return answer(ctx, `╭━━━〔 👥 بطاقة المجموعة 〕━━━╮\n\n-︰اسم المجموعة : ❨ ${g.title} ❩\n\n✦ اختَر الخدمة اللي تريد تديرها من الأزرار أدناه. 🐾\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
 
@@ -311,11 +311,11 @@ export function registerCallbacks(bot, shared) {
       // لا نسمح لبقايا خطوة سابقة (خصوصاً الإذاعة) بالتقاط النص الذي سيُرسل في هذا القسم.
       clearPending(ctx);
       const kb = new InlineKeyboard()
-        .text('📝 توحيد نص أو وصف قائمة', 'globaltextedit:text').row()
+        .text('📝 توحيد نص أو وصف', 'globaltextedit:text')
         .text('🔘 توحيد اسم زر', 'globaltextedit:button').row()
-        .text('📋 عرض التعديلات الحالية', 'globaltextlist:0').row()
-        .text('♻️ مسح كل تعديلات التوحيد', 'globaltextclear').row()
-        .text('🔙 العودة إلى لوحة المالك', 'ownerpanel');
+        .text('📋 عرض التعديلات', 'globaltextlist:0')
+        .text('♻️ مسح تعديلات التوحيد', 'globaltextclear').row()
+        .text('↩️ لوحة المالك', 'ownerpanel');
       return answer(ctx, '╭━━━〔 📝 توحيد النصوص | نغنوغ 〕━━━╮\n\nمن هنا تغيّر نصوص وأوصاف القوائم أو أسماء الأزرار بشكل عام، ويظهر التغيير لكل مستخدمي البوت.\n\n١. اختَر نوع التعديل.\n٢. أرسل النص القديم أو العبارة القديمة كما تظهر في البوت. تگدر ترسل جزءاً من الوصف حتى يتغير بكل مكان يظهر بيه.\n٣. أرسل النص الجديد.\n\n✦ معرفات الأزرار الداخلية تبقى نفسها، لذلك تظل الأزرار تعمل بعد تغيير أسمائها.\n✦ زر «استعادة النصوص الافتراضية» في تخصيص نغنوغ يمسح هذه التعديلات العامة أيضاً لجميع المستخدمين.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
 
@@ -335,7 +335,7 @@ export function registerCallbacks(bot, shared) {
     if (data === 'globaltextcancel') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       clearPending(ctx);
-      return answer(ctx, 'تم إلغاء التعديل.', { reply_markup: new InlineKeyboard().text('🔙 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+      return answer(ctx, 'تم إلغاء التعديل.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').text('👑 لوحة المالك', 'ownerpanel') });
     }
 
     if (data === 'globaltextbacktonew') {
@@ -449,7 +449,7 @@ export function registerCallbacks(bot, shared) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       db.globalTextOverrides = { texts: [], buttons: [] };
       save();
-      return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية للجميع.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+      return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية للجميع.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').text('👑 لوحة المالك', 'ownerpanel') });
     }
 
     // لوحة المالك والاشتراك الإجباري[cite: 4, 5]
@@ -815,7 +815,7 @@ export function registerCallbacks(bot, shared) {
         .text('🧩 الاختيار الصحيح: خ', 'game_ch').text('🔢 الرياضيات: ر', 'game_ma').row()
         .text('🐅 معرفة الحيوان: ح', 'game_an').text('💡 أسئلة عامة: س', 'game_ge').row()
         .text('🏆 المتصدرون: توب', 'game_top').row()
-        .text(menuBackTarget(ctx, 'games') === 'managementmenu' ? '↩️ رجوع للإدارة' : menuBackTarget(ctx, 'games') === 'ownerpanel' ? '↩️ رجوع للمالك' : menuBackTarget(ctx, 'games') === 'groupsettings' ? '↩️ إعدادات المجموعة' : '🔙 رجوع لمركز الأوامر', menuBackTarget(ctx, 'games'));
+        .text(menuBackTarget(ctx, 'games') === 'managementmenu' ? '↩️ الإدارة' : menuBackTarget(ctx, 'games') === 'ownerpanel' ? '↩️ لوحة المالك' : menuBackTarget(ctx, 'games') === 'groupsettings' ? '↩️ إعدادات المجموعة' : '📚 مركز الأوامر', menuBackTarget(ctx, 'games'));
 
       if (ctx.callbackQuery) {
         try { await ctx.editMessageText(gamesText, { reply_markup: gamesKb }); }
@@ -873,9 +873,10 @@ export function registerCallbacks(bot, shared) {
       const scores = groupScores(chatId);
       const mine = Number(scores[userKey(ctx)] || 0);
       const total = Object.values(scores).reduce((sum, n) => sum + Number(n || 0), 0);
-      const kb = new InlineKeyboard().text('🏆 أفضل 3 أعضاء', 'stats_top').row()
-        .text('⭐ نقاطي في هذه المجموعة', 'stats_mine').row()
-        .text('🎮 تعليمات الألعاب', 'gamesmenu').row().text('🏠 القائمة الرئيسية', 'home');
+      const kb = new InlineKeyboard().text('🏆 أفضل 3 أعضاء', 'stats_top')
+        .text('⭐ نقاطي', 'stats_mine').row()
+        .text('🎮 تعليمات الألعاب', 'gamesmenu')
+        .text('🏠 الرئيسية', 'home');
       return answer(ctx, `╭━━━〔 📊 النقاط والإحصائيات 〕━━━╮${g ? `\nالمجموعة: «${g.title}»` : ''}\n\n👥 الأعضاء الذين لديهم نقاط: ${Object.keys(scores).length}\n⭐ مجموع النقاط الممنوحة: ${total}\n🌟 رصيدك من النقاط: ${mine}\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
     if (data === 'stats_top') {
