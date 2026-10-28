@@ -456,10 +456,23 @@ export function registerMessages(bot, shared) {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new', 'global-ui-confirm'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new'].includes(p.action)) {
           clearPending(ctx);
           return ctx.reply('❌ تم إلغاء توحيد النصوص.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
         }
+        if (p.action === 'global-catalog-new') {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          const newValue = String(text || '').trim();
+          if (!newValue) return ctx.reply('❌ القيمة الجديدة فارغة. أرسل نصاً يحتوي على أحرف.');
+          const isButton = p.kind === 'button';
+          if (newValue.length > (isButton ? 60 : 1800)) return ctx.reply(isButton ? '❌ اسم الزر طويل. اختَر اسماً أقصر.' : '❌ النص طويل للمعاينة؛ الحد هنا 1800 حرف.');
+          if (isButton && Buffer.byteLength(newValue, 'utf8') > 64) return ctx.reply('❌ اسم الزر يتجاوز حد تيليگرام البالغ 64 بايت. اختَر اسماً أقصر.');
+          if (newValue === String(p.from || '')) return ctx.reply('ماكو تغيير للحفظ لأن القيمة الجديدة مطابقة للحالية. أرسل قيمة مختلفة أو ألغِ العملية.');
+          pending(ctx, { ...p, action: 'global-ui-confirm', kind: isButton ? 'button' : 'text', to: newValue });
+          const preview = `👁️ معاينة تعديل من فهرس نغنوغ\n\nالقسم: ${p.catalogCategory || 'غير محدد'}\nالمصدر: ${p.catalogIndex != null ? 'العنصر رقم ' + (Number(p.catalogIndex) + 1) : 'غير محدد'}\n\n━━━━━━━━━━━━\nقبل:\n${String(p.from || '').slice(0, 1400)}\n\n━━━━━━━━━━━━\nبعد:\n${newValue.slice(0, 1400)}\n━━━━━━━━━━━━\n\nهل تعتمد التغيير للجميع؟`;
+          return ctx.reply(preview, { reply_markup: new InlineKeyboard().text('✅ اعتماد التعديل للجميع', 'globaltextsave').row().text('✏️ تعديل القيمة الجديدة', 'globaltextbacktonew').row().text('❌ إلغاء', 'globaltextcancel') });
+        }
+
         if (p.action === 'global-ui-old') {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
           const oldValue = String(text || '').trim();
@@ -480,7 +493,7 @@ export function registerMessages(bot, shared) {
           if (p.kind === 'button' && Buffer.byteLength(newValue, 'utf8') > 64) return ctx.reply('❌ اسم الزر يتجاوز حد تيليگرام البالغ 64 بايت. اختَر اسماً أقصر.');
           const from = String(p.from || '').trim();
           if (!from || from === newValue) return ctx.reply('ماكو تغيير للحفظ لأن النص القديم والجديد متطابقان. أرسل نصاً جديداً مختلفاً أو اضغط إلغاء.');
-          pending(ctx, { action: 'global-ui-confirm', kind: p.kind === 'button' ? 'button' : 'text', from, to: newValue });
+          pending(ctx, { ...p, action: 'global-ui-confirm', kind: p.kind === 'button' ? 'button' : 'text', from, to: newValue });
           const title = p.kind === 'button' ? '🔘 معاينة اسم الزر' : '📝 معاينة النص أو الوصف';
           const preview = `${title}\n\n━━━━━━━━━━━━\nقبل:\n${from}\n\n━━━━━━━━━━━━\nبعد:\n${newValue}\n━━━━━━━━━━━━\n\nهل تريد اعتماد هذا التغيير لكل مستخدمي نغنوغ؟`;
           return ctx.reply(preview, { reply_markup: new InlineKeyboard().text('✅ اعتماد التعديل للجميع', 'globaltextsave').row().text('✏️ تعديل النص الجديد', 'globaltextbacktonew').row().text('❌ إلغاء', 'globaltextcancel') });
