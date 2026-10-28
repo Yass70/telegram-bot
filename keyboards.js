@@ -157,3 +157,4 @@ export function repliesKeyboard(back = 'groupsettings') {
     .text('🗑️ حذف رد تلقائي', 'replydelete')
     .row()
     .text(back === 'managementmenu' ? '↩️ العودة إلى الإدارة' : back === 'ownerpanel' ? '↩️ العودة إلى لوحة المالك' : back === 'publiccommands' ? '↩️ العودة إلى مركز الأوامر' : '↩️ العودة إلى إعدادات المجموعة', back);
+}
