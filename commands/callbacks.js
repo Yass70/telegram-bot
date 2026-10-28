@@ -46,7 +46,7 @@ export function registerCallbacks(bot, shared) {
       'togglelinks', 'togglemedia', 'togglebadwords', 'toggleaudio', 'toggleaudioclips', 
       'toggleforward', 'togglecontacts', 'enableallprotection', 'mygroups', 
       'groupstats', 'userreplies', 'repliesmenu', 'groupoverview',
-      'welcomeedit', 'toggleflood', 'togglereplies',
+      'welcomeedit', 'welcometoggle', 'toggleflood', 'togglereplies',
       'warningslimit', 'warningsaction', 'warningsduration', 'warningslog', 'warningsclear'
     ];
 
@@ -440,7 +440,17 @@ export function registerCallbacks(bot, shared) {
       return answer(ctx, `╭━━━〔 🧹 تصفير التحذيرات 〕━━━╮\n\n-︰النتيجة : ❨ تم تصفير تحذيرات أعضاء المجموعة بنجاح ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: new InlineKeyboard().text('🔙 رجوع للتحذيرات', 'warningsmenu') });
     }
 
-    // إعدادات المجموعة المتقدمة[cite: 3, 5]
+    // تشغيل/إيقاف الترحيب تلقائياً من لوحة إعدادات المجموعة.
+    if (data === 'welcometoggle') {
+      const g = selectedGroup(ctx);
+      if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
+      g.welcomeEnabled = !g.welcomeEnabled;
+      save();
+      const status = g.welcomeEnabled ? '🟢 تم تشغيل الترحيب التلقائي.' : '⚪ تم إيقاف الترحيب التلقائي.';
+      return answer(ctx, `${status}\n\nالمجموعة: ${g.title}`, { reply_markup: groupSettingsKeyboard(g) });
+    }
+
+    // تخصيص نص الترحيب من الخاص فقط؛ هذا لا يغيّر حالة التشغيل والإيقاف.
     if (data === 'welcomeedit') {
       const g = selectedGroup(ctx);
       if (!g || !await userCanManage(ctx, g)) return answer(ctx, 'اختار مجموعة.');
@@ -731,3 +741,4 @@ export function registerCallbacks(bot, shared) {
     return answer(ctx, '⚠️ 〔 خيار غير معروف 〕\nجرّب الرجوع إلى القائمة السابقة واختيار أحد الأزرار المتاحة.');
   });
 }
+
