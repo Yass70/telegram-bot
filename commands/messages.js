@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { findAutoReply } from '../autoReplies.js';
 import { groupSettingsKeyboard } from '../keyboards.js';
+import { makeNameBatch, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
 import { handleGroupGameMessage } from '../games/messageHandler.js';
 
 export function registerMessages(bot, shared) {
@@ -455,6 +456,20 @@ export function registerMessages(bot, shared) {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
+        if (p.action === 'touches-name') {
+          if (!text) return ctx.reply('❌ دزلي الاسم كنص حتى أگدر أزخرفه.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel') });
+          if ([...text].length > 40) return ctx.reply('❌ خلي الاسم 40 حرف أو أقل حتى تطلع الزخارف مرتبة. دز الاسم مرة ثانية.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel') });
+          const name = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+          if (!name) return ctx.reply('❌ الاسم فارغ، دزلي الاسم مرة ثانية.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel') });
+          const language = p.language === 'en' ? 'en' : 'ar';
+          clearPending(ctx);
+          const results = makeNameBatch(name, language, []);
+          db.touchSessions ||= {};
+          db.touchSessions[userKey(ctx)] = { name, language, used: [...results], batchNumber: 1 };
+          save();
+          return ctx.reply(touchesBatchText(name, language, results, 1), { reply_markup: touchesBatchKeyboard(results) });
+        }
+
         if (p.action === 'broadcast-message') {
           clearPending(ctx);
           const users = db.privateUsers || [];
