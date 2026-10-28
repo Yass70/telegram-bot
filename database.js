@@ -34,6 +34,7 @@ export const freshDB = () => ({
   groupPoints: {},
   activeGames: {},
   customizations: {},
+  globalTextOverrides: { texts: [], buttons: [] },
   touchSessions: {},
   userMeta: {},
   referrals: {},
@@ -58,6 +59,9 @@ function load() {
     db.groupPoints ||= {};
     db.activeGames ||= {};
     db.customizations ||= {};
+    db.globalTextOverrides ||= { texts: [], buttons: [] };
+    db.globalTextOverrides.texts ||= [];
+    db.globalTextOverrides.buttons ||= [];
     db.touchSessions ||= {};
     db.userMeta ||= {};
     db.referrals ||= {};
