@@ -19,3 +19,4 @@ installGlobalTextOverrides(bot, db);
 setupCommands(bot, db, helpers);
 
 bot.start();
+
