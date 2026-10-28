@@ -135,7 +135,9 @@ export function warningsKeyboard(g = {}, back = 'groupsettings') {
 
 export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
-    .text('👋 رسالة الترحيب', 'welcomeedit')
+    .text(g?.welcomeEnabled ? '👋 الترحيب: 🟢 يعمل' : '👋 الترحيب: ⚪ متوقف', 'welcometoggle')
+    .row()
+    .text('✏️ تخصيص نص الترحيب', 'welcomeedit')
     .row()
     .text('🛡️ الحماية الموحدة', 'protectionmenu')
     .row()
