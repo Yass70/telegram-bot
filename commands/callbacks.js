@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { handleActiveGameCallback } from '../games/callbacks.js';
 import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard } from '../keyboards.js';
+import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
 
 export function registerCallbacks(bot, shared) {
   const {
@@ -80,6 +81,44 @@ export function registerCallbacks(bot, shared) {
     };
 
     if (data === 'home') return showHomeFunc(ctx);
+
+    // لمسات: زخرفة أسماء بالعربية والإنجليزية، مع دفعات قابلة للنسخ.
+    if (data === 'touchesmenu') {
+      clearPending(ctx);
+      db.touchSessions ||= {};
+      delete db.touchSessions[userKey(ctx)];
+      return answer(ctx, '╭━━━〔 🔥🐈‍⬛ لمسات نغنوغ 〕━━━╮\n\nاختَر اللمسة اللي تريدها من هنا. ❤️‍🔥\n\n✦ زخرفة الأسماء بدفعات متنوعة، وتكدر تنسخ أي نتيجة مباشرة من زر النسخ.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: touchesMenuKeyboard() });
+    }
+    if (data === 'touchesdecorate') {
+      clearPending(ctx);
+      return answer(ctx, '✨ زخرفة الأسماء\n\nاختَر لغة الاسم أولاً:', { reply_markup: touchesLanguageKeyboard() });
+    }
+    if (data === 'touchescancel') {
+      clearPending(ctx);
+      db.touchSessions ||= {};
+      delete db.touchSessions[userKey(ctx)];
+      return answer(ctx, 'تم إلغاء طلب الزخرفة. إذا تحب ترجع، اختَر الزخرفة من القائمة.', { reply_markup: touchesMenuKeyboard() });
+    }
+    if (data === 'toucheslang:ar' || data === 'toucheslang:en') {
+      const language = data.endsWith(':en') ? 'en' : 'ar';
+      clearPending(ctx);
+      pending(ctx, { action: 'touches-name', language });
+      return answer(ctx, language === 'en'
+        ? '🇬🇧 Send the English name you want to decorate.\n\nI will give you 10 different styles per batch.'
+        : '🇮🇶 دزلي الاسم العربي اللي تريد تزخرفه.\n\nراح أطيك 10 زخارف مختلفة بكل دفعة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel').row().text('🔙 رجوع للغة', 'touchesdecorate') });
+    }
+    if (data === 'touchesmore') {
+      db.touchSessions ||= {};
+      const session = db.touchSessions[userKey(ctx)];
+      if (!session?.name || !['ar', 'en'].includes(session.language)) {
+        return answer(ctx, 'حتى أجهزلك زخارف، اختَر اللغة ودزلي الاسم أولاً.', { reply_markup: touchesLanguageKeyboard() });
+      }
+      const results = makeNameBatch(session.name, session.language, session.used || []);
+      session.used = [...(session.used || []), ...results].slice(-500);
+      session.batchNumber = Number(session.batchNumber || 1) + 1;
+      save();
+      return answer(ctx, touchesBatchText(session.name, session.language, results, session.batchNumber), { reply_markup: touchesBatchKeyboard(results) });
+    }
     if (data === 'publiccommands') {
       return answer(ctx, '╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين تتطلب صلاحيات مناسبة.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
     }
