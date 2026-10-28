@@ -1,32 +1,22 @@
-const { Bot } = require("grammy");
+import { Bot } from 'grammy';
+import { setupCommands } from './commands.js';
+import { db, save, freshGroup } from './database.js';
+import { createHelpers } from './helpers.js';
+import { installGlobalTextOverrides } from './globalTextOverrides.js';
 
-// ضع توكن البوت الخاص بك هنا
-const token = process.env.BOT_TOKEN || "YOUR_BOT_TOKEN";
-const bot = new Bot(token);
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
+if (!TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN environment variable');
+if (!OWNER_ID) console.warn('Warning: BOT_OWNER_ID is not set; owner-only features will be unavailable.');
 
-// معالج الأخطاء العالمي لمنع توقف البوت وحل مشاكل الـ Composer الاستثنائية
+const bot = new Bot(TOKEN);
 bot.catch((err) => {
-    const ctx = err.ctx;
-    console.error(`خطأ أثناء معالجة التحديث ${ctx?.update?.update_id || 'غير معروف'}:`);
-    console.error(err.error);
+  console.error('Error happened in bot catch:', err);
 });
 
-// استيراد الأوامر والملفات الأساسية بلطف مع معالجة الأخطاء
-try {
-    require("./commands")(bot);
-} catch (e) {
-    console.error("خطأ في تحميل ملف الأوامر:", e.message);
-}
+const helpers = createHelpers({ bot, db, save, freshGroup, OWNER_ID });
+installGlobalTextOverrides(bot, db);
+setupCommands(bot, db, helpers);
 
-try {
-    require("./autoReplies")(bot);
-} catch (e) {
-    console.error("خطأ في تحميل الردود التلقائية:", e.message);
-}
+bot.start();
 
-// تشغيل البوت بأمان
-bot.start().then(() => {
-    console.log("تم تشغيل البوت بنجاح واستقرار تام.");
-}).catch((err) => {
-    console.error("فشل تشغيل البوت:", err);
-});
