@@ -456,16 +456,6 @@ export function registerMessages(bot, shared) {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
-        if (p.action === 'music-add') {
-          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('إضافة الأغاني متاحة للمالك من الخاص فقط.'); }
-          const audio = msg.audio || (msg.document && String(msg.document.mime_type || '').startsWith('audio/') ? msg.document : null);
-          if (!audio) return ctx.reply('❌ أرسل ملفاً صوتياً صالحاً، أو اضغط إلغاء للرجوع إلى مكتبة الأغاني.');
-          db.musicTracks ||= [];
-          const title = String(msg.caption || audio.title || audio.file_name || `مقطع ${db.musicTracks.length + 1}`).trim().slice(0, 100);
-          db.musicTracks.push({ title, fileId: audio.file_id, addedAt: new Date().toISOString(), addedBy: userKey(ctx) });
-          save(); clearPending(ctx);
-          return ctx.reply(`✅ تمت إضافة «${title}» إلى مكتبة الأغاني.\nعدد المقاطع حالياً: ${db.musicTracks.length}`, { reply_markup: new InlineKeyboard().text('🎵 فتح مكتبة الأغاني', 'touchesmusic').row().text('✨ لمسة نغنوغ', 'touchesmenu') });
-        }
         if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new'].includes(p.action)) {
           clearPending(ctx);
           return ctx.reply('❌ تم إلغاء توحيد النصوص.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
@@ -530,11 +520,10 @@ export function registerMessages(bot, shared) {
 
         if (p.action === 'broadcast-message') {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('الإذاعة متاحة للمالك من الخاص فقط.'); }
-          const draft = String(text || msg.caption || '').trim();
-          if (!draft && !msg.photo && !msg.video && !msg.audio && !msg.document && !msg.animation && !msg.voice && !msg.video_note && !msg.sticker) return ctx.reply('أرسل نصاً أو صورة أو فيديو أو ملفاً أو صوتاً للإذاعة، أو اضغط إلغاء.');
-          const preview = draft || (msg.photo ? '🖼️ صورة' : msg.video ? '🎬 فيديو' : msg.audio ? '🎵 ملف صوتي' : msg.document ? '📎 ملف' : msg.voice ? '🎙️ رسالة صوتية' : msg.animation ? '🎞️ صورة متحركة' : msg.video_note ? '⭕ فيديو دائري' : '✨ رسالة');
-          pending(ctx, { action: 'broadcast-confirm', text: draft, sourceChatId: ctx.chat.id, sourceMessageId: msg.message_id });
-          return ctx.reply(`📢 معاينة الإذاعة — لم يتم الإرسال بعد\n\n${preview.slice(0, 1200)}\n\n👥 عدد المستخدمين المسجلين: ${(db.privateUsers || []).length}\n\nإذا المحتوى صحيح اضغط «إرسال الإذاعة الآن».`, { reply_markup: new InlineKeyboard().text('✅ إرسال الإذاعة الآن', 'broadcastsend').row().text('❌ إلغاء الإذاعة', 'broadcastcancel') });
+          const draft = String(text || '').trim();
+          if (!draft) return ctx.reply('أرسل نص الإذاعة أو اضغط إلغاء.');
+          pending(ctx, { action: 'broadcast-confirm', text: draft });
+          return ctx.reply(`📢 معاينة الإذاعة — لن يُرسل شيء بعد\n\n${draft}\n\nعدد المستخدمين المسجلين حالياً: ${(db.privateUsers || []).length}\n\nإذا النص صحيح اضغط «إرسال الإذاعة الآن».`, { reply_markup: new InlineKeyboard().text('✅ إرسال الإذاعة الآن', 'broadcastsend').row().text('❌ إلغاء الإذاعة', 'broadcastcancel') });
         }
 
         if (p.action === 'broadcast-confirm') {
