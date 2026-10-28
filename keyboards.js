@@ -81,14 +81,13 @@ export function helpKeyboard(ui = {}) {
 }
 
 export function ownerKeyboard() {
-  // توزيع أزرار لوحة المالك على صفوف متوازنة بدل القائمة الطويلة.
+  // لوحة المالك تعرض أدوات الإدارة المركزية فقط؛ الحماية وإعدادات البوت لها مدخل مستقل.
   return new InlineKeyboard()
     .text('📊 إحصائيات نغنوغ', 'botstats')
     .text('👥 المجموعات النشطة', 'activatedgroups').row()
     .text('📢 إرسال إشعار عام', 'broadcastmenu')
-    .text('⚙️ إعدادات البوت العامة', 'botsettings').row()
-    .text('🛡️ حماية المجموعة المحددة', 'globalprotection')
     .text('🔐 الاشتراك الإجباري', 'requiredmenu').row()
+    .text('📝 توحيد النصوص', 'globaltextmenu').row()
     .text('🔙 القائمة الرئيسية', 'home');
 }
 
@@ -135,9 +134,7 @@ export function warningsKeyboard(g = {}, back = 'groupsettings') {
 
 export function groupSettingsKeyboard(g) {
   return new InlineKeyboard()
-    .text(g?.welcomeEnabled ? '👋 الترحيب: 🟢 يعمل' : '👋 الترحيب: ⚪ متوقف', 'welcometoggle')
-    .row()
-    .text('✏️ تخصيص نص الترحيب', 'welcomeedit')
+    .text('👋 رسالة الترحيب', 'welcomeedit')
     .row()
     .text('🛡️ الحماية الموحدة', 'protectionmenu')
     .row()
