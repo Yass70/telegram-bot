@@ -456,7 +456,7 @@ export function registerMessages(bot, shared) {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new', 'global-ui-confirm'].includes(p.action)) {
           clearPending(ctx);
           return ctx.reply('❌ تم إلغاء توحيد النصوص.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
         }
@@ -464,11 +464,11 @@ export function registerMessages(bot, shared) {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
           const oldValue = String(text || '').trim();
           if (!oldValue) return ctx.reply('❌ النص فارغ. أرسل النص القديم أو اسم الزر مرة ثانية.');
-          if (oldValue.length > 2500) return ctx.reply('❌ النص طويل جداً. أرسل العبارة المطلوبة أو جزءاً واضحاً منها (2500 حرف كحد أقصى).');
+          if (oldValue.length > 1800) return ctx.reply('❌ النص طويل للمعاينة. أرسل العبارة المطلوبة أو جزءاً واضحاً منها (1800 حرف كحد أقصى).');
           pending(ctx, { action: 'global-ui-new', kind: p.kind === 'button' ? 'button' : 'text', from: oldValue });
           return ctx.reply(p.kind === 'button'
-            ? `تمام. هسه أرسل اسم الزر الجديد بدلاً من:\n${oldValue}\n\nخلي الاسم قصير حتى يقبله تيليگرام.`
-            : `تمام. هسه أرسل النص الجديد بدلاً من العبارة التالية:\n${oldValue}\n\nسيُستبدل النص القديم في كل رسائل الواجهات التي تحتوي عليه.`,
+            ? `🔘 الزر قبل التعديل:\n${oldValue}\n\nهسه أرسل اسم الزر الجديد. ما راح يتغير شي قبل ما تشوف المعاينة وتضغط «اعتماد التعديل».`
+            : `📝 النص قبل التعديل:\n\n${oldValue}\n\nهسه أرسل النص الجديد. راح أعرض لك القديم والجديد للمراجعة، وما ينحفظ أي تغيير قبل ضغط «اعتماد التعديل».`,
             { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel') });
         }
 
@@ -476,50 +476,19 @@ export function registerMessages(bot, shared) {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
           const newValue = String(text || '').trim();
           if (!newValue) return ctx.reply('❌ النص الجديد فارغ. أرسله مرة ثانية.');
-          if (newValue.length > (p.kind === 'button' ? 64 : 3500)) return ctx.reply(p.kind === 'button' ? '❌ اسم الزر طويل جداً. أرسل اسماً أقصر (64 حرفاً كحد أقصى، والأفضل أقصر بسبب قيود تيليگرام).' : '❌ النص الجديد طويل جداً. اختصره إلى 3500 حرف أو أقل.');
+          if (newValue.length > (p.kind === 'button' ? 64 : 1800)) return ctx.reply(p.kind === 'button' ? '❌ اسم الزر طويل جداً. أرسل اسماً أقصر.' : '❌ النص الجديد طويل للمعاينة. اختصره إلى 1800 حرف أو أقل.');
           if (p.kind === 'button' && Buffer.byteLength(newValue, 'utf8') > 64) return ctx.reply('❌ اسم الزر يتجاوز حد تيليگرام البالغ 64 بايت. اختَر اسماً أقصر.');
-          const kind = p.kind === 'button' ? 'button' : 'text';
           const from = String(p.from || '').trim();
-          if (!from || from === newValue) { clearPending(ctx); return ctx.reply('ماكو تغيير للحفظ لأن النص القديم والجديد متطابقان.'); }
-          db.globalTextOverrides ||= { texts: [], buttons: [] };
-          db.globalTextOverrides.texts ||= [];
-          db.globalTextOverrides.buttons ||= [];
-          const rules = kind === 'button' ? db.globalTextOverrides.buttons : db.globalTextOverrides.texts;
-          let updated = false;
-          // إذا كان النص الذي أرسله المالك هو نتيجة تعديل سابق، نحدّث القاعدة الأصلية بدلاً من إنشاء تعارض.
-          for (const rule of rules) {
-            if (rule.from === from || rule.to === from) {
-              rule.to = newValue;
-              updated = true;
-              break;
-            }
-          }
-          if (!updated) {
-            for (const rule of rules) {
-              if (typeof rule.to === 'string' && rule.to.includes(from)) {
-                rule.to = rule.to.split(from).join(newValue);
-                updated = true;
-              }
-            }
-          }
-          if (!updated) {
-            // إذا أرسل المالك وصفاً كاملاً ظاهراً يحتوي تعديلاً سابقاً، نعيده للنص الأصلي
-            // ثم نحفظ قاعدة أطول حتى يستطيع تعديل الوصف الكامل مرة ثانية بسهولة.
-            let reconstructedSource = from;
-            const reverseRules = [...rules].filter(rule => rule && typeof rule.to === 'string' && rule.to && typeof rule.from === 'string')
-              .sort((a, b) => b.to.length - a.to.length);
-            for (const rule of reverseRules) {
-              if (reconstructedSource.includes(rule.to)) reconstructedSource = reconstructedSource.split(rule.to).join(rule.from);
-            }
-            if (reconstructedSource !== from && reconstructedSource) {
-              rules.push({ from: reconstructedSource, to: newValue, createdAt: Date.now() });
-              updated = true;
-            }
-          }
-          if (!updated) rules.push({ from, to: newValue, createdAt: Date.now() });
-          save();
-          clearPending(ctx);
-          return ctx.reply(`✅ تم حفظ التعديل العام بنجاح.\n\nالنوع: ${kind === 'button' ? 'اسم زر' : 'نص أو وصف'}\nكل مستخدمي نغنوغ راح يشوفون التغيير، ووظائف الأزرار تبقى كما هي.`, { reply_markup: new InlineKeyboard().text('➕ تعديل آخر', `globaltextedit:${kind}`).row().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
+          if (!from || from === newValue) return ctx.reply('ماكو تغيير للحفظ لأن النص القديم والجديد متطابقان. أرسل نصاً جديداً مختلفاً أو اضغط إلغاء.');
+          pending(ctx, { action: 'global-ui-confirm', kind: p.kind === 'button' ? 'button' : 'text', from, to: newValue });
+          const title = p.kind === 'button' ? '🔘 معاينة اسم الزر' : '📝 معاينة النص أو الوصف';
+          const preview = `${title}\n\n━━━━━━━━━━━━\nقبل:\n${from}\n\n━━━━━━━━━━━━\nبعد:\n${newValue}\n━━━━━━━━━━━━\n\nهل تريد اعتماد هذا التغيير لكل مستخدمي نغنوغ؟`;
+          return ctx.reply(preview, { reply_markup: new InlineKeyboard().text('✅ اعتماد التعديل للجميع', 'globaltextsave').row().text('✏️ تعديل النص الجديد', 'globaltextbacktonew').row().text('❌ إلغاء', 'globaltextcancel') });
+        }
+
+        if (p.action === 'global-ui-confirm') {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          return ctx.reply('👀 عندك معاينة جاهزة للقديم والجديد. استخدم الأزرار أدناه لاعتماد التغيير أو تعديل النص الجديد أو الإلغاء.', { reply_markup: new InlineKeyboard().text('✅ اعتماد التعديل للجميع', 'globaltextsave').row().text('✏️ تعديل النص الجديد', 'globaltextbacktonew').row().text('❌ إلغاء', 'globaltextcancel') });
         }
 
         if (p.action === 'touches-name') {
@@ -537,20 +506,15 @@ export function registerMessages(bot, shared) {
         }
 
         if (p.action === 'broadcast-message') {
-          clearPending(ctx);
-          const users = db.privateUsers || [];
-          let successCount = 0, failCount = 0;
-          const statusMsg = await ctx.reply(`📢 جاري إرسال الإذاعة...`);
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('الإذاعة متاحة للمالك من الخاص فقط.'); }
+          const draft = String(text || '').trim();
+          if (!draft) return ctx.reply('أرسل نص الإذاعة أو اضغط إلغاء.');
+          pending(ctx, { action: 'broadcast-confirm', text: draft });
+          return ctx.reply(`📢 معاينة الإذاعة — لن يُرسل شيء بعد\n\n${draft}\n\nعدد المستخدمين المسجلين حالياً: ${(db.privateUsers || []).length}\n\nإذا النص صحيح اضغط «إرسال الإذاعة الآن».`, { reply_markup: new InlineKeyboard().text('✅ إرسال الإذاعة الآن', 'broadcastsend').row().text('❌ إلغاء الإذاعة', 'broadcastcancel') });
+        }
 
-          for (const userId of users) {
-            try {
-              await bot.api.sendMessage(Number(userId), `📢 **إشعار من الإدارة:**\n\n${text}`, { parse_mode: 'Markdown', disable_notification: false });
-              successCount++;
-              await new Promise(resolve => setTimeout(resolve, 40));
-            } catch { failCount++; }
-          }
-
-          return answer(ctx, `✅ **تمت الإذاعة بنجاح!**\n📤 إرسال: ${successCount}\n❌ فشل: ${failCount}`, { reply_markup: new InlineKeyboard().text('👑 لوحة المالك', 'ownerpanel') });
+        if (p.action === 'broadcast-confirm') {
+          return ctx.reply('📢 توجد إذاعة بانتظار التأكيد. اضغط إرسال الإذاعة الآن أو إلغاء الإذاعة من الأزرار أعلاه.');
         }
 
         if (p.action === 'add-required-chat') {
