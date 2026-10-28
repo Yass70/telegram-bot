@@ -33,10 +33,11 @@ export async function handleActiveGameCallback(ctx, shared, data) {
       return true;
     }
 
-    if (data === 'game_stop') {
+    if (data === 'game_stop' || data.startsWith('game_stop:')) {
       const chatId = String(ctx.chat?.id || '');
       const round = db.activeGames?.[chatId];
-      if (!round?.active) { try { await ctx.answerCallbackQuery({ text: 'ماكو سؤال نشط.' }); } catch {} return true; }
+      const buttonRoundId = data.startsWith('game_stop:') ? data.slice('game_stop:'.length) : '';
+      if (!round?.active || !buttonRoundId || round.roundId !== buttonRoundId) { try { await ctx.answerCallbackQuery({ text: 'هذا زر سؤال قديم؛ السؤال الحالي تغيّر.' }); } catch {} return true; }
       const allowed = String(round.starterId) === String(ctx.from.id) || isOwner(ctx) || await userIsAdmin(chatId, ctx.from.id);
       if (!allowed) { try { await ctx.answerCallbackQuery({ text: 'الأمر غير مخصص إلك', show_alert: true }); } catch {} return true; }
       db.activeGames[chatId] = null; save();
@@ -47,3 +48,4 @@ export async function handleActiveGameCallback(ctx, shared, data) {
     }
   return false;
 }
+
