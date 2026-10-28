@@ -49,5 +49,3 @@ export async function handleActiveGameCallback(ctx, shared, data) {
   return false;
 }
 
-
-
