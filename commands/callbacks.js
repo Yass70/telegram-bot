@@ -33,7 +33,7 @@ export function registerCallbacks(bot, shared) {
 
     if (await handleActiveGameCallback(ctx, shared, data)) return;
 
-    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu'];
+    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
     if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:') || data.startsWith('globaltext')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
@@ -296,12 +296,11 @@ export function registerCallbacks(bot, shared) {
     if (data === 'customreset') {
       if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
       db.customizations ||= {};
+      // استعادة المستخدم تمسح تخصيصه الشخصي فقط؛ تعديلات المالك العامة تبقى هي الافتراضي للجميع.
       delete db.customizations[userKey(ctx)];
-      // حسب نظام توحيد النصوص: الاستعادة من أي حساب تعيد الافتراضيات العامة لكل المستخدمين.
-      db.globalTextOverrides = { texts: [], buttons: [] };
       clearPending(ctx);
       save();
-      return answer(ctx, '♻️ تمت استعادة النصوص والأزرار الافتراضية المعتمدة من المطوّر.\nتم مسح تخصيصك الشخصي وتعديلات توحيد النصوص العامة؛ لذلك ترجع النصوص العامة للافتراضي عند الجميع، بينما تبقى التخصيصات الشخصية لبقية المستخدمين خاصة بهم.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
+      return answer(ctx, '♻️ تمت استعادة تخصيصك الشخصي.\nرجعت واجهتك إلى النصوص الافتراضية المعتمدة من المالك، بما فيها تعديلات «توحيد النصوص» العامة. لم تتغير واجهات بقية المستخدمين.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
     }
 
     if (data === 'groupstats') return showGroupStats(ctx);
@@ -309,6 +308,8 @@ export function registerCallbacks(bot, shared) {
     // توحيد النصوص: تعديلات عامة على نصوص الواجهات وأسماء الأزرار لكل المستخدمين.
     if (data === 'globaltextmenu') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      // لا نسمح لبقايا خطوة سابقة (خصوصاً الإذاعة) بالتقاط النص الذي سيُرسل في هذا القسم.
+      clearPending(ctx);
       const kb = new InlineKeyboard()
         .text('📝 توحيد نص أو وصف قائمة', 'globaltextedit:text').row()
         .text('🔘 توحيد اسم زر', 'globaltextedit:button').row()
@@ -322,6 +323,8 @@ export function registerCallbacks(bot, shared) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       const kind = data.split(':')[1];
       if (!['text', 'button'].includes(kind)) return answer(ctx, 'نوع التعديل غير معروف.');
+      // نلغي أي خطوة معلّقة قديمة قبل بدء توحيد النصوص حتى لا يلتقطها معالج الإذاعة.
+      clearPending(ctx);
       pending(ctx, { action: 'global-ui-old', kind });
       return answer(ctx, kind === 'button'
         ? '🔘 أرسل اسم الزر القديم كما يظهر في أي قائمة. سيُطبّق الاسم الجديد على كل زر يحمل العبارة نفسها، مع بقاء وظيفة الزر كما هي.\n\nأرسل /cancel للإلغاء.'
@@ -333,6 +336,68 @@ export function registerCallbacks(bot, shared) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
       clearPending(ctx);
       return answer(ctx, 'تم إلغاء التعديل.', { reply_markup: new InlineKeyboard().text('🔙 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+    }
+
+    if (data === 'globaltextbacktonew') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const p = db.pending?.[userKey(ctx)];
+      if (!p || p.action !== 'global-ui-confirm') return answer(ctx, 'انتهت جلسة التعديل. ابدأ من جديد من «توحيد النصوص».', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu') });
+      pending(ctx, { action: 'global-ui-new', kind: p.kind === 'button' ? 'button' : 'text', from: p.from });
+      return answer(ctx, `✏️ أرسل النص الجديد مرة ثانية.\n\nالنص القديم:\n${String(p.from || '').slice(0, 1500)}\n\nراح أعرض لك معاينة جديدة قبل الحفظ.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel') });
+    }
+
+    if (data === 'globaltextsave') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم متاح لمالك البوت من الخاص فقط.');
+      const p = db.pending?.[userKey(ctx)];
+      if (!p || p.action !== 'global-ui-confirm') {
+        clearPending(ctx);
+        return answer(ctx, 'انتهت جلسة التعديل أو لم تعد موجودة. ابدأ من «توحيد النصوص» من جديد.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+      }
+      const kind = p.kind === 'button' ? 'button' : 'text';
+      const from = String(p.from || '').trim();
+      const to = String(p.to || '').trim();
+      if (!from || !to || from === to) {
+        clearPending(ctx);
+        return answer(ctx, 'لم يُحفظ التعديل لأن النص القديم والجديد فارغان أو متطابقان.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu') });
+      }
+      db.globalTextOverrides ||= { texts: [], buttons: [] };
+      db.globalTextOverrides.texts ||= [];
+      db.globalTextOverrides.buttons ||= [];
+      const rules = kind === 'button' ? db.globalTextOverrides.buttons : db.globalTextOverrides.texts;
+      let updated = false;
+      for (const rule of rules) {
+        if (rule.from === from || rule.to === from) {
+          rule.to = to;
+          rule.updatedAt = Date.now();
+          updated = true;
+          break;
+        }
+      }
+      if (!updated) {
+        for (const rule of rules) {
+          if (typeof rule.to === 'string' && rule.to.includes(from)) {
+            rule.to = rule.to.split(from).join(to);
+            rule.updatedAt = Date.now();
+            updated = true;
+          }
+        }
+      }
+      if (!updated) {
+        let reconstructedSource = from;
+        const reverseRules = [...rules].filter(rule => rule && typeof rule.to === 'string' && rule.to && typeof rule.from === 'string')
+          .sort((a, b) => b.to.length - a.to.length);
+        for (const rule of reverseRules) {
+          if (reconstructedSource.includes(rule.to)) reconstructedSource = reconstructedSource.split(rule.to).join(rule.from);
+        }
+        if (reconstructedSource !== from && reconstructedSource) {
+          rules.push({ from: reconstructedSource, to, createdAt: Date.now() });
+          updated = true;
+        }
+      }
+      if (!updated) rules.push({ from, to, createdAt: Date.now() });
+      save();
+      clearPending(ctx);
+      return answer(ctx, `✅ تم اعتماد التعديل العام بنجاح.\n\nالقديم: ${from.slice(0, 500)}\n\nالجديد: ${to.slice(0, 500)}\n\n🌍 سيظهر التغيير لكل المستخدمين، مع الحفاظ على وظائف الأزرار.`, { reply_markup: new InlineKeyboard().text('➕ تعديل آخر', `globaltextedit:${kind}`).row().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
     }
 
     if (data.startsWith('globaltextlist:')) {
@@ -821,9 +886,36 @@ export function registerCallbacks(bot, shared) {
     }
 
     if (data === 'broadcastmenu') {
-      if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.');
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'الإذاعة متاحة للمالك من الخاص فقط.');
+      clearPending(ctx);
       pending(ctx, { action: 'broadcast-message' });
       return answer(ctx, '╭━━━〔 📢 الإذاعة العامة 〕━━━╮\n\nأرسل الآن النص أو الرسالة التي تريد إيصالها إلى المستخدمين المسجّلين.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'ownerpanel') });
+    }
+    if (data === 'broadcastcancel') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'الإذاعة متاحة للمالك من الخاص فقط.');
+      clearPending(ctx);
+      return answer(ctx, '❌ تم إلغاء الإذاعة. لم يتم إرسال أي رسالة.', { reply_markup: new InlineKeyboard().text('📢 إرسال إشعار عام', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+    }
+    if (data === 'broadcastsend') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'الإذاعة متاحة للمالك من الخاص فقط.');
+      const p = db.pending?.[userKey(ctx)];
+      if (!p || p.action !== 'broadcast-confirm' || !String(p.text || '').trim()) {
+        clearPending(ctx);
+        return answer(ctx, 'ماكو إذاعة بانتظار التأكيد. افتح الإذاعة من لوحة المالك وابدأ من جديد.', { reply_markup: new InlineKeyboard().text('📢 إرسال إشعار عام', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+      }
+      const draft = String(p.text).trim();
+      clearPending(ctx);
+      const users = [...new Set((db.privateUsers || []).map(String).filter(id => /^\d+$/.test(id)))];
+      let successCount = 0, failCount = 0;
+      const status = await answer(ctx, `📢 جاري إرسال الإذاعة المؤكدة إلى ${users.length} مستخدم…`);
+      for (const userId of users) {
+        try {
+          await bot.api.sendMessage(Number(userId), `📢 إشعار من الإدارة:\n\n${draft}`);
+          successCount++;
+          await new Promise(resolve => setTimeout(resolve, 45));
+        } catch { failCount++; }
+      }
+      return answer(ctx, `✅ انتهت الإذاعة المؤكدة.\n\n📤 تم الإرسال: ${successCount}\n❌ تعذّر الإرسال: ${failCount}`, { reply_markup: new InlineKeyboard().text('📢 إذاعة أخرى', 'broadcastmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
     }
 
     return answer(ctx, '⚠️ 〔 خيار غير معروف 〕\nجرّب الرجوع إلى القائمة السابقة واختيار أحد الأزرار المتاحة.');
