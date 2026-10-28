@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy';
 import { helpKeyboard } from './keyboards.js';
 
 // قاعدة بيانات ألعاب الأسئلة والتحديات (40 سؤالاً لكل فئة بإجمالي 160 عنصراً)[cite: 4]
-import { QUESTIONS_DB, SHUAR_LIST, KET_LIST, N_PHRASES } from './games/data.js';
+import { QUESTIONS_DB, SHUAR_LIST, KET_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES } from './games/data.js';
 import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
 
@@ -20,7 +20,7 @@ export function setupCommands(bot, db, helpers) {
     const keyboard = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
     const callbacks = keyboard.flat().map(button => button.callback_data).filter(Boolean);
     const previous = db.menuBack?.[userKey(ctx)]?.[kind];
-    if (kind === 'games' && (text.includes('لعبة الخيار') || text.includes('لعبة الرياضيات') || text.includes('لعبة الحيوان') || text.includes('الأسئلة العامة') || text.includes('أبطال نغنوغ'))) {
+    if (kind === 'games' && (text.includes('الاختيارات الصحيحة') || text.includes('الرياضيات') || text.includes('معرفة الحيوان') || text.includes('معاني') || text.includes('عكس الكلمة') || text.includes('تفكيك الكلمة') || text.includes('اسئلني') || text.includes('الأسئلة العامة') || text.includes('أبطال نغنوغ'))) {
       return previous || (isGroup(ctx) ? 'publiccommands' : 'managementmenu');
     }
     if (kind === 'warnings' && (text.includes('التحذيرات والعقوبات') || text.includes('سجل التحذيرات') || text.includes('إدارة الكلمات الممنوعة'))) {
@@ -320,7 +320,7 @@ ${link}
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
     ensureReferralData, referralLinkFor, referralStatsFor, referralMenuKeyboard,
     referralLinkKeyboard, showReferralLink, publicCommandsKeyboard,
-    QUESTIONS_DB, SHUAR_LIST, KET_LIST, N_PHRASES
+    QUESTIONS_DB, SHUAR_LIST, KET_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES
   };
   registerCallbacks(bot, commandShared);
   registerMessages(bot, commandShared);
