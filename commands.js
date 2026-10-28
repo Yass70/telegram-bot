@@ -242,7 +242,77 @@ export function setupCommands(bot, db, helpers) {
     .text('🔙 رجوع للقائمة السابقة', back);
 
   // أمر البداية /start[cite: 4]
+  const ensureReferralData = () => {
+    db.userMeta ||= {};
+    db.referrals ||= {};
+    db.referralByUser ||= {};
+  };
+  const referralLinkFor = userId => {
+    const username = String(bot.botInfo?.username || 'iii5iii55bot').replace(/^@/, '');
+    return `https://t.me/${username}?start=ref_${encodeURIComponent(String(userId))}`;
+  };
+  const referralStatsFor = userId => {
+    ensureReferralData();
+    const stats = db.referrals[String(userId)] || {};
+    return {
+      joinedCount: Math.max(0, Number(stats.joinedCount) || 0),
+      rewardPoints: Math.max(0, Number(stats.rewardPoints) || 0)
+    };
+  };
+  const referralMenuKeyboard = () => new InlineKeyboard()
+    .text('🔗 رابط مشاركة', 'referrallink')
+    .row()
+    .text('↩️ رجوع', 'home');
+  const referralLinkKeyboard = userId => {
+    const link = referralLinkFor(userId);
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('🐈‍⬛ تعال جرّب بوت نغنوغ ❤️')}`;
+    return new InlineKeyboard()
+      .add({ text: '📋 نسخ رابط المشاركة', copy_text: { text: link } })
+      .row()
+      .url('📤 مشاركة الرابط', shareUrl)
+      .row()
+      .text('🔄 تحديث الإحصائيات', 'referralrefresh')
+      .row()
+      .text('↩️ رجوع إلى ستار', 'starmenu')
+      .text('🏠 الرئيسية', 'home');
+  };
+  const showReferralLink = async ctx => {
+    const uid = String(ctx.from.id);
+    const stats = referralStatsFor(uid);
+    const link = referralLinkFor(uid);
+    const text = `╭━━━〔 🔗 رابط المشاركة 〕━━━╮
+
+🐈‍⬛ هذا رابطك الخاص في نغنوغ:
+
+${link}
+
+👥 عدد الأشخاص المنضمين برابطك: ${stats.joinedCount}
+⭐ نقاط الجوائز من الإحالات: ${stats.rewardPoints}
+
+📌 كل مستخدم جديد يبدأ البوت من رابطك يُحتسب مرة واحدة فقط.
+╰━━━━━━━━━━━━━━━━━━╯`;
+    return answer(ctx, text, { reply_markup: referralLinkKeyboard(uid) });
+  };
+
   bot.command('start', async ctx => {
+    ensureReferralData();
+    const uid = String(ctx.from?.id || '');
+    const alreadyKnown = (db.users || []).includes(uid);
+    const payload = String(ctx.match || '').trim();
+    const match = payload.match(/^ref_(\d+)$/);
+    // تكافأ الإحالة فقط إذا كان هذا أول تسجيل للمستخدم، ولا يُسمح بإحالة النفس أو تكرارها.
+    if (uid && !alreadyKnown && !db.userMeta[uid] && match) {
+      const referrerId = String(match[1]);
+      if (referrerId !== uid && (db.users || []).includes(referrerId)) {
+        db.referrals[referrerId] ||= { joinedCount: 0, rewardPoints: 0 };
+        if (!db.referralByUser[uid]) {
+          db.referralByUser[uid] = referrerId;
+          db.referrals[referrerId].joinedCount = Math.max(0, Number(db.referrals[referrerId].joinedCount) || 0) + 1;
+          db.referrals[referrerId].rewardPoints = Math.max(0, Number(db.referrals[referrerId].rewardPoints) || 0) + 1;
+          save();
+        }
+      }
+    }
     ensureUser(ctx);
     if (!await subscriptionGate(ctx)) return;
     const c = getCustomization(ctx);
@@ -516,10 +586,26 @@ export function setupCommands(bot, db, helpers) {
     
     // الأزرار الأساسية والحساب[cite: 3, 4]
     if (data === 'accountinfo') {
+      ensureReferralData();
       const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || 'غير متوفر';
       const username = ctx.from.username ? `@${ctx.from.username}` : 'ما عندك اسم مستخدم';
-      const userId = ctx.from.id;
-      return answer(ctx, `${customText(ctx, 'replies', 'account')}\n${customText(ctx, 'descriptions', 'account') || ''}\n\n📝 الاسم: ${name}\n🔗 المستخدم: ${username}\n🆔 الآيدي: ${userId}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
+      const userId = String(ctx.from.id);
+      const meta = db.userMeta[userId] || {};
+      const joinedAt = meta.firstSeenAt
+        ? new Date(Number(meta.firstSeenAt)).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'غير متاح للحسابات المسجلة قبل إضافة الميزة';
+      const referralStats = referralStatsFor(userId);
+      const text = `👤 ملفي الشخصي 🐈‍⬛\n\n🪪 معلومات الحساب\n\nالاسم: ${name}\nالمعرّف: ${username}\nايدي: ${userId}\nتاريخ الانضمام للبوت: ${joinedAt}\nعدد نقاط الجوائز: ${referralStats.rewardPoints}\nعدد الأشخاص المنضمين برابطي: ${referralStats.joinedCount}`;
+      return answer(ctx, text, { reply_markup: new InlineKeyboard().text('⭐ ستار', 'starmenu').row().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
+    }
+
+    if (data === 'starmenu') {
+      const stats = referralStatsFor(String(ctx.from.id));
+      return answer(ctx, `╭━━━〔 ⭐ ستار | نغنوغ 🐈‍⬛ 〕━━━╮\n\nاجمع نقاط الجوائز من خلال دعوة أشخاص جدد إلى نغنوغ.\n\n👥 الأشخاص المنضمون برابطك: ${stats.joinedCount}\n⭐ نقاط الجوائز: ${stats.rewardPoints}\n\nاضغط على رابط المشاركة حتى تحصل على رابطك الخاص وتشوف إحصائياتك.\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: referralMenuKeyboard() });
+    }
+
+    if (data === 'referrallink' || data === 'referralrefresh') {
+      return showReferralLink(ctx);
     }
     
     if (data === 'userreplies') {
