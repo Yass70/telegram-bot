@@ -10,7 +10,7 @@ export function mainKeyboard(ctx, bot, ui = {}) {
     .text(label('management', '⚙️ الإدارة'), 'managementmenu')
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
     .text('⭐ ستار', 'starmenu')
-    .text('✨ لمسة نغنوغ', 'touchesmenu').row()
+    .text('✨ لمسات نغنوغ', 'touchesmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
     .text(label('help', '📖 المساعدة'), 'help');
   return kb;
