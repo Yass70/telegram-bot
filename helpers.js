@@ -250,15 +250,7 @@ async function showProfileCard(ctx, g, targetUser = null) {
       if (memberInfo.status === 'creator') groupRole = 'مالك المجموعة 👑';
       else if (memberInfo.status === 'administrator') groupRole = 'مشرف 🛡️';
       else if (g?.admins?.includes(id)) groupRole = 'مشرف نغنوغ ⚙️';
-      // لا نعرض صفة الكتم لمجرد أن حالة Telegram هي restricted؛ قد تكون بعض الصلاحيات الأخرى محدودة.
-      // يظهر «عضو مقيّد 🔇» فقط عندما تؤكد Telegram أن إرسال الرسائل ممنوع فعلاً.
-      else if (memberInfo.status === 'restricted') {
-        groupRole = memberInfo.can_send_messages === false
-          ? 'عضو مقيّد 🔇'
-          : memberInfo.can_send_messages === true
-            ? 'عضو'
-            : 'عضو بصلاحيات محدودة';
-      }
+      else if (memberInfo.status === 'restricted') groupRole = 'عضو مقيّد 🔇';
       else if (memberInfo.status === 'left' || memberInfo.status === 'kicked') groupRole = 'ليس عضواً حالياً 🚪';
     }
   } catch {
