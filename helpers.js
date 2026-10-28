@@ -181,17 +181,15 @@ async function subscriptionGate(ctx) {
 function selectedGroupKeyboard(ctx) {
   const kb = new InlineKeyboard();
   const entries = Object.values(db.groups).filter(g => g.activated && (isOwner(ctx) || String(g.activatedBy) === userKey(ctx) || (g.admins || []).includes(userKey(ctx))));
-  for (const g of entries) kb.text(`👥 ${String(g.title || 'مجموعة').slice(0, 45)}`, `choosegroup:${g.id}`).row();
-  const username = String(bot.botInfo?.username || 'YZ_VIDbot').replace(/^@/, '');
-  kb.url('➕ أضفني إلى مجموعة', `https://t.me/${username}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row();
-  kb.text('🔙 القائمة الرئيسية', 'home');
+  for (const g of entries) kb.text(`👥 ${g.title}`, `choosegroup:${g.id}`).row();
+  kb.text('🔙 رجوع', 'home');
   return { kb, entries };
 }
 
 async function showGroups(ctx) {
   const { kb, entries } = selectedGroupKeyboard(ctx);
-  if (!entries.length) return answer(ctx, '╭━━━〔 👥 مجموعاتي النشطة 〕━━━╮\n\nما ظهرت عندك مجموعات مفعّلة لحد الآن.\nأضف نغنوغ إلى مجموعتك، امنحه صلاحيات الإدارة المطلوبة، ثم أرسل «تفعيل نغنوغ» داخل المجموعة.\n\nبعد التفعيل راح تظهر مجموعتك هنا وتكدر تدخل لإعداداتها من الزر الخاص بيها.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
-  return answer(ctx, uiText(ctx, 'groups', '╭━━━〔 👥 مجموعاتي النشطة 〕━━━╮\n\nاختَر اسم المجموعة حتى تفتح إعداداتها وإحصائياتها.\n╰━━━━━━━━━━━━━━━━━━━━╯'), { reply_markup: kb });
+  if (!entries.length) return answer(ctx, customText(ctx, 'replies', 'nogroups'));
+  return answer(ctx, uiText(ctx, 'groups', '👥 قسم مجموعاتي | 🐈‍⬛\n\nمن هنا تكدر تستعرض مجموعاتك المفعّلة ويا نغنوغ، وتختار المجموعة اللي تريد تشوف تفاصيلها وتتحكم بالخيارات المتاحة إلها. ❤️\n\n━━━━━━━━━━━━━━━━━━\n\n👇🏻 اختار المجموعة من الأسفل. 🐾'), { reply_markup: kb });
 }
 
 async function showGroupSettings(ctx, g = selectedGroup(ctx)) {
@@ -267,7 +265,7 @@ async function showProfileCard(ctx, g, targetUser = null) {
 
   const username = user.username ? `@${user.username}` : 'لا يوجد';
   const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || 'غير متاح';
-  const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${displayName} ❩\n-︰ايديك : ❨ ${id} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
+  const caption = `🐾 بطاقة نغنوغ\n-︰أسمك : ❨ ${displayName} ❩\n-︰معرفك : ❨ ${username} ❩\n-︰ايديك : ❨ ${id} ❩\n-︰رتبتك : ❨ ${groupRole} ❩\n-︰رسائلك : ❨ ${messages} ❩\n-︰نقاطك : ❨ ${points} ❩\n-︰سحكاتك : ❨ ${sakhakat} ❩`;
   // زر ثابت يفتح حساب صاحب البوت من بطاقة العضو.
   const profileLinkKeyboard = new InlineKeyboard().url('𓆩♡ مـشـمـشہ 𓆪', 'https://t.me/llll6llll6');
 
