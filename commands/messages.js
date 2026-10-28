@@ -456,6 +456,72 @@ export function registerMessages(bot, shared) {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
       if (p) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['global-ui-old', 'global-ui-new'].includes(p.action)) {
+          clearPending(ctx);
+          return ctx.reply('❌ تم إلغاء توحيد النصوص.', { reply_markup: new InlineKeyboard().text('📝 توحيد النصوص', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel') });
+        }
+        if (p.action === 'global-ui-old') {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          const oldValue = String(text || '').trim();
+          if (!oldValue) return ctx.reply('❌ النص فارغ. أرسل النص القديم أو اسم الزر مرة ثانية.');
+          if (oldValue.length > 2500) return ctx.reply('❌ النص طويل جداً. أرسل العبارة المطلوبة أو جزءاً واضحاً منها (2500 حرف كحد أقصى).');
+          pending(ctx, { action: 'global-ui-new', kind: p.kind === 'button' ? 'button' : 'text', from: oldValue });
+          return ctx.reply(p.kind === 'button'
+            ? `تمام. هسه أرسل اسم الزر الجديد بدلاً من:\n${oldValue}\n\nخلي الاسم قصير حتى يقبله تيليگرام.`
+            : `تمام. هسه أرسل النص الجديد بدلاً من العبارة التالية:\n${oldValue}\n\nسيُستبدل النص القديم في كل رسائل الواجهات التي تحتوي عليه.`,
+            { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'globaltextcancel') });
+        }
+
+        if (p.action === 'global-ui-new') {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          const newValue = String(text || '').trim();
+          if (!newValue) return ctx.reply('❌ النص الجديد فارغ. أرسله مرة ثانية.');
+          if (newValue.length > (p.kind === 'button' ? 64 : 3500)) return ctx.reply(p.kind === 'button' ? '❌ اسم الزر طويل جداً. أرسل اسماً أقصر (64 حرفاً كحد أقصى، والأفضل أقصر بسبب قيود تيليگرام).' : '❌ النص الجديد طويل جداً. اختصره إلى 3500 حرف أو أقل.');
+          if (p.kind === 'button' && Buffer.byteLength(newValue, 'utf8') > 64) return ctx.reply('❌ اسم الزر يتجاوز حد تيليگرام البالغ 64 بايت. اختَر اسماً أقصر.');
+          const kind = p.kind === 'button' ? 'button' : 'text';
+          const from = String(p.from || '').trim();
+          if (!from || from === newValue) { clearPending(ctx); return ctx.reply('ماكو تغيير للحفظ لأن النص القديم والجديد متطابقان.'); }
+          db.globalTextOverrides ||= { texts: [], buttons: [] };
+          db.globalTextOverrides.texts ||= [];
+          db.globalTextOverrides.buttons ||= [];
+          const rules = kind === 'button' ? db.globalTextOverrides.buttons : db.globalTextOverrides.texts;
+          let updated = false;
+          // إذا كان النص الذي أرسله المالك هو نتيجة تعديل سابق، نحدّث القاعدة الأصلية بدلاً من إنشاء تعارض.
+          for (const rule of rules) {
+            if (rule.from === from || rule.to === from) {
+              rule.to = newValue;
+              updated = true;
+              break;
+            }
+          }
+          if (!updated) {
+            for (const rule of rules) {
+              if (typeof rule.to === 'string' && rule.to.includes(from)) {
+                rule.to = rule.to.split(from).join(newValue);
+                updated = true;
+              }
+            }
+          }
+          if (!updated) {
+            // إذا أرسل المالك وصفاً كاملاً ظاهراً يحتوي تعديلاً سابقاً، نعيده للنص الأصلي
+            // ثم نحفظ قاعدة أطول حتى يستطيع تعديل الوصف الكامل مرة ثانية بسهولة.
+            let reconstructedSource = from;
+            const reverseRules = [...rules].filter(rule => rule && typeof rule.to === 'string' && rule.to && typeof rule.from === 'string')
+              .sort((a, b) => b.to.length - a.to.length);
+            for (const rule of reverseRules) {
+              if (reconstructedSource.includes(rule.to)) reconstructedSource = reconstructedSource.split(rule.to).join(rule.from);
+            }
+            if (reconstructedSource !== from && reconstructedSource) {
+              rules.push({ from: reconstructedSource, to: newValue, createdAt: Date.now() });
+              updated = true;
+            }
+          }
+          if (!updated) rules.push({ from, to: newValue, createdAt: Date.now() });
+          save();
+          clearPending(ctx);
+          return ctx.reply(`✅ تم حفظ التعديل العام بنجاح.\n\nالنوع: ${kind === 'button' ? 'اسم زر' : 'نص أو وصف'}\nكل مستخدمي نغنوغ راح يشوفون التغيير، ووظائف الأزرار تبقى كما هي.`, { reply_markup: new InlineKeyboard().text('➕ تعديل آخر', `globaltextedit:${kind}`).row().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
+        }
+
         if (p.action === 'touches-name') {
           if (!text) return ctx.reply('❌ دزلي الاسم كنص حتى أگدر أزخرفه.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel') });
           if ([...text].length > 40) return ctx.reply('❌ خلي الاسم 40 حرف أو أقل حتى تطلع الزخارف مرتبة. دز الاسم مرة ثانية.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel') });
