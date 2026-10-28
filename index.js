@@ -54,6 +54,9 @@ const freshDB = () => ({
   groupPoints: {},
   activeGames: {},
   customizations: {},
+  userMeta: {},
+  referrals: {},
+  referralByUser: {},
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 }
 });
 
@@ -74,6 +77,9 @@ function load() {
     db.groupPoints ||= {};
     db.activeGames ||= {};
     db.customizations ||= {};
+    db.userMeta ||= {};
+    db.referrals ||= {};
+    db.referralByUser ||= {};
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
@@ -108,7 +114,12 @@ function ensureUser(ctx) {
   const id = userKey(ctx);
   if (!id) return;
   let changed = false;
-  if (!db.users.includes(id)) { db.users.push(id); changed = true; }
+  db.userMeta ||= {};
+  if (!db.users.includes(id)) {
+    db.users.push(id);
+    db.userMeta[id] ||= { firstSeenAt: Date.now() };
+    changed = true;
+  }
   if (isPrivate(ctx)) {
     db.privateUsers ||= [];
     if (!db.privateUsers.includes(id)) { db.privateUsers.push(id); changed = true; }
