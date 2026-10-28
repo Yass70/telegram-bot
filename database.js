@@ -34,6 +34,7 @@ export const freshDB = () => ({
   groupPoints: {},
   activeGames: {},
   customizations: {},
+  touchSessions: {},
   userMeta: {},
   referrals: {},
   referralByUser: {},
@@ -57,6 +58,7 @@ function load() {
     db.groupPoints ||= {};
     db.activeGames ||= {};
     db.customizations ||= {};
+    db.touchSessions ||= {};
     db.userMeta ||= {};
     db.referrals ||= {};
     db.referralByUser ||= {};
