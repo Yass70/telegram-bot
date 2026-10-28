@@ -6,7 +6,7 @@ import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBat
 export function registerCallbacks(bot, shared) {
   const {
     db, isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor,
-    selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard,
+    selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange, customText, getHomeKeyboard,
     HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
     showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList,
@@ -395,9 +395,11 @@ export function registerCallbacks(bot, shared) {
         }
       }
       if (!updated) rules.push({ from, to, createdAt: Date.now() });
+      // احفظ النص الجديد أيضاً كافتراضي عام؛ استعادة المستخدم سترجع إلى هذا النص.
+      const affectedDefaults = applyGlobalCustomizationChange(kind, from, to);
       save();
       clearPending(ctx);
-      return answer(ctx, `✅ تم اعتماد التعديل العام بنجاح.\n\nالقديم: ${from.slice(0, 500)}\n\nالجديد: ${to.slice(0, 500)}\n\n🌍 سيظهر التغيير لكل المستخدمين، مع الحفاظ على وظائف الأزرار.`, { reply_markup: new InlineKeyboard().text('➕ تعديل آخر', `globaltextedit:${kind}`).row().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
+      return answer(ctx, `✅ تم اعتماد التعديل العام بنجاح.\n\nالقديم: ${from.slice(0, 500)}\n\nالجديد: ${to.slice(0, 500)}\n\n🌍 سيظهر التغيير لكل المستخدمين، وسيصبح هو الافتراضي حتى بعد ضغط أي مستخدم على «استعادة النصوص الافتراضية».\n📌 القيم الافتراضية التي تم تحديثها: ${affectedDefaults}`, { reply_markup: new InlineKeyboard().text('➕ تعديل آخر', `globaltextedit:${kind}`).row().text('📋 عرض التعديلات', 'globaltextlist:0').row().text('🔙 توحيد النصوص', 'globaltextmenu') });
     }
 
     if (data.startsWith('globaltextlist:')) {
