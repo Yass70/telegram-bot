@@ -87,7 +87,7 @@ export function registerCallbacks(bot, shared) {
       clearPending(ctx);
       db.touchSessions ||= {};
       delete db.touchSessions[userKey(ctx)];
-      return answer(ctx, '╭━━━〔 🔥🐈‍⬛ لمسات نغنوغ 〕━━━╮\n\nاختَر اللمسة اللي تريدها من هنا. ❤️‍🔥\n\n✦ زخرفة الأسماء بدفعات متنوعة، وتكدر تنسخ أي نتيجة مباشرة من زر النسخ.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: touchesMenuKeyboard() });
+      return answer(ctx, '╭━━━〔 🔥🐈‍⬛ لمسات نغنوغ 〕━━━╮\n\nاختَر اللمسة اللي تريدها من هنا. ❤️‍🔥\n\n✦ زخرفة عربية تغيّر مظهر الحروف، وزخرفة إنجليزية، والنسخ بلمسة على الاسم نفسه.\n╰━━━━━━━━━━━━━━━━━━━━╯', { reply_markup: touchesMenuKeyboard() });
     }
     if (data === 'touchesdecorate') {
       clearPending(ctx);
