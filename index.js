@@ -1,22 +1,26 @@
-import { Bot } from 'grammy';
-import { setupCommands } from './commands.js';
-import { db, save, freshGroup } from './database.js';
-import { createHelpers } from './helpers.js';
-import { installGlobalTextOverrides } from './globalTextOverrides.js';
+import { loadStore, saveStore } from './src/store.js';
+import { createBot } from './src/bot.js';
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const OWNER_ID = String(process.env.BOT_OWNER_ID || '').trim();
-if (!TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN environment variable');
-if (!OWNER_ID) console.warn('Warning: BOT_OWNER_ID is not set; owner-only features will be unavailable.');
+const token = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+if (!token) {
+  console.error('❌ المتغير TELEGRAM_BOT_TOKEN غير موجود. أضفه من إعدادات الاستضافة ولا تكتبه داخل الملفات.');
+  process.exit(1);
+}
+if (!String(process.env.BOT_OWNER_ID || '').trim()) {
+  console.warn('⚠️ BOT_OWNER_ID غير مضبوط؛ لوحة المالك والميزات الخاصة به لن تعمل حتى تضيف رقم تيليغرام الرقمي للمالك.');
+}
 
-const bot = new Bot(TOKEN);
-bot.catch((err) => {
-  console.error('Error happened in bot catch:', err);
-});
+await loadStore();
+const bot = createBot(token);
+const me = await bot.api.getMe();
+console.log(`🐈‍⬛ نغنوغ يعمل الآن: @${me.username}`);
+await bot.start({ onStart: info => console.log(`✅ بدأ استقبال التحديثات للبوت @${info.username}`) });
 
-const helpers = createHelpers({ bot, db, save, freshGroup, OWNER_ID });
-installGlobalTextOverrides(bot, db);
-setupCommands(bot, db, helpers);
-
-bot.start();
-
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, async () => {
+    console.log(`\n⏹️ استلام ${signal}، جارٍ حفظ البيانات وإيقاف البوت...`);
+    try { await bot.stop(); } catch {}
+    try { await saveStore(); } catch (e) { console.error('تعذر حفظ البيانات عند الإيقاف:', e.message); }
+    process.exit(0);
+  });
+}
