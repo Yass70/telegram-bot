@@ -43,17 +43,30 @@ function ensureUser(ctx) {
   }
 
   db.userMeta ||= {};
-  const now = Date.now();
-  if (!db.users.includes(id)) {
-    db.users.push(id);
-    db.userMeta[id] ||= { firstSeenAt: now, lastSeenAt: now };
+  const wasKnown = db.users.includes(id);
+  if (!db.userMeta[id] || typeof db.userMeta[id] !== 'object' || Array.isArray(db.userMeta[id])) {
+    db.userMeta[id] = { firstSeenAt: wasKnown ? 0 : Date.now() };
     changed = true;
-  } else if (!db.userMeta[id]) {
-    db.userMeta[id] = { firstSeenAt: now, lastSeenAt: now };
+  }
+  const now = Date.now();
+  if (!wasKnown) {
+    db.users.push(id);
+    db.userMeta[id].firstSeenAt = now;
     changed = true;
   }
   const meta = db.userMeta[id];
-  if (!Number(meta.firstSeenAt)) { meta.firstSeenAt = now; changed = true; }
+  // إذا كان المستخدم موجوداً قبل إضافة تتبّع تاريخ التسجيل، لا نعتبره مستخدماً جديداً الآن.
+  if (!Number(meta.firstSeenAt) && !wasKnown) { meta.firstSeenAt = now; changed = true; }
+  // حفظ بيانات التعريف المتاحة حتى يستطيع المالك تمييز المستخدمين المسجلين.
+  const from = ctx.from || {};
+  const profile = {
+    firstName: String(from.first_name || ''),
+    lastName: String(from.last_name || ''),
+    username: String(from.username || ''),
+  };
+  for (const [key, value] of Object.entries(profile)) {
+    if (meta[key] !== value) { meta[key] = value; changed = true; }
+  }
   // تحديث آخر نشاط كل 10 دقائق كحد أقصى، مع الاحتفاظ بالتاريخ في bot_data.json.
   if (!Number(meta.lastSeenAt) || now - Number(meta.lastSeenAt) >= 10 * 60 * 1000) {
     meta.lastSeenAt = now;
