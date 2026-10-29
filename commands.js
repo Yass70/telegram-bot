@@ -261,7 +261,7 @@ ${link}
 
   // لوحة الأوامر التفاعلية: تظهر كأزرار داخل المجموعة وتُحدّث الرسالة نفسها عند الاختيار.
   const publicCommandsKeyboard = () => new InlineKeyboard()
-    .text('🎮 الألعاب', 'gamesmenu')
+    .text('🎮 الألعاب', 'gameshub')
     .text('💬 التفاعلية', 'interactive_menu').row()
     .text('🛡️ الحماية', 'protectionmenu')
     .text('👑 المشرفون', 'adminpanel').row()
@@ -272,6 +272,16 @@ ${link}
     return ctx.reply('╭━━━〔 🐈‍⬛ مركز أوامر نغنوغ 〕━━━╮\n\nاختَر القسم المطلوب من الأزرار أدناه.\n🎮 الألعاب والأوامر التفاعلية متاحة للجميع.\n🛡️ الحماية وأوامر المشرفين مخصّصة للمخوّلين فقط.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: publicCommandsKeyboard() });
   };
   bot.command('commands', sendPublicCommands);
+  // قائمة الترفيه المستقلة: الألعاب، التفاعلية، والخدمات الحصرية.
+  const sendGamesHub = async ctx => {
+    if (!isGroup(ctx)) return ctx.reply('🐾 افتح «العاب» داخل المجموعة حتى تظهر لك أقسام الترفيه.');
+    const kb = new InlineKeyboard()
+      .text('🎮 الألعاب', 'gamesmenu').row()
+      .text('💬 تفاعلية', 'interactive_menu').row()
+      .text('🎁 خدمات حصرية', 'exclusive_services');
+    return ctx.reply('╭━━━〔 🐈‍⬛ عالم نغنوغ 〕━━━╮\n\nاختَر شنو تحب تسوي ويانه:\n🎮 ألعاب وتحدّيات.\n💬 أوامر تفاعلية.\n🎁 خدمات حصرية.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
+  };
+  bot.hears(/^(?:العاب|ألعاب|الالعاب|الألعاب)$/i, sendGamesHub);
   // يقبل الصيغ الشائعة لعرض الأوامر داخل المجموعة.
   bot.hears(/^(?:الأوامر|الاوامر|أمر|امر)$/i, sendPublicCommands);
 
