@@ -101,8 +101,8 @@ export function registerCallbacks(bot, shared) {
       return;
     }
 
-    const ownerOnlyActions = ['ownerpanel', 'botstats', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
-    if (ownerOnlyActions.includes(data) || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext')) {
+    const ownerOnlyActions = ['ownerpanel', 'botstats', 'botusers', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
+    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
         return;
@@ -271,20 +271,27 @@ export function registerCallbacks(bot, shared) {
     }
     if (data === 'howto') return answer(ctx, '╭━━━〔 📖 طريقة استخدام نغنوغ 〕━━━╮\nاختَر الخدمة المطلوبة من القائمة أدناه.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').text('🏠 الرئيسية', 'home') });
     if (data === 'protection') return answer(ctx, '╭━━━〔 🛡️ ميزات الحماية 〕━━━╮\nتعرّف على أدوات حماية المجموعة والتحكم بها.', { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').text('🏠 الرئيسية', 'home') });
+    if (data === 'gameshub') {
+      const kb = new InlineKeyboard()
+        .text('🎮 الألعاب', 'gamesmenu').row()
+        .text('💬 تفاعلية', 'interactive_menu').row()
+        .text('🎁 خدمات حصرية', 'exclusive_services');
+      return answer(ctx, '╭━━━〔 🐈‍⬛ عالم نغنوغ 〕━━━╮\n\nاختَر القسم اللي يناسب مزاجك:\n🎮 ألعاب وتحدّيات.\n💬 أوامر تفاعلية.\n🎁 خدمات حصرية.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
+    }
     if (data === 'interactive_menu') {
       const kb = new InlineKeyboard().text('👤 بطاقة العضو: ا', 'interactive_profile').row()
         .text('🎯 سؤال شخصي: كت', 'interactive_ket').text('📜 الشعر: ش', 'interactive_poem').row()
         .text('🐈‍⬛ نغنوغ: ن', 'interactive_n').text('🪪 بايو: ب', 'interactive_bio').row()
-        .text('↩️ العودة إلى قائمة الأوامر', 'publiccommands');
+        .text('↩️ عالم نغنوغ', 'gameshub');
       return answer(ctx, '╭━━━〔 💬 الأوامر التفاعلية 〕━━━╮\n👤 «ا» بطاقة العضو\n🎯 «كت» سؤال شخصي\n📜 «ش» شعر عراقي\n🐈‍⬛ «ن» ردود نغنوغ\n🪪 «ب» بايو عشوائي\n\nاضغط الزر لمعرفة طريقة الاستخدام باختصار.\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: kb });
     }
-    if (data === 'interactive_reminder') { const username = ctx.me?.username; const kb = new InlineKeyboard(); if (username) kb.url('⏰ فتح قسم ذكّرني', `https://t.me/${username}?start=reminder`).row(); return answer(ctx, '*⏰ أمر ذكرني*\n\nاكتب «ذكرني» داخل المجموعة حتى يرسل لك نغنوغ شرحاً وزر فتح القسم. لإنشاء تذكير واستلامه بوقته، افتح البوت بالخاص واضغط Start أولاً، ثم حدّد الشيء واليوم والساعة.', { reply_markup: kb.text('↩️ الأوامر التفاعلية', 'interactive_menu'), parse_mode: 'Markdown' }); }
+    if (data === 'interactive_reminder') { const username = ctx.me?.username; const kb = new InlineKeyboard(); if (username) kb.url('⏰ فتح قسم ذكّرني', `https://t.me/${username}?start=reminder`).row(); return answer(ctx, '*⏰ أمر ذكرني*\n\nاكتب «ذكرني» داخل المجموعة حتى يرسل لك نغنوغ شرحاً وزر فتح القسم. لإنشاء تذكير واستلامه بوقته، افتح البوت بالخاص واضغط Start أولاً، ثم حدّد الشيء واليوم والساعة.', { reply_markup: kb.text('↩️ عالم نغنوغ', 'gameshub'), parse_mode: 'Markdown' }); }
     if (data === 'interactive_profile') { try { await ctx.answerCallbackQuery({ text: 'لعرض بطاقة عضو، اكتب «ا» داخل المجموعة أو ردّ به على رسالته.', show_alert: true }); } catch {} return; }
     if (data === 'interactive_ket') { try { await ctx.answerCallbackQuery({ text: 'لسؤال شخصي عشوائي، اكتب «كت» داخل المجموعة.', show_alert: true }); } catch {} return; }
     if (data === 'interactive_poem') { try { await ctx.answerCallbackQuery({ text: 'حتى يرسل نغنوغ شعر عراقي، اكتب «ش» داخل المجموعة.', show_alert: true }); } catch {} return; }
     if (data === 'interactive_n') { try { await ctx.answerCallbackQuery({ text: 'لردود نغنوغ العراقية، اكتب «ن» داخل المجموعة.', show_alert: true }); } catch {} return; }
     if (data === 'interactive_bio') { try { await ctx.answerCallbackQuery({ text: 'لبايو احترافي اكتب: ب', show_alert: true }); } catch {} return; }
-    if (data === 'exclusive_services') { const username = ctx.me?.username; const kb = new InlineKeyboard(); if (username) kb.url('⏰ فتح قسم ذكّرني', `https://t.me/${username}?start=reminder`).row(); kb.text('↩️ العودة إلى الألعاب', 'gamesmenu'); return answer(ctx, '🎁 خدمات نغنوغ الحصرية\n\n⏰ ذكّرني: أنشئ تذكيراً خاصاً بموعد محدد حسب توقيت بغداد.\n\nافتح القسم من الزر بالأسفل، ولازم تكون بادئ البوت بالخاص حتى تصلك التذكيرات.', { reply_markup: kb }); }
+    if (data === 'exclusive_services') { const username = ctx.me?.username; const kb = new InlineKeyboard(); if (username) kb.url('⏰ فتح قسم ذكّرني', `https://t.me/${username}?start=reminder`).row(); kb.text('↩️ عالم نغنوغ', 'gameshub'); return answer(ctx, '🎁 خدمات نغنوغ الحصرية\n\n⏰ ذكّرني: أنشئ تذكيراً خاصاً بموعد محدد حسب توقيت بغداد.\n\nافتح القسم من الزر بالأسفل، ولازم تكون بادئ البوت بالخاص حتى تصلك التذكيرات.', { reply_markup: kb }); }
         if (data === 'help') return answer(ctx, customText(ctx, 'helpText') || HELP_TEXT, { reply_markup: helpKeyboard(getCustomization(ctx)) });
     
     // الأزرار الأساسية والحساب[cite: 3, 4]
@@ -702,22 +709,58 @@ export function registerCallbacks(bot, shared) {
     // لوحة المالك والاشتراك الإجباري[cite: 4, 5]
     if (data === 'ownerpanel') return showOwnerPanel(ctx);
     if (data === 'botstats') {
-      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'الإحصائيات متاحة للمالك من الخاص فقط.');
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 إحصائيات نغنوغ متاحة للمالك من الخاص فقط.');
       const now = Date.now();
       const users = [...new Set((Array.isArray(db.users) ? db.users : []).map(String))];
-      const totalUsers = users.length;
       const privateUsers = new Set((Array.isArray(db.privateUsers) ? db.privateUsers : []).map(String)).size;
       const meta = db.userMeta || {};
-      const active24h = users.filter(id => now - Number(meta[id]?.lastSeenAt || 0) <= 24 * 60 * 60 * 1000 && Number(meta[id]?.lastSeenAt || 0) > 0).length;
-      const active7d = users.filter(id => now - Number(meta[id]?.lastSeenAt || 0) <= 7 * 24 * 60 * 60 * 1000 && Number(meta[id]?.lastSeenAt || 0) > 0).length;
       const new24h = users.filter(id => now - Number(meta[id]?.firstSeenAt || 0) <= 24 * 60 * 60 * 1000 && Number(meta[id]?.firstSeenAt || 0) > 0).length;
       const groups = Object.values(db.groups || {});
-      const activeGroups = groups.filter(g => g.activated).length;
-      const totalReferrals = Object.values(db.referrals || {}).reduce((sum, item) => sum + Math.max(0, Number(item?.joinedCount) || 0), 0);
-      const totalReferralRewards = Object.values(db.referrals || {}).reduce((sum, item) => sum + Math.max(0, Number(item?.rewardPoints) || 0), 0);
-      const totalMessages = Math.max(0, Number(db.stats?.messages) || 0);
-      const kb = new InlineKeyboard().text('🔄 تحديث الإحصائيات', 'botstats').row().text('👑 لوحة المالك', 'ownerpanel');
-      return answer(ctx, `╭━━━〔 📊 إحصائيات نغنوغ 〕━━━╮\n\n👥 إجمالي المستخدمين: ${totalUsers}\n🟢 نشطون خلال 24 ساعة: ${active24h}\n📆 نشطون خلال 7 أيام: ${active7d}\n🆕 مستخدمون جدد خلال 24 ساعة: ${new24h}\n💬 مستخدمو الخاص: ${privateUsers}\n\n👥 المجموعات المسجّلة: ${groups.length}\n🟢 المجموعات المفعّلة: ${activeGroups}\n✉️ رسائل المجموعات المرصودة: ${totalMessages}\n\n🔗 إحالات ناجحة: ${totalReferrals}\n⭐ نقاط جوائز الإحالة: ${totalReferralRewards}\n\n✦ النشاط محسوب من آخر تفاعل سجّله البوت، وقد تكون بيانات النشاط القديم غير متوفرة للمستخدمين السابقين.\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
+      const kb = new InlineKeyboard()
+        .text('🔄 تحديث الإحصائيات', 'botstats').row()
+        .text('👥 قائمة المستخدمين', 'botusers').row()
+        .text('👑 لوحة المالك', 'ownerpanel');
+      return answer(ctx, `🐈‍⬛ إحصائيات نغنوغ\n\n- مستخدمو الخاص: (${privateUsers})\n- المجموعات: (${groups.length})\n- مستخدمون جدد خلال 24 ساعة: (${new24h})\n\n✦ الأرقام مبنية على البيانات التي سجّلها نغنوغ.`, { reply_markup: kb });
+    }
+    if (data === 'botusers' || data.startsWith('botuserspage:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 قائمة المستخدمين خاصة بمالك نغنوغ ومن الخاص فقط.');
+      const all = [...new Set((Array.isArray(db.users) ? db.users : []).map(String).filter(id => /^\d+$/.test(id)))];
+      const pageSize = 8;
+      const page = Math.max(0, Number(data.split(':')[1]) || 0);
+      const pageCount = Math.max(1, Math.ceil(all.length / pageSize));
+      const safePage = Math.min(page, pageCount - 1);
+      const shown = all.slice(safePage * pageSize, (safePage + 1) * pageSize);
+      const kb = new InlineKeyboard();
+      for (const id of shown) {
+        const meta = db.userMeta?.[id] || {};
+        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'مستخدم بدون اسم محفوظ';
+        const username = meta.username ? `@${String(meta.username).replace(/^@/, '')}` : 'بدون @username';
+        kb.text(`👤 ${Array.from(name).slice(0, 18).join('')} · ${id}`, `botuser:${id}`).row();
+      }
+      if (safePage > 0) kb.text('⬅️ السابقة', `botuserspage:${safePage - 1}`);
+      if (safePage + 1 < pageCount) kb.text('➡️ التالية', `botuserspage:${safePage + 1}`);
+      if (safePage > 0 || safePage + 1 < pageCount) kb.row();
+      kb.text('🔄 تحديث القائمة', `botuserspage:${safePage}`).row().text('↩️ الإحصائيات', 'botstats');
+      const text = shown.length ? shown.map((id, i) => {
+        const meta = db.userMeta?.[id] || {};
+        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'اسم غير متوفر';
+        const username = meta.username ? `@${String(meta.username).replace(/^@/, '')}` : 'غير متوفر';
+        return `${safePage * pageSize + i + 1}. ${name}\n   ID: ${id}\n   المعرف: ${username}`;
+      }).join('\n\n') : 'ماكو مستخدمين مسجّلين بالخاص لحد الآن.';
+      return answer(ctx, `👥 قائمة مستخدمي نغنوغ\n\n${text}\n\n✦ المستخدمون المسجّلون: ${all.length}\nالصفحة ${safePage + 1} من ${pageCount}`, { reply_markup: kb });
+    }
+    if (data.startsWith('botuser:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 تفاصيل المستخدمين خاصة بالمالك.');
+      const id = data.slice('botuser:'.length);
+      if (!/^\d+$/.test(id) || !(db.users || []).map(String).includes(id)) return answer(ctx, 'هذا الحساب غير موجود ضمن قائمة مستخدمي نغنوغ.', { reply_markup: new InlineKeyboard().text('↩️ قائمة المستخدمين', 'botusers') });
+      const meta = db.userMeta?.[id] || {};
+      const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'اسم غير متوفر';
+      const username = String(meta.username || '').replace(/^@/, '');
+      const hasPrivateChat = (db.privateUsers || []).map(String).includes(id);
+      const kb = new InlineKeyboard().add({ text: '📋 نسخ ID', copy_text: { text: id } }).row();
+      if (username) kb.url('🔗 فتح حساب تيليغرام', `https://t.me/${encodeURIComponent(username)}`).row();
+      kb.text('↩️ قائمة المستخدمين', 'botusers');
+      return answer(ctx, `🐈‍⬛ بطاقة مستخدم\n\nالاسم: ${name}\nالمعرّف الرقمي (ID): ${id}\nاسم المستخدم: ${username ? '@' + username : 'غير متوفر'}\nمحادثة الخاص: ${hasPrivateChat ? '🟢 مسجّلة' : '⚪ غير مسجّلة'}\n\n✦ ${hasPrivateChat ? 'يمكن محاولة مراسلته من البوت ما لم يكن قد حظره.' : 'لا يستطيع البوت بدء محادثة خاصة معه؛ عليه فتح البوت والضغط على Start أولاً.'}`, { reply_markup: kb });
     }
     if (data === 'activatedgroups') {
       if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
@@ -1084,8 +1127,7 @@ export function registerCallbacks(bot, shared) {
         .text('🐾 حيوان', 'game_an').text('💡 أسئلة', 'game_ge').row()
         .text('🍎 معاني', 'game_meanings').text('🔁 عكس', 'game_opposite').row()
         .text('🔤 تفكيك', 'game_decompose').row()
-        .text('💬 الأوامر التفاعلية', 'interactive_menu').text('🎁 خدمات حصرية', 'exclusive_services').row()
-        .text(menuBackTarget(ctx, 'games') === 'managementmenu' ? '↩️ الإدارة' : menuBackTarget(ctx, 'games') === 'ownerpanel' ? '↩️ لوحة المالك' : menuBackTarget(ctx, 'games') === 'groupsettings' ? '↩️ إعدادات المجموعة' : '📚 مركز الأوامر', menuBackTarget(ctx, 'games'));
+        .text('↩️ عالم نغنوغ', 'gameshub');
 
       if (ctx.callbackQuery) {
         try { await ctx.editMessageText(gamesText, { reply_markup: gamesKb }); }
