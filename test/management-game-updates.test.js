@@ -42,3 +42,27 @@ test('owner chat subscription feature is persisted and checks membership', () =>
   assert.match(messages, /chatSub\?\.enabled/);
   assert.match(messages, /chat-sub-set/);
 });
+
+
+test('owner stats expose compact counts and a paginated user directory', () => {
+  const callbacks = read('../commands/callbacks.js');
+  const helpers = read('../helpers.js');
+  assert.match(callbacks, /- مستخدمو الخاص:/);
+  assert.match(callbacks, /- المجموعات:/);
+  assert.match(callbacks, /- مستخدمون جدد خلال 24 ساعة:/);
+  assert.match(callbacks, /botuserspage:/);
+  assert.match(callbacks, /copy_text: \{ text: id \}/);
+  assert.match(helpers, /firstName/);
+  assert.match(helpers, /username/);
+});
+
+test('games hub separates games from interactive commands and exclusive services', () => {
+  const commands = read('../commands.js');
+  const callbacks = read('../commands/callbacks.js');
+  assert.match(commands, /bot\.hears\(\/\^\(\?:العاب/);
+  assert.match(callbacks, /if \(data === 'gameshub'\)/);
+  const gamesBlock = callbacks.slice(callbacks.indexOf("if (data === 'gamesmenu'"), callbacks.indexOf("if (data === 'game_top'"));
+  assert.doesNotMatch(gamesBlock, /text\('💬 الأوامر التفاعلية'/);
+  assert.doesNotMatch(gamesBlock, /text\('🎁 خدمات حصرية'/);
+  assert.match(callbacks, /'↩️ عالم نغنوغ', 'gameshub'/);
+});

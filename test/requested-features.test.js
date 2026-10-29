@@ -29,11 +29,13 @@ test('group games command and random profile praise are registered', () => {
   assert.match(messages, /const praise = PROFILE_PHRASES\[Math\.floor\(Math\.random\(\) \* PROFILE_PHRASES\.length\)\]/);
 });
 
-test('owner text editor is text-only and statistics include activity windows', () => {
+test('owner text editor is text-only and bot statistics use the compact requested layout', () => {
   const callbacks = read('../commands/callbacks.js');
   assert.match(callbacks, /const textCatalog = UI_TEXT_CATALOG[\s\S]*filter\(item => item\.kind === 'text'\)/);
-  assert.match(callbacks, /نشطون خلال 24 ساعة/);
-  assert.match(callbacks, /نشطون خلال 7 أيام/);
+  assert.match(callbacks, /- مستخدمو الخاص:/);
+  assert.match(callbacks, /- المجموعات:/);
+  assert.match(callbacks, /- مستخدمون جدد خلال 24 ساعة:/);
+  assert.match(callbacks, /botuserspage:/);
   assert.match(callbacks, /if \(kind !== 'text'\)/);
 });
 
