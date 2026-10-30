@@ -6,6 +6,7 @@ import { QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES } from './
 import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
 import { registerChannelManager } from './channelManager.js';
+import { registerQrLikeCallbacks } from './qrLikes.js';
 import { ensureEarnings, earningsBalance, awardReferral, redeemReward, setRedemptionStatus } from './earnings.js';
 
 export function setupCommands(bot, db, helpers) {
@@ -34,6 +35,7 @@ export function setupCommands(bot, db, helpers) {
   });
 
   registerChannelManager(bot, { db, save, isOwner });
+  registerQrLikeCallbacks(bot, { db, save, archiveChannel: process.env.QR_IMAGE_CHANNEL || '@QRiii5i' });
 
   // نحفظ القائمة التي دخل المستخدم منها إلى الألعاب أو التحذيرات، حتى يعود إليها فعلاً.
   const inferMenuBack = (ctx, kind) => {
