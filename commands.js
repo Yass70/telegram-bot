@@ -5,6 +5,7 @@ import { helpKeyboard } from './keyboards.js';
 import { QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES } from './games/data.js';
 import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
+import { registerChannelManager } from './channelManager.js';
 import { ensureEarnings, earningsBalance, awardReferral, redeemReward, setRedemptionStatus } from './earnings.js';
 
 export function setupCommands(bot, db, helpers) {
@@ -31,6 +32,8 @@ export function setupCommands(bot, db, helpers) {
     }
     return next();
   });
+
+  registerChannelManager(bot, { db, save, isOwner });
 
   // نحفظ القائمة التي دخل المستخدم منها إلى الألعاب أو التحذيرات، حتى يعود إليها فعلاً.
   const inferMenuBack = (ctx, kind) => {

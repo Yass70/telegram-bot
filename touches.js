@@ -219,6 +219,7 @@ export function touchesMenuKeyboard() {
     .text('⏰ ذكّرني', 'remindermenu').row()
     .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
     .text('📥 تحميل الفيديوهات', 'touchesdownload').row()
+    .text('📢 إدارة القنوات', 'chmgr:home').row()
     .text('🏠 القائمة الرئيسية', 'home');
 }
 

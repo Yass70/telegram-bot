@@ -43,6 +43,7 @@ export const freshDB = () => ({
   globalTextOverrides: { texts: [], buttons: [], buttonCallbacks: {} },
   globalCustomizationDefaults: {},
   touchSessions: {},
+  channelManager: { users: {}, jobs: {}, counters: { published: 0, failed: 0 } },
   reminders: [],
   adhkarLast: {},
   userMeta: {},
@@ -104,6 +105,8 @@ function load() {
     db.globalTextOverrides.buttonCallbacks ||= {};
     db.globalCustomizationDefaults ||= {};
     db.touchSessions ||= {};
+    db.channelManager ||= { users: {}, jobs: {}, counters: { published: 0, failed: 0 } };
+    db.channelManager.users ||= {}; db.channelManager.jobs ||= {}; db.channelManager.counters ||= { published: 0, failed: 0 };
     db.reminders = Array.isArray(db.reminders) ? db.reminders : [];
     db.adhkarLast ||= {};
     db.userMeta ||= {};
