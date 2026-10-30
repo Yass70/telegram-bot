@@ -101,8 +101,8 @@ export function registerCallbacks(bot, shared) {
       return;
     }
 
-    const ownerOnlyActions = ['ownerpanel', 'botstats', 'botusers', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
-    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext')) {
+    const ownerOnlyActions = ['ownerpanel', 'botstats', 'botusers', 'botgroups', 'botnew24h', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
+    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botgroupspage:') || data.startsWith('botnew24hpage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext') || data.startsWith('activegroup:') || data.startsWith('activegroupinvite:')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
         return;
@@ -711,43 +711,76 @@ export function registerCallbacks(bot, shared) {
     if (data === 'botstats') {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 إحصائيات نغنوغ متاحة للمالك من الخاص فقط.');
       const now = Date.now();
-      const users = [...new Set((Array.isArray(db.users) ? db.users : []).map(String))];
-      const privateUsers = new Set((Array.isArray(db.privateUsers) ? db.privateUsers : []).map(String)).size;
-      const meta = db.userMeta || {};
-      const new24h = users.filter(id => now - Number(meta[id]?.firstSeenAt || 0) <= 24 * 60 * 60 * 1000 && Number(meta[id]?.firstSeenAt || 0) > 0).length;
-      const groups = Object.values(db.groups || {});
+      const privateUsers = [...new Set((Array.isArray(db.privateUsers) ? db.privateUsers : []).map(String).filter(id => /^\d+$/.test(id)))];
+      const new24h = privateUsers.filter(id => {
+        const firstStart = Number(db.userMeta?.[id]?.privateStartAt || 0);
+        return firstStart > 0 && now - firstStart >= 0 && now - firstStart < 24 * 60 * 60 * 1000;
+      }).length;
+      const groups = Object.values(db.groups || {}).filter(g => g && g.id);
       const kb = new InlineKeyboard()
+        .text('📊 الإحصائيات العامة', 'botstats').row()
+        .text('👤 قائمة مستخدمي الخاص', 'botusers').row()
+        .text('👥 المجموعات المسجّلة', 'botgroups').row()
+        .text('🆕 المنضمون آخر 24 ساعة', 'botnew24h').row()
         .text('🔄 تحديث الإحصائيات', 'botstats').row()
-        .text('👥 قائمة المستخدمين', 'botusers').row()
-        .text('👑 لوحة المالك', 'ownerpanel');
-      return answer(ctx, `🐈‍⬛ إحصائيات نغنوغ\n\n- مستخدمو الخاص: (${privateUsers})\n- المجموعات: (${groups.length})\n- مستخدمون جدد خلال 24 ساعة: (${new24h})\n\n✦ الأرقام مبنية على البيانات التي سجّلها نغنوغ.`, { reply_markup: kb });
+        .text('🔙 رجوع', 'ownerpanel');
+      return answer(ctx, `╭━━━〔 📊 إحصائيات نغنوغ 〕━━━╮
+
+👤 إجمالي مستخدمي الخاص: ${privateUsers.length}
+👥 المجموعات المسجّلة: ${groups.length}
+🆕 المنضمون خلال آخر 24 ساعة: ${new24h}
+
+✦ تُحتسب الحسابات من تسجيل /start، وتُحسب المجموعات من قاعدة البيانات المحفوظة.
+╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
-    if (data === 'botusers' || data.startsWith('botuserspage:')) {
+    if (data === 'botusers' || data.startsWith('botuserspage:') || data === 'botnew24h' || data.startsWith('botnew24hpage:')) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 قائمة المستخدمين خاصة بمالك نغنوغ ومن الخاص فقط.');
-      const all = [...new Set((Array.isArray(db.users) ? db.users : []).map(String).filter(id => /^\d+$/.test(id)))];
+      const now = Date.now();
+      const all = [...new Set((Array.isArray(db.privateUsers) ? db.privateUsers : []).map(String).filter(id => /^\d+$/.test(id)))];
+      const recentOnly = data === 'botnew24h' || data.startsWith('botnew24hpage:');
+      const filtered = recentOnly ? all.filter(id => { const t = Number(db.userMeta?.[id]?.privateStartAt || 0); return t > 0 && now - t >= 0 && now - t < 86400000; }) : all;
+      const pageSize = 8;
+      const page = Math.max(0, Number(data.split(':')[1]) || 0);
+      const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+      const safePage = Math.min(page, pageCount - 1);
+      const shown = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+      const kb = new InlineKeyboard();
+      for (const id of shown) {
+        const meta = db.userMeta?.[id] || {};
+        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'مستخدم بدون اسم محفوظ';
+        kb.text(`👤 ${Array.from(name).slice(0, 18).join('')} · ${id}`, `botuser:${id}`).row();
+      }
+      const pageCallback = recentOnly ? 'botnew24hpage:' : 'botuserspage:';
+      if (safePage > 0) kb.text('⬅️ السابقة', `${pageCallback}${safePage - 1}`);
+      if (safePage + 1 < pageCount) kb.text('➡️ التالية', `${pageCallback}${safePage + 1}`);
+      if (safePage > 0 || safePage + 1 < pageCount) kb.row();
+      kb.text('🔄 تحديث القائمة', `${pageCallback}${safePage}`).row()
+        .text('↩️ الإحصائيات', 'botstats');
+      const body = shown.length ? shown.map((id, i) => {
+        const meta = db.userMeta?.[id] || {};
+        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'اسم غير متوفر';
+        const username = meta.username ? `@${String(meta.username).replace(/^@/, '')}` : 'غير متوفر';
+        return `${safePage * pageSize + i + 1}. ${name}\n   ID: ${id}\n   المعرف: ${username}`;
+      }).join('\n\n') : (recentOnly ? 'ماكو مستخدمون جدد مسجّلون خلال آخر 24 ساعة.' : 'ماكو مستخدمين بدأوا البوت بالخاص لحد الآن.');
+      const title = recentOnly ? '🆕 المنضمون خلال آخر 24 ساعة' : '👤 قائمة مستخدمي الخاص';
+      return answer(ctx, `${title}\n\n${body}\n\n✦ العدد: ${filtered.length}\nالصفحة ${safePage + 1} من ${pageCount}`, { reply_markup: kb });
+    }
+    if (data === 'botgroups' || data.startsWith('botgroupspage:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 قائمة المجموعات خاصة بمالك نغنوغ ومن الخاص فقط.');
+      const all = Object.values(db.groups || {}).filter(g => g && g.id);
       const pageSize = 8;
       const page = Math.max(0, Number(data.split(':')[1]) || 0);
       const pageCount = Math.max(1, Math.ceil(all.length / pageSize));
       const safePage = Math.min(page, pageCount - 1);
       const shown = all.slice(safePage * pageSize, (safePage + 1) * pageSize);
       const kb = new InlineKeyboard();
-      for (const id of shown) {
-        const meta = db.userMeta?.[id] || {};
-        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'مستخدم بدون اسم محفوظ';
-        const username = meta.username ? `@${String(meta.username).replace(/^@/, '')}` : 'بدون @username';
-        kb.text(`👤 ${Array.from(name).slice(0, 18).join('')} · ${id}`, `botuser:${id}`).row();
-      }
-      if (safePage > 0) kb.text('⬅️ السابقة', `botuserspage:${safePage - 1}`);
-      if (safePage + 1 < pageCount) kb.text('➡️ التالية', `botuserspage:${safePage + 1}`);
+      for (const group of shown) kb.text(`👥 ${Array.from(String(group.title || group.id)).slice(0, 28).join('')}`, `activegroup:${group.id}`).row();
+      if (safePage > 0) kb.text('⬅️ السابقة', `botgroupspage:${safePage - 1}`);
+      if (safePage + 1 < pageCount) kb.text('➡️ التالية', `botgroupspage:${safePage + 1}`);
       if (safePage > 0 || safePage + 1 < pageCount) kb.row();
-      kb.text('🔄 تحديث القائمة', `botuserspage:${safePage}`).row().text('↩️ الإحصائيات', 'botstats');
-      const text = shown.length ? shown.map((id, i) => {
-        const meta = db.userMeta?.[id] || {};
-        const name = [meta.firstName, meta.lastName].filter(Boolean).join(' ') || 'اسم غير متوفر';
-        const username = meta.username ? `@${String(meta.username).replace(/^@/, '')}` : 'غير متوفر';
-        return `${safePage * pageSize + i + 1}. ${name}\n   ID: ${id}\n   المعرف: ${username}`;
-      }).join('\n\n') : 'ماكو مستخدمين مسجّلين بالخاص لحد الآن.';
-      return answer(ctx, `👥 قائمة مستخدمي نغنوغ\n\n${text}\n\n✦ المستخدمون المسجّلون: ${all.length}\nالصفحة ${safePage + 1} من ${pageCount}`, { reply_markup: kb });
+      kb.text('🔄 تحديث القائمة', `botgroupspage:${safePage}`).row().text('↩️ الإحصائيات', 'botstats');
+      const details = shown.map((g, i) => `${safePage * pageSize + i + 1}. ${g.title || 'مجموعة بدون اسم'}\n   ID: ${g.id}\n   الحالة: ${g.activated ? '🟢 مفعّلة' : '⚪ غير مفعّلة'}`).join('\n\n') || 'ماكو مجموعات مسجّلة.';
+      return answer(ctx, `👥 المجموعات المسجّلة\n\n${details}\n\n✦ العدد الكلي: ${all.length}\nالصفحة ${safePage + 1} من ${pageCount}`, { reply_markup: kb });
     }
     if (data.startsWith('botuser:')) {
       if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, '🐾 تفاصيل المستخدمين خاصة بالمالك.');
