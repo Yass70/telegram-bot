@@ -32,9 +32,9 @@ test('group games command and random profile praise are registered', () => {
 test('owner text editor is text-only and bot statistics use the compact requested layout', () => {
   const callbacks = read('../commands/callbacks.js');
   assert.match(callbacks, /const textCatalog = UI_TEXT_CATALOG[\s\S]*filter\(item => item\.kind === 'text'\)/);
-  assert.match(callbacks, /- مستخدمو الخاص:/);
-  assert.match(callbacks, /- المجموعات:/);
-  assert.match(callbacks, /- مستخدمون جدد خلال 24 ساعة:/);
+  assert.match(callbacks, /إجمالي مستخدمي الخاص:/);
+  assert.match(callbacks, /المجموعات المسجّلة:/);
+  assert.match(callbacks, /المنضمون خلال آخر 24 ساعة:/);
   assert.match(callbacks, /botuserspage:/);
   assert.match(callbacks, /if \(kind !== 'text'\)/);
 });

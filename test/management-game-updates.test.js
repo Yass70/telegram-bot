@@ -47,13 +47,17 @@ test('owner chat subscription feature is persisted and checks membership', () =>
 test('owner stats expose compact counts and a paginated user directory', () => {
   const callbacks = read('../commands/callbacks.js');
   const helpers = read('../helpers.js');
-  assert.match(callbacks, /- مستخدمو الخاص:/);
-  assert.match(callbacks, /- المجموعات:/);
-  assert.match(callbacks, /- مستخدمون جدد خلال 24 ساعة:/);
+  assert.match(callbacks, /إجمالي مستخدمي الخاص:/);
+  assert.match(callbacks, /المجموعات المسجّلة:/);
+  assert.match(callbacks, /المنضمون خلال آخر 24 ساعة:/);
+  assert.match(callbacks, /botgroupspage:/);
+  assert.match(callbacks, /botnew24hpage:/);
   assert.match(callbacks, /botuserspage:/);
   assert.match(callbacks, /copy_text: \{ text: id \}/);
   assert.match(helpers, /firstName/);
   assert.match(helpers, /username/);
+  assert.match(helpers, /function registerPrivateStart/);
+  assert.match(helpers, /privateStartAt/);
 });
 
 test('games hub separates games from interactive commands and exclusive services', () => {
