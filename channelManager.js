@@ -1,4 +1,5 @@
 import { InlineKeyboard } from 'grammy';
+import { resolveTelegramChatTarget } from './chatTarget.js';
 
 const uid = ctx => String(ctx.from?.id || '');
 const emptyUser = () => ({ channels: [], drafts: [], scheduled: [], posts: [], templates: [], settings: { enabled: true } });
@@ -59,7 +60,7 @@ export function registerChannelManager(bot, { db, save, isOwner }) {
       }
       if (action === 'add') {
         db.pending[id] = { action: 'chmgr-add-channel' }; save();
-        return reply(ctx, '➕ إضافة قناة\nأرسل @username أو معرّف القناة الرقمي (مثل -100...) بعد إضافة نغنوغ مشرفاً بصلاحية النشر.\nلن يتم النشر قبل تأكيدك.', back());
+        return reply(ctx, '➕ إضافة قناة\nأرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمي. للجهة الخاصة: Chat ID | رابط الدعوة. أضف نغنوغ مشرفاً بصلاحية النشر.\nلن يتم النشر قبل تأكيدك.', back());
       }
       if (action.startsWith('channel:')) {
         const cid = action.slice(8); const c = u.channels.find(x => x.id === cid);
@@ -141,19 +142,19 @@ ${String(e.description||e.message||'').slice(0,180)}`,kbHome());} }
     if (ctx.message && isPrivate(ctx)) {
       const p = session(id);
       if (p?.action === 'chmgr-add-channel') {
-        const raw = String(ctx.message.text||'').trim(); if(!raw) return ctx.reply('أرسل @username أو معرّف القناة الرقمي.');
+        const raw = String(ctx.message.text||'').trim(); if(!raw) return ctx.reply('أرسل @username أو رابطاً عاماً من t.me/telegram.me أو Chat ID رقمي.');
         try {
-          const chat = await ctx.api.getChat(raw);
-          if (!['channel'].includes(chat.type)) return ctx.reply('هذا ليس معرّف قناة. أرسل قناة عامة أو معرّف قناة صحيح.');
-          const me = await ctx.api.getChatMember(chat.id, ctx.me.id);
-          if (me.status !== 'administrator' || me.can_post_messages !== true) return ctx.reply('❌ نغنوغ ليس مشرفاً بصلاحية نشر الرسائل. أضفه مشرفاً وفعّل صلاحية نشر الرسائل ثم أعد المحاولة.');
-          const member = await ctx.api.getChatMember(chat.id, ctx.from.id);
-          if (!['creator','administrator'].includes(member.status)) return ctx.reply('❌ تيليگرام لم يؤكد أنك مالك أو مشرف في هذه القناة؛ لم تتم إضافتها.');
+          const chat = await resolveTelegramChatTarget(ctx, raw, {
+            botId: ctx.me?.id || bot.botInfo?.id,
+            allowedTypes: ['channel'],
+            requireBotPost: true,
+            requireUserAdmin: true,
+          });
           const u=data(id); if(u.channels.some(c=>c.id===String(chat.id))){clear(id);return ctx.reply('القناة مضافة مسبقاً.',{reply_markup:kbHome()});}
-          const channel={id:String(chat.id),title:chat.title||String(chat.id),username:chat.username||'',url:chat.username?`https://t.me/${chat.username}`:'',addedAt:new Date().toISOString()};
+          const channel={id:String(chat.id),title:chat.title,username:chat.username,url:chat.url,addedAt:new Date().toISOString()};
           u.channels.push(channel); clear(id); save();
-          return ctx.reply(`✅ تمت إضافة القناة: ${channel.title}\nتم التحقق من صلاحية إشرافك ومن صلاحية نغنوغ على النشر.`,{reply_markup:kbHome()});
-        } catch(e) { return ctx.reply(`❌ لم أستطع التحقق من القناة. تأكد من صحة المعرّف ومن أن البوت مضاف إليها.\n${String(e.description||e.message||'').slice(0,200)}\nأعد الإرسال أو اضغط إلغاء.`,{reply_markup:back()}); }
+          return ctx.reply(`✅ تمت إضافة القناة: ${channel.title}\nتم التحقق من صلاحية إشرافك ومن صلاحية نغنوغ على النشر.${chat.privateInviteSupplied ? '\nتنبيه: تعذّر على Telegram Bot API إثبات أن رابط الدعوة الخاص يعود إلى Chat ID؛ تأكد من صحة الرابط.' : ''}`,{reply_markup:kbHome()});
+        } catch(e) { return ctx.reply(`❌ لم أستطع إضافة القناة.\nالسبب: ${String(e.description||e.message||'خطأ غير معروف').slice(0,240)}\nأصلح السبب ثم أعد الإرسال أو اضغط إلغاء.`,{reply_markup:back()}); }
       }
       if (p?.action === 'chmgr-compose') {
         const u=data(id); const channel=u.channels.find(c=>c.id===p.channelId); if(!channel){clear(id);return ctx.reply('القناة غير مرتبطة.');}
