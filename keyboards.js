@@ -3,17 +3,29 @@ import { InlineKeyboard } from 'grammy';
 export function mainKeyboard(ctx, bot, ui = {}) {
   const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
   const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
-  // واجهة الخاص الأساسية موحّدة للمالك والمستخدم، مع أزرار المالك الإضافية من index.js.
-  const kb = new InlineKeyboard()
-    .text(label('groups', '👥 مجموعاتي'), 'mygroups')
-    .url(label('addBot', '➕ أضف نغنوغ'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
-    .text(label('management', '⚙️ الإدارة'), 'managementmenu')
-    .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
-    .text('💰 أرباحي', 'earningsmenu')
-    .text('✨ لمسات نغنوغ', 'touchesmenu').row()
+  // واجهة الخدمات الرئيسية: الأدوات الأكثر استخداماً ظاهرة مباشرة وبترتيب متوازن.
+  return new InlineKeyboard()
+    .text('▦ إنشاء الباركود', 'qrmenu')
+    .text('✨ زخرفة الأسماء', 'touchesdecorate').row()
+    .text('⏰ ذكّرني', 'remindermenu')
+    .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
+    .text('📥 تحميل الفيديوهات', 'touchesdownload')
+    .text('📢 إدارة القنوات', 'chmgr:home').row()
+    .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo')
+    .text('💰 أرباحي', 'earningsmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
-    .text(label('help', '📖 المساعدة'), 'help');
-  return kb;
+    .text(label('help', '📖 المساعدة'), 'help').row()
+    .text('👥 إدارة المجموعات', 'groupmanagementmenu');
+}
+
+export function groupManagementKeyboard(bot) {
+  const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
+  const addBotUrl = `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`;
+  return new InlineKeyboard()
+    .url('➕ أضفني للمجموعة', addBotUrl).row()
+    .text('👥 مجموعاتي', 'mygroups').row()
+    .text('⚙️ الإدارة', 'managementmenu').row()
+    .text('🏠 القائمة الرئيسية', 'home');
 }
 
 export function customizationKeyboard(ui = {}) {
