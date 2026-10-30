@@ -215,7 +215,7 @@ async function userCanManage(ctx, g) {
 
 function normalizeChatIdentifier(value) {
   const raw = String(value ?? '').trim();
-  return /^-?\d+$/.test(raw) ? Number(raw) : raw;
+  return raw;
 }
 
 function isJoinedMember(member) {
@@ -272,7 +272,7 @@ async function ensureSubscriptionLink(setting, scope = 'required') {
 async function checkSubscription(userId) {
   const missingChannels = [];
   const errors = [];
-  for (const ch of (Array.isArray(db.requiredChats) ? db.requiredChats : [])) {
+  for (const ch of (Array.isArray(db.requiredChats) ? db.requiredChats : []).filter(item => item && item.enabled !== false)) {
     try {
       await ensureSubscriptionLink(ch, 'required');
       const member = await bot.api.getChatMember(normalizeChatIdentifier(ch.id), Number(userId));
@@ -318,17 +318,41 @@ async function subscriptionGate(ctx) {
 
 async function checkChatSubscription(chatId, userId) {
   const setting = db.chatSubscriptions?.[String(chatId)];
-  if (!setting?.enabled || !setting.requiredChatId) return { required: false, ok: true };
-  try {
-    await ensureSubscriptionLink({ ...setting, id: setting.requiredChatId, requiredChatId: setting.requiredChatId }, 'chat').then(resolved => {
-      setting.title = resolved.title; setting.username = resolved.username; setting.url = resolved.url;
-    });
-    const member = await bot.api.getChatMember(normalizeChatIdentifier(setting.requiredChatId), Number(userId));
-    return { required: true, ok: isJoinedMember(member), setting };
-  } catch (error) {
-    await notifySubscriptionProblem('chat', { ...setting, id: setting.requiredChatId }, error);
-    return { required: true, ok: false, technicalError: true, setting, error };
+  const targets = Array.isArray(setting?.requiredChats) && setting.requiredChats.length
+    ? setting.requiredChats
+    : (setting?.requiredChatId ? [{ id: String(setting.requiredChatId), title: setting.title, username: setting.username || '', url: setting.url || '' }] : []);
+  if (!setting?.enabled || !targets.length) return { required: false, ok: true, setting };
+  const missing = [];
+  const errors = [];
+  for (const target of targets) {
+    try {
+      const resolved = await ensureSubscriptionLink({ ...target, id: target.id || target.requiredChatId }, 'chat');
+      const member = await bot.api.getChatMember(normalizeChatIdentifier(resolved.id), Number(userId));
+      if (!isJoinedMember(member)) missing.push(resolved);
+    } catch (error) {
+      errors.push({ target, error });
+      await notifySubscriptionProblem('chat', { ...setting, ...target, id: target.id }, error);
+    }
   }
+  // Keep legacy fields synchronized for old menus and installations.
+  if (targets.length) {
+    setting.requiredChats = targets;
+    setting.requiredChatId = targets[0].id;
+    setting.title = targets[0].title;
+    setting.username = targets[0].username || '';
+    setting.url = targets[0].url || '';
+  }
+  return { required: true, ok: missing.length === 0 && errors.length === 0, setting, missing, errors, technicalError: errors.length > 0 };
+}
+
+async function ensureGroupSubscriptionPermissions(ctx, groupId) {
+  const chat = await bot.api.getChat(normalizeChatIdentifier(groupId));
+  if (chat.type !== 'supergroup') throw new Error('اشتراك الدردشة يحتاج مجموعة خارقة (Supergroup) حتى يمكن تقييد العضو؛ حوّل المجموعة إلى مجموعة خارقة أولاً.');
+  const me = await bot.api.getChatMember(chat.id, bot.botInfo.id);
+  if (me.status !== 'administrator' || !me.can_delete_messages || !me.can_restrict_members) {
+    throw new Error('ارفع نغنوغ مشرفاً في المجموعة وفعّل له صلاحيتَي حذف الرسائل وتقييد الأعضاء، ثم أعد التشغيل.');
+  }
+  return true;
 }
 
 async function chatSubscriptionGate(ctx, { callback = false } = {}) {
@@ -341,7 +365,8 @@ async function chatSubscriptionGate(ctx, { callback = false } = {}) {
   if (!result.required || result.ok) return true;
   if (callback && String(ctx.callbackQuery?.data || '').startsWith('chatsubverify:')) return true;
   if (result.technicalError) {
-    const message = '⚠️ تعذّر التحقق من الاشتراك حالياً بسبب مشكلة بصلاحيات البوت أو الوصول إلى الجهة. تم تنبيه المالك؛ حاول بعد قليل.';
+    const details = result.errors.map(item => `${item.target?.title || item.target?.id}: ${item.error?.description || item.error?.message || 'خطأ غير معروف'}`).join(' | ').slice(0, 500);
+    const message = `⚠️ تعذّر التحقق من الاشتراك حالياً. لم نعتبرك مشتركاً ولم نسمح بتجاوز الشرط. تم تنبيه المالك. السبب: ${details || 'تعذّر الوصول إلى جهة الاشتراك'}`;
     if (callback) {
       try { await ctx.answerCallbackQuery({ text: message, show_alert: true }); } catch {}
     } else {
@@ -350,10 +375,32 @@ async function chatSubscriptionGate(ctx, { callback = false } = {}) {
     }
     return false;
   }
+  // قيد العضو مؤقتاً بعد التأكد من أن إعداد المجموعة يسمح بذلك؛ لا نغيّر تقييداً سابقاً فرضه مشرف.
+  try {
+    const currentMember = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
+    if (currentMember.status !== 'restricted') {
+      db.chatSubRestricted ||= {};
+      const restrictionKey = `${ctx.chat.id}:${ctx.from.id}`;
+      if (!db.chatSubRestricted[restrictionKey]) {
+        await ctx.api.restrictChatMember(ctx.chat.id, ctx.from.id, {
+          can_send_messages: false, can_send_audios: false, can_send_documents: false,
+          can_send_photos: false, can_send_videos: false, can_send_video_notes: false,
+          can_send_voice_notes: false, can_send_polls: false, can_send_other_messages: false,
+          can_add_web_page_previews: false
+        });
+        db.chatSubRestricted[restrictionKey] = { applied: true, at: Date.now() };
+        save();
+      }
+    }
+  } catch (restrictionError) {
+    console.warn('[chat-subscription] could not restrict unjoined member:', restrictionError?.description || restrictionError?.message || restrictionError);
+    await notifySubscriptionProblem('chat', { id: ctx.chat.id, title: ctx.chat.title }, restrictionError);
+  }
   const kb = new InlineKeyboard();
-  if (result.setting.url && /^https:\/\/t\.me\//i.test(result.setting.url)) kb.url('📣 اشترك الآن', result.setting.url).row();
+  for (const target of (result.missing || [])) if (target.url && /^https:\/\/t\.me\//i.test(target.url)) kb.url(`📣 اشترك الآن: ${String(target.title || 'الجهة المطلوبة').slice(0, 22)}`, target.url).row();
   kb.text('✅ تحقّق من الاشتراك', `chatsubverify:${ctx.chat.id}`);
-  const text = `🔒 لاستخدام الدردشة، اشترك أولاً في «${result.setting.title || 'القناة/المجموعة المطلوبة'}»، ثم اضغط زر التحقق.`;
+  const missingNames = (result.missing || []).map(item => item.title || item.id).join('، ');
+  const text = `🔒 لاستخدام الدردشة، اشترك أولاً في الجهات التالية: ${missingNames}، ثم اضغط زر التحقق.`;
   if (callback) {
     try { await ctx.answerCallbackQuery({ text: '🔒 عليك الاشتراك أولاً حتى تستخدم أزرار الدردشة.', show_alert: true }); } catch {}
     const throttleKey = `${ctx.chat.id}:${ctx.from.id}`;
@@ -372,6 +419,26 @@ async function chatSubscriptionGate(ctx, { callback = false } = {}) {
     }
   }
   return false;
+}
+
+async function restoreChatSubscriptionRestriction(chatId, userId) {
+  const key = `${chatId}:${userId}`;
+  const record = db.chatSubRestricted?.[key];
+  if (!record?.applied) return false;
+  try {
+    await bot.api.restrictChatMember(normalizeChatIdentifier(chatId), Number(userId), {
+      can_send_messages: true, can_send_audios: true, can_send_documents: true,
+      can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
+      can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
+      can_add_web_page_previews: true
+    });
+    delete db.chatSubRestricted[key];
+    save();
+    return true;
+  } catch (error) {
+    console.warn('[chat-subscription] could not restore member permissions:', error?.description || error?.message || error);
+    throw error;
+  }
 }
 
 function selectedGroupKeyboard(ctx) {
@@ -435,9 +502,15 @@ async function showRequiredList(ctx) {
   if (!isOwner(ctx)) return answer(ctx, 'خاص بالمالك.');
   if (!db.requiredChats.length) return answer(ctx, 'ماكو قنوات أو مجموعات مضافة.', { reply_markup: new InlineKeyboard().text('➕ إضافة قناة', 'requiredadd').text('↩️ رجوع', 'requiredmenu') });
   const kb = new InlineKeyboard();
-  db.requiredChats.forEach((ch, i) => kb.text(`🗑️ حذف ${ch.title || ch.username || ch.id}`, `reqdel:${i}`).row());
+  db.requiredChats.forEach((ch, i) => {
+    const title = String(ch.title || ch.username || ch.id || `جهة ${i + 1}`).slice(0, 28);
+    kb.text(`${ch.enabled === false ? '⚪' : '🟢'} ${title}`, `reqtoggle:${i}`).row();
+    kb.text('✏️ تعديل', `reqedit:${i}`).text('🗑️ حذف', `reqdel:${i}`).row();
+  });
   kb.text('➕ إضافة قناة أخرى', 'requiredadd').row().text('🔙 رجوع', 'requiredmenu');
-  return answer(ctx, `📋 قنوات ومجموعات الاشتراك الإجباري`, { reply_markup: kb });
+  return answer(ctx, `📋 قنوات ومجموعات الاشتراك الإجباري
+🟢 مفعّل | ⚪ متوقف
+اضغط على اسم الجهة لتشغيلها أو إيقافها.`, { reply_markup: kb });
 }
 
 const PROFILE_PHRASES = [
@@ -545,7 +618,7 @@ async function handleViolation(ctx, g, reason) {
   return {
     isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor,
     selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange: (kind, from, to) => applyGlobalCustomizationChange(db, DEFAULT_CUSTOMIZATION, kind, from, to), customText, getHomeKeyboard,
-    HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, chatSubscriptionGate, checkChatSubscription, notifySubscriptionProblem,
+    HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, chatSubscriptionGate, checkChatSubscription, ensureGroupSubscriptionPermissions, restoreChatSubscriptionRestriction, notifySubscriptionProblem,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
     showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, subscriptionsMenu,
     showProfileCard, handleViolation, showOwnerPanel, PROFILE_PHRASES, uiText

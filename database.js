@@ -35,6 +35,7 @@ export const freshDB = () => ({
   chatSubscriptionAdminGroups: {},
   subscriptionAlerts: {},
   chatSubPromptAt: {},
+  chatSubRestricted: {},
   points: {},
   groupPoints: {},
   activeGames: {},
@@ -62,7 +63,7 @@ function load() {
     if (!fs.existsSync(DATA_FILE)) return;
     const old = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     db = { ...freshDB(), ...old };
-    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.menuBack ||= {}; db.pending ||= {}; db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {};
+    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.menuBack ||= {}; db.pending ||= {}; db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {}; db.chatSubRestricted ||= {};
     // تطبيع قوائم المستخدمين القديمة فقط؛ بعض النسخ خزّنتها ككائن بدل مصفوفة.
     // لا نحوّل requiredChats إلى نصوص، لأن كل عنصر يجب أن يبقى كائناً فيه id وurl وtitle.
     const normalizeIdList = (value) => {
@@ -81,9 +82,17 @@ function load() {
       // توافق مع تخزين قديم محتمل على شكل كائن، مع الاحتفاظ بعناصر القنوات ككائنات.
       const oldChats = db.requiredChats && typeof db.requiredChats === 'object'
         ? Object.values(db.requiredChats) : [];
-      db.requiredChats = oldChats.filter((chat) => chat && typeof chat === 'object' && chat.id != null);
+      db.requiredChats = oldChats;
     }
-    db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {};
+    // ترحيل العناصر النصية القديمة إلى سجلات قابلة للتحقق دون إسقاط أي Chat ID محفوظ.
+    db.requiredChats = db.requiredChats.map((chat) => {
+      if (typeof chat === 'string' || typeof chat === 'number') {
+        const id = String(chat).trim();
+        return id ? { id, title: id, username: '', url: '', enabled: true } : null;
+      }
+      return chat && typeof chat === 'object' && chat.id != null ? chat : null;
+    }).filter(Boolean);
+    db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {}; db.chatSubRestricted ||= {};
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
     db.groupPoints ||= {};
