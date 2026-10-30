@@ -215,6 +215,7 @@ export function makeNameBatch(name, language, previous = []) {
 export function touchesMenuKeyboard() {
   return new InlineKeyboard()
     .text('✨ زخرفة الأسماء', 'touchesdecorate')
+    .text('▦ إنشاء الباركود', 'qrmenu').row()
     .text('⏰ ذكّرني', 'remindermenu').row()
     .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
     .text('📥 تحميل الفيديوهات', 'touchesdownload').row()
