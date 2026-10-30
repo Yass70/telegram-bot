@@ -12,6 +12,7 @@ import path from 'node:path';
 import { ensureEarnings, addManualEarnings } from '../earnings.js';
 import { buildQrPayload, QR_TYPE_LABELS } from '../qrPayload.js';
 import { makeQrBuffer } from '../qrService.js';
+import { ensureQrLikes, qrLikeKeyboard } from '../qrLikes.js';
 
 export function registerMessages(bot, shared) {
   const {
@@ -614,6 +615,17 @@ export function registerMessages(bot, shared) {
           const posted = await ctx.api.sendPhoto(channel, photoFileId, { caption: 'صورة منشورة بواسطة خدمة باركود نغنوغ 🐈‍⬛' });
           const channelUsername = channel.replace(/^@/, '');
           if (!/^[A-Za-z0-9_]{5,}$/.test(channelUsername) || !posted?.message_id) throw new Error('تعذّر تكوين رابط منشور الصورة.');
+          const likeImages = ensureQrLikes(db);
+          const likeKey = `${String(posted.chat?.id ?? channel)}:${String(posted.message_id)}`;
+          likeImages[likeKey] ||= { chatId: String(posted.chat?.id ?? channel), messageId: Number(posted.message_id), users: [], count: 0, createdAt: new Date().toISOString() };
+          likeImages[likeKey].users ||= [];
+          likeImages[likeKey].count = likeImages[likeKey].users.length;
+          save();
+          try {
+            await ctx.api.editMessageReplyMarkup(posted.chat?.id ?? channel, posted.message_id, { reply_markup: qrLikeKeyboard(posted.message_id, likeImages[likeKey].count) });
+          } catch (markupError) {
+            console.error('QR archive like button could not be attached:', markupError?.description || markupError?.message || markupError);
+          }
           const imageUrl = `https://t.me/${channelUsername}/${posted.message_id}`;
           const qr = await makeQrBuffer(imageUrl);
           await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-image-qr.png'), {
