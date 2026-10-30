@@ -36,10 +36,11 @@ test('owner chat subscription feature is persisted and checks membership', () =>
   const database = read('../database.js');
   const callbacks = read('../commands/callbacks.js');
   const messages = read('../commands/messages.js');
+  const commands = read('../commands.js');
   assert.match(database, /chatSubscriptions:\s*\{\}/);
   assert.match(callbacks, /showChatSubscriptionMenu/);
   assert.match(callbacks, /chatsubverify:/);
-  assert.match(messages, /chatSub\?\.enabled/);
+  assert.match(commands, /chatSubscriptionGate\(ctx, \{ callback: isCallback \}\)/);
   assert.match(messages, /chat-sub-set/);
 });
 
@@ -69,4 +70,21 @@ test('games hub separates games from interactive commands and exclusive services
   assert.doesNotMatch(gamesBlock, /text\('💬 الأوامر التفاعلية'/);
   assert.doesNotMatch(gamesBlock, /text\('🎁 خدمات حصرية'/);
   assert.match(callbacks, /'↩️ عالم نغنوغ', 'gameshub'/);
+});
+
+
+test('subscription gates cover private commands and group buttons with actionable join links', () => {
+  const commands = read('../commands.js');
+  const helpers = read('../helpers.js');
+  const callbacks = read('../commands/callbacks.js');
+  const messages = read('../commands/messages.js');
+  assert.match(commands, /bot\.use\(async \(ctx, next\)/);
+  assert.match(commands, /subscriptionGate\(ctx\)/);
+  assert.match(helpers, /function subscriptionKeyboard/);
+  assert.match(helpers, /notifySubscriptionProblem/);
+  assert.match(helpers, /تحقّق من الاشتراك/);
+  assert.match(helpers, /اشترك الآن/);
+  assert.match(messages, /resolveSubscriptionTarget/);
+  assert.match(messages, /السبب:/);
+  assert.match(callbacks, /تم التحقق من اشتراكك بنجاح/);
 });
