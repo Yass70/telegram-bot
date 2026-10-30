@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ensureEarnings, earningsBalance, awardReferral, addManualEarnings, redeemReward, setRedemptionStatus } from '../earnings.js';
+import { ensureEarnings, earningsBalance, awardReferral, addManualEarnings, redeemReward, setRedemptionStatus, prepareRedemptionRequest } from '../earnings.js';
 
 function makeDb() {
   return { referrals: { '10': { joinedCount: 4, rewardPoints: 17 } }, referralByUser: {}, earnings: { settings: { enabled: true, pointsPerReferral: 5 }, wallets: {}, referralRecords: {}, rewards: {}, redemptionRequests: {}, ledger: [] } };
@@ -84,4 +84,68 @@ test('out of stock reward is rejected without deducting points', () => {
   db.earnings.redemptionRequests.req5 = { userId: '70', rewardId: 'r4', status: 'pending' };
   assert.equal(redeemReward(db, '70', 'req5').reason, 'out_of_stock');
   assert.equal(earningsBalance(db, '70'), 20);
+});
+
+test('legacy rewards migrate into a visible legacy category without changing wallets or requests', () => {
+  const db = { earnings: { wallets: { '8': { balance: 77, earned: 77, spent: 0 } }, rewards: { old: { id: 'old', name: 'قديم', price: 10, active: true } }, redemptionRequests: { oldReq: { userId: '8', rewardId: 'old', status: 'delivered' } }, ledger: [{ id: 'keep', amount: 77 }] } };
+  ensureEarnings(db);
+  assert.equal(db.earnings.rewards.old.categoryId, 'legacy-default');
+  assert.equal(db.earnings.categories['legacy-default'].name, 'المكافآت السابقة');
+  assert.equal(earningsBalance(db, '8'), 77);
+  assert.equal(db.earnings.redemptionRequests.oldReq.status, 'delivered');
+  assert.equal(db.earnings.ledger[0].id, 'keep');
+});
+
+test('categories can be created, toggled externally, and cannot be deleted while rewards remain', async () => {
+  const { createEarningsCategory, deleteEarningsCategory, moveEarningsReward } = await import('../earnings.js');
+  const db = makeDb();
+  const a = createEarningsCategory(db, 'المتابعون', '👥');
+  const b = createEarningsCategory(db, 'الرصيد', '💳');
+  assert.equal(a.ok, true); assert.equal(b.ok, true);
+  db.earnings.rewards.r1 = { id: 'r1', name: '100 متابع', price: 10, active: true, categoryId: a.category.id };
+  assert.equal(deleteEarningsCategory(db, a.category.id).reason, 'has_rewards');
+  assert.equal(moveEarningsReward(db, 'r1', b.category.id).ok, true);
+  assert.equal(db.earnings.rewards.r1.categoryId, b.category.id);
+  assert.equal(deleteEarningsCategory(db, a.category.id).ok, true);
+});
+
+test('redemption retains category snapshot and failed delivery still refunds exactly once', () => {
+  const db = makeDb();
+  ensureEarnings(db).categories.c1 = { id: 'c1', name: 'المتابعون', emoji: '👥', active: true };
+  addManualEarnings(db, '90', 30, 'manual_add', 'اختبار', '1');
+  db.earnings.rewards.r5 = { id: 'r5', name: '100 متابع', price: 10, active: true, categoryId: 'c1' };
+  db.earnings.redemptionRequests.rq5 = { userId: '90', rewardId: 'r5', status: 'pending' };
+  const result = redeemReward(db, '90', 'rq5');
+  assert.equal(result.ok, true);
+  assert.equal(result.request.categoryId, 'c1');
+  assert.equal(result.request.categoryName, 'المتابعون');
+  assert.equal(setRedemptionStatus(db, 'rq5', 'failed', '1').ok, true);
+  assert.equal(earningsBalance(db, '90'), 30);
+});
+
+test('disabled category blocks redemption and cancelled unconfirmed requests cannot be refunded', () => {
+  const db = makeDb();
+  ensureEarnings(db).categories.c2 = { id: 'c2', name: 'الرصيد', active: false };
+  addManualEarnings(db, '91', 40, 'manual_add', 'اختبار', '1');
+  db.earnings.rewards.r6 = { id: 'r6', name: 'رصيد', price: 10, active: true, categoryId: 'c2' };
+  db.earnings.redemptionRequests.rq6 = { userId: '91', rewardId: 'r6', status: 'pending' };
+  assert.equal(redeemReward(db, '91', 'rq6').reason, 'unavailable');
+  db.earnings.redemptionRequests.rq6.status = 'cancelled';
+  assert.equal(setRedemptionStatus(db, 'rq6', 'failed', '1').reason, 'not_redeemed');
+  assert.equal(earningsBalance(db, '91'), 40);
+});
+
+
+test('repeated reward taps reuse one pending request instead of creating duplicates', () => {
+  const db = makeDb();
+  addManualEarnings(db, '92', 50, 'manual_add', 'اختبار', '1');
+  db.earnings.rewards.r7 = { id: 'r7', name: 'هدية', price: 20, active: true };
+  const first = prepareRedemptionRequest(db, '92', 'r7');
+  const second = prepareRedemptionRequest(db, '92', 'r7');
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  assert.equal(second.reused, true);
+  assert.equal(second.requestId, first.requestId);
+  assert.equal(Object.values(db.earnings.redemptionRequests).filter(r => r.rewardId === 'r7').length, 1);
+  assert.equal(earningsBalance(db, '92'), 50);
 });
