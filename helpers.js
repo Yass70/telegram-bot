@@ -72,11 +72,27 @@ function ensureUser(ctx) {
     meta.lastSeenAt = now;
     changed = true;
   }
-  if (isPrivate(ctx) && !db.privateUsers.includes(id)) {
-    db.privateUsers.push(id);
-    changed = true;
-  }
   if (changed) save();
+}
+
+function registerPrivateStart(ctx) {
+  if (!isPrivate(ctx)) return;
+  const id = userKey(ctx);
+  if (!id) return;
+  db.privateUsers = Array.isArray(db.privateUsers) ? db.privateUsers.map(String) : [];
+  db.userMeta ||= {};
+  const existed = db.privateUsers.includes(id);
+  if (!existed) db.privateUsers.push(id);
+  const meta = db.userMeta[id] && typeof db.userMeta[id] === 'object' ? db.userMeta[id] : (db.userMeta[id] = {});
+  // تاريخ أول /start دقيق للمستخدمين الذين يبدأون بعد اعتماد هذا الحقل.
+  // السجلات القديمة التي لا نعرف تاريخ /start الحقيقي لها تبقى بتاريخ غير معروف ولا تُحسب كجدد.
+  if (!Object.hasOwn(meta, 'privateStartAt')) meta.privateStartAt = existed ? 0 : Date.now();
+  const from = ctx.from || {};
+  meta.firstName = String(from.first_name || meta.firstName || '');
+  meta.lastName = String(from.last_name || meta.lastName || '');
+  meta.username = String(from.username || meta.username || '');
+  meta.lastPrivateStartAt = Date.now();
+  save();
 }
 
 function groupFor(chat) {
@@ -394,7 +410,7 @@ async function handleViolation(ctx, g, reason) {
 }
 
   return {
-    isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor,
+    isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor,
     selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange: (kind, from, to) => applyGlobalCustomizationChange(db, DEFAULT_CUSTOMIZATION, kind, from, to), customText, getHomeKeyboard,
     HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,

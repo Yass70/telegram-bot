@@ -7,7 +7,7 @@ import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
 
 export function setupCommands(bot, db, helpers) {
-  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
+  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
 
   db.activeGames ||= {};
   db.groupPoints ||= {};
@@ -144,6 +144,7 @@ ${link}
       }
     }
     ensureUser(ctx);
+    registerPrivateStart(ctx);
     if (!await subscriptionGate(ctx)) return;
     save();
     if (payload === 'reminder') {
