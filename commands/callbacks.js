@@ -1113,7 +1113,7 @@ export function registerCallbacks(bot, shared) {
       db.chatSubscriptionSelection[ownerId] = data === 'chatsubclear' ? [] : [...(db.chatSubscriptionAdminGroups?.[ownerId] || [])];
       save(); return showChatSubscriptionMenu(ctx);
     }
-    if (data === 'chatsubsetselected') { const ids=(db.chatSubscriptionSelection?.[String(ctx.from.id)]||[]).map(String); if(!ids.length) return answer(ctx,'حدد مجموعة واحدة على الأقل أولاً.',{reply_markup:new InlineKeyboard().text('↩️ المجموعات','chatsubmenu')}); pending(ctx,{action:'chat-sub-set',groupIds:ids}); return answer(ctx,'أرسل جهة الاشتراك العامة للمجموعات المحددة بصيغة @channel أو -1001234567890 | https://t.me/+invite. يجب أن يكون نغنوغ مشرفاً في جهة الاشتراك حتى يتحقق من العضوية.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
+    if (data === 'chatsubsetselected') { const ids=(db.chatSubscriptionSelection?.[String(ctx.from.id)]||[]).map(String); if(!ids.length) return answer(ctx,'حدد مجموعة واحدة على الأقل أولاً.',{reply_markup:new InlineKeyboard().text('↩️ المجموعات','chatsubmenu')}); pending(ctx,{action:'chat-sub-set',groupIds:ids}); return answer(ctx,'أرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمياً. للجهة الخاصة: Chat ID | رابط الدعوة الخاص. يجب أن يكون نغنوغ مشرفاً في الجهة حتى يتحقق من العضوية.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
     if (data.startsWith('chatsubtargetdel:')) {
       const [, groupId, targetId] = data.split(':');
       const setting = db.chatSubscriptions?.[String(groupId)];
@@ -1172,7 +1172,7 @@ export function registerCallbacks(bot, shared) {
       save();
       return answer(ctx, `${data === 'chatsubenable_selected' ? '🟢 تم تشغيل' : '🔴 تم إيقاف'} اشتراك الدردشة للمجموعات المحددة (${ids.length}).`, { reply_markup: new InlineKeyboard().text('↩️ إدارة المجموعات', 'chatsubmenu') });
     }
-    if (data.startsWith('chatsubset:')) { const id=data.slice('chatsubset:'.length); pending(ctx,{action:'chat-sub-set',groupIds:[String(id)]}); return answer(ctx,'أرسل جهة الاشتراك بصيغة @channel أو -1001234567890 | https://t.me/+invite للمجموعة الخاصة.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
+    if (data.startsWith('chatsubset:')) { const id=data.slice('chatsubset:'.length); pending(ctx,{action:'chat-sub-set',groupIds:[String(id)]}); return answer(ctx,'أرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمياً. للجهة الخاصة: Chat ID | رابط الدعوة الخاص.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
     if (data.startsWith('chatsubtoggle:')) {
       const id = String(data.slice('chatsubtoggle:'.length));
       db.chatSubscriptions ||= {}; db.chatSubscriptions[id] ||= {};
@@ -1194,7 +1194,7 @@ export function registerCallbacks(bot, shared) {
     if (data === 'requiredlist') return showRequiredList(ctx);
     if (data === 'requiredadd') {
       pending(ctx, { action: 'add-required-chat' });
-      return answer(ctx, '➕ أرسل معرف القناة/المجموعة مثل @channel أو -1001234567890. وللجهة الخاصة أرسل الآيدي ثم | ثم رابط الدعوة: -1001234567890 | https://t.me/+xxxx. يجب أن يكون نغنوغ مشرفاً في الجهة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredmenu') });
+      return answer(ctx, '➕ أرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمياً. للجهة الخاصة: Chat ID | رابط الدعوة الخاص. يجب أن يكون نغنوغ مشرفاً في الجهة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredmenu') });
     }
     if (data.startsWith('reqtoggle:')) {
       const index = Number(data.split(':')[1]);
@@ -1208,7 +1208,7 @@ export function registerCallbacks(bot, shared) {
       const index = Number(data.split(':')[1]);
       if (!db.requiredChats?.[index]) return answer(ctx, 'الجهة غير موجودة.');
       pending(ctx, { action: 'edit-required-chat', index });
-      return answer(ctx, 'أرسل بيانات الجهة الجديدة: @username أو رابط عام، أو آيدي الجهة الخاصة ثم | ثم رابط الدعوة. سيتم فحصها قبل حفظ التعديل.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredlist') });
+      return answer(ctx, 'أرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمياً. للجهة الخاصة: Chat ID | رابط الدعوة الخاص. سيتم فحص الجهة وصلاحيات نغنوغ قبل حفظ التعديل.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredlist') });
     }
     if (data.startsWith('reqdel:')) {
       const index = Number(data.split(':')[1]);

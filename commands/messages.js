@@ -13,6 +13,7 @@ import { ensureEarnings, addManualEarnings } from '../earnings.js';
 import { buildQrPayload, QR_TYPE_LABELS } from '../qrPayload.js';
 import { makeQrBuffer } from '../qrService.js';
 import { ensureQrLikes, qrLikeKeyboard } from '../qrLikes.js';
+import { resolveTelegramChatTarget } from '../chatTarget.js';
 
 export function registerMessages(bot, shared) {
   const {
@@ -30,48 +31,11 @@ export function registerMessages(bot, shared) {
   } = shared;
 
   async function resolveSubscriptionTarget(ctx, input) {
-    const parts = String(input || '').split('|').map(value => value.trim());
-    let targetRef = parts[0] || '';
-    const suppliedUrl = parts[1] || '';
-    if (!targetRef) throw new Error('لم ترسل معرف القناة أو المجموعة. أرسل @username أو آيدي يبدأ بـ -100 أو رابطاً عاماً من t.me.');
-    if (/^https?:\/\/(?:www\.)?(?:t\.me|telegram\.me)\//i.test(targetRef)) {
-      const url = new URL(targetRef.replace(/^http:/i, 'https:'));
-      const pathPart = decodeURIComponent(url.pathname.replace(/^\//, '').split('/')[0] || '');
-      if (pathPart.startsWith('+') || pathPart === 'joinchat') {
-        throw new Error('رابط الدعوة الخاص وحده لا يكفي للتعرّف على الجهة عبر Bot API. أرسل آيدي الجهة ثم | ثم رابط الدعوة: -1001234567890 | https://t.me/+xxxx');
-      }
-      if (!pathPart || ['c', 'joinchat'].includes(pathPart.toLowerCase())) throw new Error('الرابط لا يحتوي على معرف عام واضح. للجهة الخاصة أرسل الآيدي مع رابط الدعوة.');
-      targetRef = pathPart.startsWith('@') ? pathPart : `@${pathPart}`;
-    }
-    if (suppliedUrl && !/^https:\/\/t\.me\/(?:\+|joinchat\/|[A-Za-z0-9_]{5,})/i.test(suppliedUrl)) {
-      throw new Error('رابط الدعوة غير صالح. استخدم رابطاً يبدأ بـ https://t.me/');
-    }
-    let targetChat;
-    try {
-      targetChat = await ctx.api.getChat(targetRef);
-    } catch (error) {
-      const description = String(error?.description || error?.message || 'غير معروف');
-      if (/chat not found/i.test(description)) throw new Error('تيليغرام لم يعثر على القناة أو المجموعة. تحقق من الآيدي أو المعرف، وتأكد أن البوت موجود فيها.');
-      if (/not enough rights|forbidden/i.test(description)) throw new Error('البوت لا يملك صلاحية الوصول إلى هذه الجهة. أضفه إليها واجعله مشرفاً.');
-      throw new Error(`تعذّر الوصول إلى الجهة: ${description}`);
-    }
-    let botMember;
-    try {
-      botMember = await ctx.api.getChatMember(targetChat.id, bot.botInfo.id);
-    } catch (error) {
-      throw new Error(`وصلت إلى الجهة لكن تعذّر فحص رتبة نغنوغ: ${error?.description || error?.message || 'خطأ غير معروف'}. أضف البوت مشرفاً ثم أعد المحاولة.`);
-    }
-    if (!['administrator', 'creator'].includes(botMember.status)) {
-      throw new Error(`نغنوغ موجود في «${targetChat.title || targetChat.username || targetChat.id}» لكنه ليس مشرفاً. ارفعه إلى مشرف حتى يستطيع فحص اشتراك الأعضاء.`);
-    }
-    let url = targetChat.username ? `https://t.me/${targetChat.username}` : (suppliedUrl || targetChat.invite_link || '');
-    if (!url && typeof ctx.api.exportChatInviteLink === 'function') {
-      try { url = await ctx.api.exportChatInviteLink(targetChat.id); } catch {}
-    }
-    if (!url || !/^https:\/\/t\.me\//i.test(url)) {
-      throw new Error('تم العثور على الجهة والتحقق من إشراف نغنوغ، لكن لم أجد رابطاً صالحاً لفتحها. أرسل رابط الدعوة معها بهذا الشكل: -1001234567890 | https://t.me/+xxxx');
-    }
-    return { id: String(targetChat.id), title: targetChat.title || (targetChat.username ? `@${targetChat.username}` : String(targetChat.id)), username: targetChat.username || '', url };
+    return resolveTelegramChatTarget(ctx, input, {
+      botId: ctx.me?.id || bot.botInfo?.id,
+      allowedTypes: ['channel', 'group', 'supergroup'],
+      requireBotAdmin: true,
+    });
   }
 
   bot.on('message', async ctx => {
@@ -106,13 +70,13 @@ export function registerMessages(bot, shared) {
         current.enabled = true; current.updatedAt = Date.now();
         db.chatSubscriptions[String(ctx.chat.id)] = current;
         clearPending(ctx); save();
-        return ctx.reply(`✅ تمت إضافة جهة الاشتراك وتفعيلها لهذه المجموعة.\nالجهة: ${target.title}\nالرابط: ${target.url}\nعدد الجهات المطلوبة: ${current.requiredChats.length}`);
+        return ctx.reply(`✅ تمت إضافة جهة الاشتراك وتفعيلها لهذه المجموعة.\nالجهة: ${target.title}\nالرابط: ${target.url}\nعدد الجهات المطلوبة: ${current.requiredChats.length}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ، لكن تيليغرام لا يتيح للبوت التأكد آلياً أن رابط الدعوة الخاص يعود إلى هذا الـ Chat ID؛ تأكد من صحة الرابط.' : ''}`);
       }
       if (isAdmin && /^(?:\/)?(?:اشتراك_دردشة|اشتراك الدردشة)$/i.test(rawText)) {
         try { await ensureGroupSubscriptionPermissions(ctx, ctx.chat.id); }
         catch (error) { return ctx.reply(`❌ لا يمكن إعداد اشتراك الدردشة حالياً.\nالسبب: ${error.message}`); }
         pending(ctx, { action: 'chat-sub-set-group', groupId: String(ctx.chat.id) });
-        return ctx.reply('💬 إعداد اشتراك الدردشة لهذه المجموعة\nأرسل @channel أو رابط t.me العام، أو آيدي الجهة الخاصة ثم | ثم رابط الدعوة. يجب أن يكون نغنوغ مشرفاً في جهة الاشتراك. لإلغاء العملية أرسل /cancel.');
+        return ctx.reply('💬 إعداد اشتراك الدردشة لهذه المجموعة\nأرسل @username أو رابط t.me/username أو telegram.me/username أو Chat ID رقمي. للجهة الخاصة: Chat ID | رابط الدعوة الخاص. يجب أن يكون نغنوغ مشرفاً في جهة الاشتراك. لإلغاء العملية أرسل /cancel.');
       }
       if (isAdmin && /^(?:\/)?(?:ايقاف اشتراك الدردشة|إيقاف اشتراك الدردشة)$/i.test(rawText)) {
         const setting = db.chatSubscriptions?.[String(ctx.chat.id)];
@@ -908,7 +872,7 @@ export function registerMessages(bot, shared) {
           if (!Number.isInteger(index) || !db.requiredChats?.[index]) { clearPending(ctx); return ctx.reply('❌ لم تعد الجهة المحددة موجودة.'); }
           db.requiredChats[index] = { ...db.requiredChats[index], ...target, enabled: db.requiredChats[index].enabled !== false, updatedAt: Date.now() };
           clearPending(ctx); save();
-          return ctx.reply(`✅ تم تعديل جهة الاشتراك بنجاح.\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}`, { reply_markup: new InlineKeyboard().text('📋 قائمة الجهات', 'requiredlist') });
+          return ctx.reply(`✅ تم تعديل جهة الاشتراك بنجاح.\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ فقط؛ لا يمكن للبوت إثبات أن رابط الدعوة يعود إلى هذا المعرّف.' : ''}`, { reply_markup: new InlineKeyboard().text('📋 قائمة الجهات', 'requiredlist') });
         }
 
         if (p.action === 'add-required-chat') {
@@ -922,7 +886,7 @@ export function registerMessages(bot, shared) {
           if (existingIndex >= 0) db.requiredChats[existingIndex] = { ...db.requiredChats[existingIndex], ...record };
           else db.requiredChats.push(record);
           clearPending(ctx); save();
-          return answer(ctx, `✅ تم التحقق من الجهة وإضافتها للاشتراك الإجباري.\n\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}\n\nسيُطلب من المستخدمين الاشتراك بها قبل استخدام البوت.`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          return answer(ctx, `✅ تم التحقق من الجهة وإضافتها للاشتراك الإجباري.\n\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ فقط؛ لا يمكن للبوت إثبات أن رابط الدعوة يعود إلى هذا المعرّف.' : ''}\n\nسيُطلب من المستخدمين الاشتراك بها قبل استخدام البوت.`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
         }
 
         if (p.action === 'edit-welcome') {
