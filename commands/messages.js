@@ -10,6 +10,8 @@ import { InputFile } from 'grammy';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { ensureEarnings, addManualEarnings } from '../earnings.js';
+import { buildQrPayload, QR_TYPE_LABELS } from '../qrPayload.js';
+import { makeQrBuffer } from '../qrService.js';
 
 export function registerMessages(bot, shared) {
   const {
@@ -598,6 +600,52 @@ export function registerMessages(bot, shared) {
     } else {
       // معالجة المحادثات الخاصة والبيانات المعلقة[cite: 4, 5]
       const p = db.pending[userKey(ctx)];
+      if (p?.action === 'qr-image') {
+        if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
+          clearPending(ctx);
+          return ctx.reply('❌ تم إلغاء طلب الصورة.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
+        }
+        if (!Array.isArray(msg.photo) || !msg.photo.length) {
+          return ctx.reply('❌ أرسل صورة كصورة من المعرض، مو كملف أو نص. أو اضغط إلغاء.');
+        }
+        const channel = String(process.env.QR_IMAGE_CHANNEL || '@QRiii5i').trim();
+        const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+        try {
+          const posted = await ctx.api.sendPhoto(channel, photoFileId, { caption: 'صورة منشورة بواسطة خدمة باركود نغنوغ 🐈‍⬛' });
+          const channelUsername = channel.replace(/^@/, '');
+          if (!/^[A-Za-z0-9_]{5,}$/.test(channelUsername) || !posted?.message_id) throw new Error('تعذّر تكوين رابط منشور الصورة.');
+          const imageUrl = `https://t.me/${channelUsername}/${posted.message_id}`;
+          const qr = await makeQrBuffer(imageUrl);
+          await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-image-qr.png'), {
+            caption: `✅ تم إنشاء باركود الصورة بنجاح.\n\n📷 عند مسح الباركود راح يفتح منشور الصورة في قناة @${channelUsername}.\n🔗 ${imageUrl}`,
+            reply_markup: new InlineKeyboard().url('🖼️ فتح الصورة', imageUrl).row().text('▦ إنشاء باركود آخر', 'qrmenu').text('↩️ لمسة نغنوغ', 'touchesmenu')
+          });
+          clearPending(ctx);
+          return;
+        } catch (error) {
+          const description = String(error?.description || error?.message || 'خطأ غير معروف');
+          return ctx.reply(`❌ ما كدرت أنشر الصورة أو أنشئ الباركود.\nالسبب: ${description}\n\nتأكد أن نغنوغ مشرف في @${channel.replace(/^@/, '')} وعنده صلاحية نشر الرسائل، وبعدها أرسل الصورة مرة ثانية أو ألغِ العملية.`);
+        }
+      }
+      if (p?.action === 'qr-input') {
+        if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
+          clearPending(ctx);
+          return ctx.reply('❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
+        }
+        if (!text) return ctx.reply('❌ أرسل البيانات كنص، أو اضغط إلغاء.');
+        try {
+          const payload = buildQrPayload(p.type, text);
+          const qr = await makeQrBuffer(payload);
+          await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-qr.png'), {
+            caption: `✅ تم إنشاء ${QR_TYPE_LABELS[p.type] || 'الباركود'} بنجاح.\n\nامسح الصورة بكاميرا الهاتف لفتح المحتوى.`,
+            reply_markup: new InlineKeyboard().text('▦ إنشاء باركود آخر', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home')
+          });
+          clearPending(ctx);
+          return;
+        } catch (error) {
+          return ctx.reply(`❌ ${error.message || 'تعذّر إنشاء الباركود.'}\n\nأرسل البيانات مرة ثانية أو اضغط إلغاء.`);
+        }
+      }
       if (p?.action === 'video-download-link') {
         if (!isPrivate(ctx)) { clearPending(ctx); return ctx.reply('📥 أرسل رابط الفيديو بالخاص فقط.'); }
         if (/^\/cancel(?:@\w+)?$/i.test(text)) {

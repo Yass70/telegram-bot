@@ -5,6 +5,7 @@ import { handleActiveGameCallback } from '../games/callbacks.js';
 import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard } from '../keyboards.js';
 import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
 import { ADHKAR_LABELS, randomDhikr } from '../adhkar.js';
+import { QR_TYPE_LABELS } from '../qrPayload.js';
 
 export function registerCallbacks(bot, shared) {
   const textCatalog = UI_TEXT_CATALOG.map((item, index) => ({ ...item, index })).filter(item => item.kind === 'text');
@@ -161,7 +162,7 @@ export function registerCallbacks(bot, shared) {
       clearPending(ctx);
       db.touchSessions ||= {};
       delete db.touchSessions[userKey(ctx)];
-      return answer(ctx, '* ( قسم لمسة نغنوغ ❤️‍🔥 )*\nمتوفر مجموعة من الأدوات اللي تسهّل عليك احتياجاتك وتضيف لمسة نغنوغ 🐈‍⬛ ✦\n\n𓆩 ✧ 𓆪 *زخرفة الأسماء*\n𓆩 🎧 𓆪 *فصل الصوت عن الموسيقى*\n𓆩 ⏰ 𓆪 *ذكّرني + أذكار*\n𓆩 🎬 𓆪 *تحميل الفيديوهات* بسهولة\n\n✦ *اختَر الخدمة اللي تحتاجها من الأزرار بالأسفل.⬇️*', { reply_markup: touchesMenuKeyboard(), parse_mode: 'Markdown' });
+      return answer(ctx, '* ( قسم لمسة نغنوغ ❤️‍🔥 )*\nمتوفر مجموعة من الأدوات اللي تسهّل عليك احتياجاتك وتضيف لمسة نغنوغ 🐈‍⬛ ✦\n\n𓆩 ✧ 𓆪 *زخرفة الأسماء*\n𓆩 🎧 𓆪 *فصل الصوت عن الموسيقى*\n𓆩 ⏰ 𓆪 *ذكّرني + أذكار*\n𓆩 🎬 𓆪 *تحميل الفيديوهات* بسهولة\n𓆩 ▦ 𓆪 *إنشاء باركود* للروابط والنصوص والصور وغيرها\n\n✦ *اختَر الخدمة اللي تحتاجها من الأزرار بالأسفل.⬇️*', { reply_markup: touchesMenuKeyboard(), parse_mode: 'Markdown' });
     }
     if (data === 'remindermenu') {
       clearPending(ctx);
@@ -195,6 +196,41 @@ export function registerCallbacks(bot, shared) {
       const kb = new InlineKeyboard().text('🔄 ذكر آخر', `adhkarnext:${type}`).row()
         .text('↩️ رجوع للأذكار', 'remindermenu').text('🏠 الرئيسية', 'home');
       return answer(ctx, `╭━━━〔 ${ADHKAR_LABELS[type]} 〕━━━╮\n\n${dhikr}\n\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
+    }
+    if (data === 'qrmenu') {
+      if (!isPrivate(ctx)) return answer(ctx, '▦ إنشاء الباركود متاح بالخاص فقط.');
+      clearPending(ctx);
+      const kb = new InlineKeyboard()
+        .text('🔗 رابط', 'qrtype:url').text('📝 نص', 'qrtype:text').row()
+        .text('📶 Wi-Fi', 'qrtype:wifi').text('📞 هاتف', 'qrtype:phone').row()
+        .text('✉️ بريد', 'qrtype:email').text('📍 موقع', 'qrtype:location').row()
+        .text('👤 جهة اتصال', 'qrtype:contact').text('🖼️ صورة', 'qrtype:image').row()
+        .text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
+      return answer(ctx, '▦ *إنشاء الباركود — نغنوغ*\n\nاختَر نوع الباركود اللي تريد تنشئه. راح أجهزه إلك كصورة PNG قابلة للمسح بكاميرا الهاتف.\n\n🖼️ خيار الصورة ينشرها في قناة @QRiii5i ثم ينشئ باركود يفتح منشورها.', { reply_markup: kb, parse_mode: 'Markdown' });
+    }
+    if (data.startsWith('qrtype:')) {
+      if (!isPrivate(ctx)) return answer(ctx, 'إنشاء الباركود متاح بالخاص فقط.');
+      const type = data.slice(7);
+      if (!Object.hasOwn(QR_TYPE_LABELS, type)) return answer(ctx, 'نوع الباركود غير معروف.');
+      if (type === 'image') {
+        pending(ctx, { action: 'qr-image' });
+        return answer(ctx, '🖼️ أرسل الصورة اللي تريد تحويلها إلى باركود.\n\nراح أنشرها في قناة @QRiii5i، وبعدها أرسل لك باركود يفتح منشور الصورة.\nللإلغاء اضغط الزر أدناه.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع الباركود', 'qrmenu') });
+      }
+      pending(ctx, { action: 'qr-input', type });
+      const prompts = {
+        url: '🔗 أرسل الرابط كاملاً ويبدأ بـ https:// أو http://.',
+        text: '📝 أرسل النص اللي تريد تخزّنه داخل الباركود.',
+        wifi: '📶 أرسل البيانات بهذا الترتيب:\nاسم الشبكة | كلمة المرور | WPA\nللشبكة المفتوحة استخدم nopass بدل نوع الحماية.',
+        phone: '📞 أرسل رقم الهاتف مع رمز الدولة إن أمكن، مثال: +9647XXXXXXXXX.',
+        email: '✉️ أرسل البيانات بهذا الترتيب:\nالبريد الإلكتروني | الموضوع | نص الرسالة',
+        location: '📍 أرسل رابط الموقع من خرائط Google ويبدأ بـ https://.',
+        contact: '👤 أرسل بيانات جهة الاتصال بهذا الترتيب:\nالاسم | رقم الهاتف | البريد الإلكتروني'
+      };
+      return answer(ctx, `${QR_TYPE_LABELS[type]}\n\n${prompts[type]}\n\nتگدر تلغي العملية بأي وقت.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع الباركود', 'qrmenu') });
+    }
+    if (data === 'qrcancel') {
+      clearPending(ctx);
+      return answer(ctx, '❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
     }
     if (data === 'touchesdecorate') {
       clearPending(ctx);
