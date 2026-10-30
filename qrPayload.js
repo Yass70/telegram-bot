@@ -1,8 +1,20 @@
 const MAX_QR_TEXT = 2500;
 
+export const QR_TYPE_LABELS = Object.freeze({
+  url: '🔗 باركود رابط',
+  text: '📝 باركود نص',
+  wifi: '📶 باركود Wi-Fi',
+  phone: '📞 باركود هاتف',
+  email: '✉️ باركود بريد إلكتروني',
+  location: '📍 باركود موقع',
+  contact: '👤 باركود جهة اتصال',
+  image: '🖼️ باركود صورة'
+});
+
 export function buildQrPayload(type, input) {
   const value = String(input || '').trim();
   if (!value) throw new Error('المحتوى فارغ. أرسل البيانات المطلوبة.');
+  if (Buffer.byteLength(value, 'utf8') > MAX_QR_TEXT) throw new Error('المحتوى طويل جداً للباركود. اختصره قليلاً ثم حاول مرة ثانية.');
   if (type === 'url') {
     let url;
     try { url = new URL(value); } catch { throw new Error('الرابط غير صحيح. أرسله كاملاً ويبدأ بـ https:// أو http://.'); }
