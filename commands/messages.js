@@ -9,7 +9,7 @@ import { downloadSocialVideo, cleanupDownloadedVideo, validateSocialVideoUrl } f
 import { InputFile } from 'grammy';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { ensureEarnings, addManualEarnings } from '../earnings.js';
+import { ensureEarnings, addManualEarnings, createEarningsCategory } from '../earnings.js';
 import { buildQrPayload, QR_TYPE_LABELS } from '../qrPayload.js';
 import { makeQrBuffer } from '../qrService.js';
 import { ensureQrLikes, qrLikeKeyboard } from '../qrLikes.js';
@@ -658,7 +658,7 @@ export function registerMessages(bot, shared) {
         }
       }
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'edit-required-chat', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason', 'earnings-reward-delivery'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'edit-required-chat', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason', 'earnings-reward-delivery', 'earnings-category-create', 'earnings-category-edit'].includes(p.action)) {
           clearPending(ctx);
           const cancelledReminder = ['reminder-text', 'reminder-day', 'reminder-time'].includes(p.action);
           const cancelledEarnings = String(p.action || '').startsWith('earnings-');
@@ -696,14 +696,29 @@ export function registerMessages(bot, shared) {
             db.earnings.settings.pointsPerReferral = rate; clearPending(ctx); save();
             return ctx.reply(`✅ تم تحديد مكافأة الدعوة الواحدة بـ ${rate} نقطة.`, { reply_markup: new InlineKeyboard().text('⚙️ إعدادات الأرباح','earningssettings') });
           }
+          if (p.action === 'earnings-category-create' || p.action === 'earnings-category-edit') {
+            const parts = value.split('|').map(part => part.trim());
+            const name = parts[0] || '', emoji = parts[1] || '🎁';
+            if (!name || name.length > 45 || emoji.length > 8 || parts.length > 2) return ctx.reply('الصيغة المطلوبة: اسم القسم | إيموجي\nمثال: استبدال النقاط بالمتابعين | 👥');
+            if (p.action === 'earnings-category-create') {
+              const created = createEarningsCategory(db, name, emoji);
+              if (!created.ok) return ctx.reply('تعذّر إنشاء القسم. تحقق من الاسم والإيموجي.');
+              clearPending(ctx); save();
+              return ctx.reply(`✅ تم إنشاء القسم ${emoji} ${name}.`, { reply_markup: new InlineKeyboard().text('🗂️ إدارة الأقسام','earningscategoriesadmin').row().text('🎁 إدارة الجوائز','earningsrewardsadmin') });
+            }
+            const category = db.earnings.categories[String(p.categoryId)];
+            if (!category) { clearPending(ctx); return ctx.reply('القسم لم يعد موجوداً.'); }
+            category.name = name; category.emoji = emoji; category.updatedAt = Date.now(); clearPending(ctx); save();
+            return ctx.reply(`✅ تم تحديث القسم إلى ${emoji} ${name}.`, { reply_markup: new InlineKeyboard().text('↩️ الأقسام','earningscategoriesadmin') });
+          }
           if (p.action === 'earnings-reward-name' || p.action === 'earnings-reward-edit-name') {
             if (!value || value.length > 70) return ctx.reply('أرسل اسماً من 1 إلى 70 حرفاً.');
-            pending(ctx, { action: p.action === 'earnings-reward-name' ? 'earnings-reward-description' : 'earnings-reward-edit-description', rewardId: p.rewardId, name: value });
+            pending(ctx, { action: p.action === 'earnings-reward-name' ? 'earnings-reward-description' : 'earnings-reward-edit-description', rewardId: p.rewardId, categoryId: p.categoryId, name: value });
             return ctx.reply('أرسل وصفاً مختصراً للمكافأة (حتى 300 حرف).');
           }
           if (p.action === 'earnings-reward-description' || p.action === 'earnings-reward-edit-description') {
             if (value.length > 300) return ctx.reply('الوصف طويل؛ اختصره إلى 300 حرف.');
-            pending(ctx, { action: p.action === 'earnings-reward-description' ? 'earnings-reward-price' : 'earnings-reward-edit-price', rewardId: p.rewardId, name: p.name, description: value });
+            pending(ctx, { action: p.action === 'earnings-reward-description' ? 'earnings-reward-price' : 'earnings-reward-edit-price', rewardId: p.rewardId, categoryId: p.categoryId, name: p.name, description: value });
             return ctx.reply('أرسل سعر المكافأة بنقاط الأرباح (رقم صحيح أكبر من صفر).');
           }
           if (p.action === 'earnings-reward-price' || p.action === 'earnings-reward-edit-price') {
@@ -712,9 +727,9 @@ export function registerMessages(bot, shared) {
             let id = p.rewardId;
             if (p.action === 'earnings-reward-price') id = `reward-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
             const previous = db.earnings.rewards[id] || {};
-            db.earnings.rewards[id] = { ...previous, id, name: p.name, description: p.description, price, active: previous.active ?? true, createdAt: previous.createdAt || Date.now(), updatedAt: Date.now() };
+            db.earnings.rewards[id] = { ...previous, id, name: p.name, description: p.description, price, categoryId: p.categoryId || previous.categoryId || 'legacy-default', active: previous.active ?? true, createdAt: previous.createdAt || Date.now(), updatedAt: Date.now() };
             clearPending(ctx); save();
-            return ctx.reply(`✅ تم حفظ المكافأة «${p.name}» بسعر ${price} نقطة.`, { reply_markup: new InlineKeyboard().text('🎁 إدارة المكافآت','earningsrewardsadmin').row().text('💰 إدارة الأرباح','earningsadmin') });
+            return ctx.reply(`✅ تم حفظ الجائزة «${p.name}» بسعر ${price} نقطة.`, { reply_markup: new InlineKeyboard().text('🎁 إدارة الجوائز','earningsrewardsadmin').row().text('🗂️ إدارة الأقسام','earningscategoriesadmin').row().text('💰 إدارة الأرباح','earningsadmin') });
           }
           if (p.action === 'earnings-user-search') {
             const query = value.replace(/^@/, '').toLowerCase();
