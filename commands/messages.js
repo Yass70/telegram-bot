@@ -580,7 +580,7 @@ export function registerMessages(bot, shared) {
         }
       }
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason', 'earnings-reward-delivery'].includes(p.action)) {
           clearPending(ctx);
           const cancelledReminder = ['reminder-text', 'reminder-day', 'reminder-time'].includes(p.action);
           const cancelledEarnings = String(p.action || '').startsWith('earnings-');
@@ -598,6 +598,20 @@ export function registerMessages(bot, shared) {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
           ensureEarnings(db);
           const value = String(text || '').trim();
+          if (p.action === 'earnings-reward-delivery') {
+            const reward = db.earnings.rewards[String(p.rewardId)];
+            if (!reward) { clearPending(ctx); return ctx.reply('المكافأة لم تعد موجودة.'); }
+            const match = value.match(/^(manual|text|link|code|feature)(?::([\s\S]*))?$/i);
+            if (!match) return ctx.reply('الصيغة غير صحيحة. أرسل manual أو text:النص أو link:الرابط أو code:الكود أو feature:اسم_الميزة.');
+            const type = match[1].toLowerCase(), payload = String(match[2] || '').trim();
+            if (type !== 'manual' && !payload) return ctx.reply('يجب إضافة المحتوى بعد النقطتين. لم يتغير إعداد التسليم.');
+            if (type === 'link' && !/^https?:\/\//i.test(payload)) return ctx.reply('الرابط يجب أن يبدأ بـ https:// أو http://.');
+            reward.deliveryType = type;
+            reward.deliveryPayload = ['text','link','code'].includes(type) ? payload : '';
+            reward.featureKey = type === 'feature' ? payload : '';
+            reward.updatedAt = Date.now(); clearPending(ctx); save();
+            return ctx.reply(`✅ تم إعداد طريقة تسليم «${reward.name}»: ${type === 'manual' ? 'يدوي من المالك' : type === 'feature' ? 'استحقاق ميزة داخلية' : 'تلقائي للمستخدم'}.`, { reply_markup: new InlineKeyboard().text('🎁 إدارة المكافآت','earningsrewardsadmin').row().text('💰 إدارة الأرباح','earningsadmin') });
+          }
           if (p.action === 'earnings-rate') {
             const rate = Number(value);
             if (!Number.isSafeInteger(rate) || rate < 1 || rate > 1000000) return ctx.reply('أرسل رقماً صحيحاً من 1 إلى 1,000,000.');
