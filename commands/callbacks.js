@@ -22,7 +22,7 @@ export function registerCallbacks(bot, shared) {
   const {
     db, isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor,
     selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange, customText, getHomeKeyboard,
-    HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, checkChatSubscription, notifySubscriptionProblem,
+    HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, checkChatSubscription, ensureGroupSubscriptionPermissions, restoreChatSubscriptionRestriction, notifySubscriptionProblem,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
     showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, subscriptionsMenu,
     showProfileCard, handleViolation, showOwnerPanel, uiText, PROFILE_PHRASES,
@@ -60,15 +60,20 @@ export function registerCallbacks(bot, shared) {
       const sub = db.chatSubscriptions[String(group.id)] || {};
       const safeTitle = Array.from(String(group.title || '').replace(/[\uD800-\uDFFF]/g, '�')).slice(0, 14).join('');
       kb.text(`${selected.has(String(group.id)) ? '☑️' : '⬜'} ${safeTitle} ${sub.enabled ? '🟢' : '⚪'}`, `chatsubpick:${group.id}`).row();
+      const targetList = Array.isArray(sub.requiredChats) && sub.requiredChats.length ? sub.requiredChats : (sub.requiredChatId ? [{ id: String(sub.requiredChatId), title: sub.title }] : []);
+      for (const target of targetList.slice(0, 8)) {
+        kb.text(`🗑️ ${String(target.title || target.id || 'جهة اشتراك').slice(0, 28)}`, `chatsubtargetdel:${group.id}:${target.id}`).row();
+      }
     }
     kb.text('☑️ تحديد الكل', 'chatsubselectall').text('🧹 إلغاء التحديد', 'chatsubclear').row()
       .text('🔗 تعيين جهة للمحدد', 'chatsubsetselected').text('🗑️ حذف جهة المحدد', 'chatsubclear_target_selected').row()
       .text('🟢 تشغيل للمحدد', 'chatsubenable_selected').text('🔴 إيقاف للمحدد', 'chatsubdisable_selected').row()
       .text('↩️ الاشتراكات', 'subscriptionsmenu');
-    const configured = groups.filter(group => db.chatSubscriptions?.[String(group.id)]?.requiredChatId).length;
+    const configured = groups.filter(group => { const sub = db.chatSubscriptions?.[String(group.id)]; return (Array.isArray(sub?.requiredChats) && sub.requiredChats.length) || sub?.requiredChatId; }).length;
     const details = groups.slice(0, 40).map(group => {
       const sub = db.chatSubscriptions?.[String(group.id)] || {};
-      return `• ${group.title}: ${sub.enabled ? '🟢 مفعّل' : '⚪ متوقف'} — ${sub.title || 'لم تُحدّد جهة اشتراك'}${sub.url ? ` (${sub.url})` : ''}`;
+      const targets = Array.isArray(sub.requiredChats) && sub.requiredChats.length ? sub.requiredChats : (sub.requiredChatId ? [{ title: sub.title, url: sub.url }] : []);
+      return `• ${group.title}: ${sub.enabled ? '🟢 مفعّل' : '⚪ متوقف'} — ${targets.length ? targets.map(t => t.title || t.id).join('، ') : 'لم تُحدّد جهة اشتراك'}`;
     }).join('\n');
     return answer(ctx, `💬 اشتراك الدردشة\nاختَر مجموعة أو أكثر من الأزرار.\nتعرض القائمة المجموعات المسجّلة التي تأكد نغنوغ من كونه مشرفاً فيها.\nجهات اشتراك محفوظة: ${configured}\n\n${details}`.slice(0, 3900), { reply_markup: kb });
   }
@@ -103,7 +108,7 @@ export function registerCallbacks(bot, shared) {
     }
 
     const ownerOnlyActions = ['earningsadmin', 'earningsadminstats', 'earningssettings', 'earningsrewardsadmin', 'earningsrewardadd', 'earningsusers', 'earningsusersearch', 'earningsrankadmin', 'earningsrateprompt', 'earningsenabledtoggle', 'earningscancel', 'earningsredemptions', 'ownerpanel', 'botstats', 'botusers', 'botgroups', 'botnew24h', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
-    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botgroupspage:') || data.startsWith('botnew24hpage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext') || data.startsWith('activegroup:') || data.startsWith('activegroupinvite:') || data.startsWith('earningsrewardedit:') || data.startsWith('earningsrewardtoggle:') || data.startsWith('earningsrewarddelete:') || data.startsWith('earningsrewarddelivery:') || data.startsWith('earningsmanual:') || data.startsWith('redemption:') || data.startsWith('earningsredemptionsfilter:') || data.startsWith('earningsredemptiondetail:')) {
+    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botgroupspage:') || data.startsWith('botnew24hpage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || data.startsWith('reqtoggle:') || data.startsWith('reqedit:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext') || data.startsWith('activegroup:') || data.startsWith('activegroupinvite:') || data.startsWith('earningsrewardedit:') || data.startsWith('earningsrewardtoggle:') || data.startsWith('earningsrewarddelete:') || data.startsWith('earningsrewarddelivery:') || data.startsWith('earningsmanual:') || data.startsWith('redemption:') || data.startsWith('earningsredemptionsfilter:') || data.startsWith('earningsredemptiondetail:')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
         return;
@@ -1073,20 +1078,101 @@ export function registerCallbacks(bot, shared) {
       save(); return showChatSubscriptionMenu(ctx);
     }
     if (data === 'chatsubsetselected') { const ids=(db.chatSubscriptionSelection?.[String(ctx.from.id)]||[]).map(String); if(!ids.length) return answer(ctx,'حدد مجموعة واحدة على الأقل أولاً.',{reply_markup:new InlineKeyboard().text('↩️ المجموعات','chatsubmenu')}); pending(ctx,{action:'chat-sub-set',groupIds:ids}); return answer(ctx,'أرسل جهة الاشتراك العامة للمجموعات المحددة بصيغة @channel أو -1001234567890 | https://t.me/+invite. يجب أن يكون نغنوغ مشرفاً في جهة الاشتراك حتى يتحقق من العضوية.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
-    if (data === 'chatsubclear_target_selected') {
-      const ids = (db.chatSubscriptionSelection?.[String(ctx.from.id)] || []).map(String);
-      if (!ids.length) return answer(ctx, 'حدد مجموعة واحدة على الأقل أولاً.', { reply_markup: new InlineKeyboard().text('↩️ المجموعات', 'chatsubmenu') });
-      for (const id of ids) { const setting = db.chatSubscriptions?.[id]; if (setting) { delete setting.requiredChatId; delete setting.title; delete setting.url; setting.enabled = false; } }
+    if (data.startsWith('chatsubtargetdel:')) {
+      const [, groupId, targetId] = data.split(':');
+      const setting = db.chatSubscriptions?.[String(groupId)];
+      if (!setting) return answer(ctx, 'إعداد اشتراك هذه المجموعة غير موجود.');
+      const targets = Array.isArray(setting.requiredChats) ? setting.requiredChats : (setting.requiredChatId ? [{ id: String(setting.requiredChatId), title: setting.title, username: setting.username, url: setting.url }] : []);
+      setting.requiredChats = targets.filter(item => String(item.id) !== String(targetId));
+      if (setting.requiredChats.length) {
+        const first = setting.requiredChats[0];
+        setting.requiredChatId = first.id; setting.title = first.title; setting.username = first.username || ''; setting.url = first.url || '';
+      } else {
+        delete setting.requiredChats; delete setting.requiredChatId; delete setting.title; delete setting.username; delete setting.url; setting.enabled = false;
+      }
       save();
       return showChatSubscriptionMenu(ctx);
     }
-    if (data === 'chatsubenable_selected' || data === 'chatsubdisable_selected') { const ids=(db.chatSubscriptionSelection?.[String(ctx.from.id)]||[]).map(String); if(!ids.length) return answer(ctx,'حدد مجموعة واحدة على الأقل أولاً.',{reply_markup:new InlineKeyboard().text('↩️ المجموعات','chatsubmenu')}); if (data === 'chatsubenable_selected') { const missing = ids.filter(id => !db.chatSubscriptions?.[id]?.requiredChatId || !db.chatSubscriptions?.[id]?.url); if (missing.length) return answer(ctx, `❌ ما أگدر أشغّل اشتراك الدردشة قبل تعيين جهة ورابط صالح للمجموعات التالية: ${missing.map(id => db.groups?.[id]?.title || id).join('، ')}.`, { reply_markup: new InlineKeyboard().text('🔗 تعيين جهة للمحدد','chatsubsetselected').row().text('↩️ رجوع','chatsubmenu') }); } for(const id of ids){db.chatSubscriptions ||= {}; db.chatSubscriptions[id] ||= {}; db.chatSubscriptions[id].enabled=data==='chatsubenable_selected';} save(); return answer(ctx,`${data==='chatsubenable_selected'?'🟢 تم تشغيل':'🔴 تم إيقاف'} اشتراك الدردشة للمجموعات المحددة (${ids.length}).`,{reply_markup:new InlineKeyboard().text('↩️ إدارة المجموعات','chatsubmenu')}); }
+    if (data === 'chatsubclear_target_selected') {
+      const ids = (db.chatSubscriptionSelection?.[String(ctx.from.id)] || []).map(String);
+      if (!ids.length) return answer(ctx, 'حدد مجموعة واحدة على الأقل أولاً.', { reply_markup: new InlineKeyboard().text('↩️ المجموعات', 'chatsubmenu') });
+      for (const id of ids) {
+        const setting = db.chatSubscriptions?.[id];
+        if (setting) { delete setting.requiredChatId; delete setting.requiredChats; delete setting.title; delete setting.username; delete setting.url; setting.enabled = false; }
+        for (const key of Object.keys(db.chatSubRestricted || {})) if (key.startsWith(`${id}:`)) {
+          const userId = key.slice(String(id).length + 1);
+          try { await restoreChatSubscriptionRestriction(id, userId); } catch {}
+        }
+      }
+      save();
+      return showChatSubscriptionMenu(ctx);
+    }
+    if (data === 'chatsubenable_selected' || data === 'chatsubdisable_selected') {
+      const ids = (db.chatSubscriptionSelection?.[String(ctx.from.id)] || []).map(String);
+      if (!ids.length) return answer(ctx, 'حدد مجموعة واحدة على الأقل أولاً.', { reply_markup: new InlineKeyboard().text('↩️ المجموعات', 'chatsubmenu') });
+      if (data === 'chatsubenable_selected') {
+        const missing = ids.filter(id => {
+          const sub = db.chatSubscriptions?.[id];
+          return !(Array.isArray(sub?.requiredChats) && sub.requiredChats.length) && !sub?.requiredChatId;
+        });
+        if (missing.length) return answer(ctx, `❌ عيّن جهة اشتراك أولاً لهذه المجموعات: ${missing.map(id => db.groups?.[id]?.title || id).join('، ')}.`, { reply_markup: new InlineKeyboard().text('🔗 تعيين جهة للمحدد', 'chatsubsetselected').row().text('↩️ رجوع', 'chatsubmenu') });
+        for (const id of ids) {
+          try { await ensureGroupSubscriptionPermissions(ctx, id); }
+          catch (error) { return answer(ctx, `❌ لم يتم تشغيل اشتراك الدردشة.
+المجموعة: ${db.groups?.[id]?.title || id}
+السبب: ${error.message}`, { reply_markup: new InlineKeyboard().text('↩️ إدارة المجموعات', 'chatsubmenu') }); }
+        }
+      }
+      for (const id of ids) {
+        db.chatSubscriptions ||= {}; db.chatSubscriptions[id] ||= {};
+        db.chatSubscriptions[id].enabled = data === 'chatsubenable_selected';
+        if (data === 'chatsubdisable_selected') {
+          for (const key of Object.keys(db.chatSubRestricted || {})) if (key.startsWith(`${id}:`)) {
+            const userId = key.slice(String(id).length + 1);
+            try { await restoreChatSubscriptionRestriction(id, userId); } catch {}
+          }
+        }
+      }
+      save();
+      return answer(ctx, `${data === 'chatsubenable_selected' ? '🟢 تم تشغيل' : '🔴 تم إيقاف'} اشتراك الدردشة للمجموعات المحددة (${ids.length}).`, { reply_markup: new InlineKeyboard().text('↩️ إدارة المجموعات', 'chatsubmenu') });
+    }
     if (data.startsWith('chatsubset:')) { const id=data.slice('chatsubset:'.length); pending(ctx,{action:'chat-sub-set',groupIds:[String(id)]}); return answer(ctx,'أرسل جهة الاشتراك بصيغة @channel أو -1001234567890 | https://t.me/+invite للمجموعة الخاصة.',{reply_markup:new InlineKeyboard().text('❌ إلغاء','chatsubmenu')}); }
-    if (data.startsWith('chatsubtoggle:')) { const id=String(data.slice('chatsubtoggle:'.length)); db.chatSubscriptions ||= {}; db.chatSubscriptions[id] ||= {}; const nextEnabled = !db.chatSubscriptions[id].enabled; if (nextEnabled && (!db.chatSubscriptions[id].requiredChatId || !db.chatSubscriptions[id].url)) return answer(ctx, '❌ لا يمكن تشغيل اشتراك الدردشة قبل إضافة جهة اشتراك ورابط صالح. عيّن الجهة أولاً من زر «تعيين جهة للمحدد».', { reply_markup: new InlineKeyboard().text('🔗 تعيين جهة','chatsubset:'+id).row().text('↩️ إدارة الاشتراك','chatsubmenu') }); db.chatSubscriptions[id].enabled=nextEnabled; save(); return answer(ctx,`${db.chatSubscriptions[id].enabled?'🟢 تم تشغيل':'🔴 تم إيقاف'} اشتراك الدردشة لهذه المجموعة.`,{reply_markup:new InlineKeyboard().text('↩️ إدارة الاشتراك','chatsubmenu')}); }
+    if (data.startsWith('chatsubtoggle:')) {
+      const id = String(data.slice('chatsubtoggle:'.length));
+      db.chatSubscriptions ||= {}; db.chatSubscriptions[id] ||= {};
+      const nextEnabled = !db.chatSubscriptions[id].enabled;
+      const setting = db.chatSubscriptions[id];
+      if (nextEnabled && !(Array.isArray(setting.requiredChats) && setting.requiredChats.length) && !setting.requiredChatId) return answer(ctx, '❌ أضف جهة اشتراك أولاً.', { reply_markup: new InlineKeyboard().text('🔗 تعيين جهة', 'chatsubset:' + id).row().text('↩️ إدارة الاشتراك', 'chatsubmenu') });
+      if (nextEnabled) {
+        try { await ensureGroupSubscriptionPermissions(ctx, id); }
+        catch (error) { return answer(ctx, `❌ تعذّر تشغيل اشتراك الدردشة.\nالسبب: ${error.message}`, { reply_markup: new InlineKeyboard().text('↩️ إدارة الاشتراك', 'chatsubmenu') }); }
+      } else {
+        for (const key of Object.keys(db.chatSubRestricted || {})) if (key.startsWith(`${id}:`)) {
+          const restrictedUserId = key.slice(String(id).length + 1);
+          try { await restoreChatSubscriptionRestriction(id, restrictedUserId); } catch {}
+        }
+      }
+      setting.enabled = nextEnabled; save();
+      return answer(ctx, `${setting.enabled ? '🟢 تم تشغيل' : '🔴 تم إيقاف'} اشتراك الدردشة لهذه المجموعة.`, { reply_markup: new InlineKeyboard().text('↩️ إدارة الاشتراك', 'chatsubmenu') });
+    }
     if (data === 'requiredlist') return showRequiredList(ctx);
     if (data === 'requiredadd') {
       pending(ctx, { action: 'add-required-chat' });
       return answer(ctx, '➕ أرسل معرف القناة/المجموعة مثل @channel أو -1001234567890. وللجهة الخاصة أرسل الآيدي ثم | ثم رابط الدعوة: -1001234567890 | https://t.me/+xxxx. يجب أن يكون نغنوغ مشرفاً في الجهة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredmenu') });
+    }
+    if (data.startsWith('reqtoggle:')) {
+      const index = Number(data.split(':')[1]);
+      const target = db.requiredChats?.[index];
+      if (!target) return answer(ctx, 'الجهة غير موجودة.');
+      target.enabled = target.enabled === false;
+      save();
+      return showRequiredList(ctx);
+    }
+    if (data.startsWith('reqedit:')) {
+      const index = Number(data.split(':')[1]);
+      if (!db.requiredChats?.[index]) return answer(ctx, 'الجهة غير موجودة.');
+      pending(ctx, { action: 'edit-required-chat', index });
+      return answer(ctx, 'أرسل بيانات الجهة الجديدة: @username أو رابط عام، أو آيدي الجهة الخاصة ثم | ثم رابط الدعوة. سيتم فحصها قبل حفظ التعديل.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'requiredlist') });
     }
     if (data.startsWith('reqdel:')) {
       const index = Number(data.split(':')[1]);
@@ -1102,13 +1188,16 @@ export function registerCallbacks(bot, shared) {
       if (!result.required) return answer(ctx, 'هذا الاشتراك غير مفعّل حالياً.');
       if (result.technicalError) return answer(ctx, '⚠️ تعذّر التحقق بسبب مشكلة تقنية أو نقص صلاحيات نغنوغ. تم تنبيه المالك، حاول بعد قليل.');
       if (result.ok) {
-        try { await ctx.editMessageText('✅ تم التحقق من اشتراكك بنجاح. رجعت الدردشة متاحة إلك، تگدر هسه تراسل وتستخدم الأزرار.'); } catch { return answer(ctx, '✅ تم التحقق من اشتراكك. تگدر هسه تراسل وتستخدم الأزرار.'); }
+        try { await restoreChatSubscriptionRestriction(chatId, ctx.from.id); }
+        catch { return answer(ctx, '✅ اشتراكك مكتمل، لكن تعذّر رفع التقييد تلقائياً. نبهنا المالك؛ اطلب من مشرف المجموعة رفع التقييد.'); }
+        try { await ctx.editMessageText('✅ تم التحقق من اشتراكك في جميع الجهات المطلوبة. رُفع تقييد نغنوغ عنك، وتگدر هسه تراسل وتستخدم الأزرار.'); } catch { return answer(ctx, '✅ تم التحقق من اشتراكك ورفع التقييد. تگدر هسه تراسل وتستخدم الأزرار.'); }
         return;
       }
       const kb = new InlineKeyboard();
-      if (result.setting.url) kb.url('📣 اشترك الآن', result.setting.url).row();
+      for (const target of (result.missing || [])) if (target.url) kb.url(`📣 اشترك في ${String(target.title || 'الجهة').slice(0, 28)}`, target.url).row();
       kb.text('✅ تحقّق من الاشتراك', `chatsubverify:${chatId}`);
-      return answer(ctx, '❌ بعدك مو مشترك بالجهة المطلوبة. اشترك أولاً ثم أعد التحقق.', { reply_markup: kb });
+      const names = (result.missing || []).map(item => item.title || item.id).join('، ');
+      return answer(ctx, `❌ بعدك مو مشترك بالجهات التالية: ${names || 'الجهة المطلوبة'}. اشترك بها ثم أعد التحقق.`, { reply_markup: kb });
     }
     if (data === 'checksubscription') {
       const allowed = await subscriptionGate(ctx);

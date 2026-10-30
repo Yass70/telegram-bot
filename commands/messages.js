@@ -17,7 +17,7 @@ export function registerMessages(bot, shared) {
     selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard,
     HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
-    showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList,
+    showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, ensureGroupSubscriptionPermissions, restoreChatSubscriptionRestriction,
     showProfileCard, handleViolation, showOwnerPanel, uiText, PROFILE_PHRASES,
     inferMenuBack, rememberMenuBack, menuBackTarget, normalizeAnswer,
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
@@ -28,15 +28,24 @@ export function registerMessages(bot, shared) {
 
   async function resolveSubscriptionTarget(ctx, input) {
     const parts = String(input || '').split('|').map(value => value.trim());
-    const targetRef = parts[0] || '';
+    let targetRef = parts[0] || '';
     const suppliedUrl = parts[1] || '';
-    if (!targetRef) throw new Error('لم ترسل معرف القناة أو المجموعة. أرسل @username أو آيدي يبدأ بـ -100.');
+    if (!targetRef) throw new Error('لم ترسل معرف القناة أو المجموعة. أرسل @username أو آيدي يبدأ بـ -100 أو رابطاً عاماً من t.me.');
+    if (/^https?:\/\/(?:www\.)?(?:t\.me|telegram\.me)\//i.test(targetRef)) {
+      const url = new URL(targetRef.replace(/^http:/i, 'https:'));
+      const pathPart = decodeURIComponent(url.pathname.replace(/^\//, '').split('/')[0] || '');
+      if (pathPart.startsWith('+') || pathPart === 'joinchat') {
+        throw new Error('رابط الدعوة الخاص وحده لا يكفي للتعرّف على الجهة عبر Bot API. أرسل آيدي الجهة ثم | ثم رابط الدعوة: -1001234567890 | https://t.me/+xxxx');
+      }
+      if (!pathPart || ['c', 'joinchat'].includes(pathPart.toLowerCase())) throw new Error('الرابط لا يحتوي على معرف عام واضح. للجهة الخاصة أرسل الآيدي مع رابط الدعوة.');
+      targetRef = pathPart.startsWith('@') ? pathPart : `@${pathPart}`;
+    }
     if (suppliedUrl && !/^https:\/\/t\.me\/(?:\+|joinchat\/|[A-Za-z0-9_]{5,})/i.test(suppliedUrl)) {
       throw new Error('رابط الدعوة غير صالح. استخدم رابطاً يبدأ بـ https://t.me/');
     }
     let targetChat;
     try {
-      targetChat = await ctx.api.getChat(/^-?\d+$/.test(targetRef) ? Number(targetRef) : targetRef);
+      targetChat = await ctx.api.getChat(targetRef);
     } catch (error) {
       const description = String(error?.description || error?.message || 'غير معروف');
       if (/chat not found/i.test(description)) throw new Error('تيليغرام لم يعثر على القناة أو المجموعة. تحقق من الآيدي أو المعرف، وتأكد أن البوت موجود فيها.');
@@ -75,6 +84,51 @@ export function registerMessages(bot, shared) {
 
       const isAdmin = (await userIsAdmin(ctx.chat.id, ctx.from.id)) || (g.admins || []).includes(String(ctx.from.id)) || isOwner(ctx);
       const uid = userKey(ctx);
+      const pendingGroupSub = db.pending?.[uid];
+      if (pendingGroupSub?.action === 'chat-sub-set-group' && String(pendingGroupSub.groupId) === String(ctx.chat.id)) {
+        if (!isAdmin) { clearPending(ctx); return ctx.reply('هذا الإجراء متاح لمشرفي المجموعة فقط.'); }
+        if (/^\/cancel(?:@\w+)?$/i.test(rawText)) { clearPending(ctx); return ctx.reply('❌ تم إلغاء إعداد اشتراك الدردشة.'); }
+        let target;
+        try {
+          await ensureGroupSubscriptionPermissions(ctx, ctx.chat.id);
+          target = await resolveSubscriptionTarget(ctx, rawText);
+        } catch (error) {
+          return ctx.reply(`❌ لم تتم إضافة جهة الاشتراك.\nالسبب: ${error.message}\nأرسل الجهة مرة ثانية أو /cancel للإلغاء.`);
+        }
+        db.chatSubscriptions ||= {};
+        const current = db.chatSubscriptions[String(ctx.chat.id)] || {};
+        const targets = Array.isArray(current.requiredChats) ? current.requiredChats : (current.requiredChatId ? [{ id: String(current.requiredChatId), title: current.title, username: current.username || '', url: current.url || '' }] : []);
+        current.requiredChats = [...targets.filter(item => String(item.id) !== String(target.id)), target];
+        current.requiredChatId = target.id; current.title = target.title; current.username = target.username; current.url = target.url;
+        current.enabled = true; current.updatedAt = Date.now();
+        db.chatSubscriptions[String(ctx.chat.id)] = current;
+        clearPending(ctx); save();
+        return ctx.reply(`✅ تمت إضافة جهة الاشتراك وتفعيلها لهذه المجموعة.\nالجهة: ${target.title}\nالرابط: ${target.url}\nعدد الجهات المطلوبة: ${current.requiredChats.length}`);
+      }
+      if (isAdmin && /^(?:\/)?(?:اشتراك_دردشة|اشتراك الدردشة)$/i.test(rawText)) {
+        try { await ensureGroupSubscriptionPermissions(ctx, ctx.chat.id); }
+        catch (error) { return ctx.reply(`❌ لا يمكن إعداد اشتراك الدردشة حالياً.\nالسبب: ${error.message}`); }
+        pending(ctx, { action: 'chat-sub-set-group', groupId: String(ctx.chat.id) });
+        return ctx.reply('💬 إعداد اشتراك الدردشة لهذه المجموعة\nأرسل @channel أو رابط t.me العام، أو آيدي الجهة الخاصة ثم | ثم رابط الدعوة. يجب أن يكون نغنوغ مشرفاً في جهة الاشتراك. لإلغاء العملية أرسل /cancel.');
+      }
+      if (isAdmin && /^(?:\/)?(?:ايقاف اشتراك الدردشة|إيقاف اشتراك الدردشة)$/i.test(rawText)) {
+        const setting = db.chatSubscriptions?.[String(ctx.chat.id)];
+        if (setting) setting.enabled = false;
+        for (const key of Object.keys(db.chatSubRestricted || {})) if (key.startsWith(`${ctx.chat.id}:`)) {
+          const restrictedUserId = key.slice(String(ctx.chat.id).length + 1);
+          try { await restoreChatSubscriptionRestriction(ctx.chat.id, restrictedUserId); } catch {}
+        }
+        save(); return ctx.reply('🔴 تم إيقاف اشتراك الدردشة لهذه المجموعة فقط.');
+      }
+      if (isAdmin && /^(?:\/)?(?:حذف اشتراك الدردشة|حذف_اشتراك_دردشة)$/i.test(rawText)) {
+        const setting = db.chatSubscriptions?.[String(ctx.chat.id)];
+        if (setting) { setting.enabled = false; delete setting.requiredChats; delete setting.requiredChatId; delete setting.title; delete setting.username; delete setting.url; }
+        for (const key of Object.keys(db.chatSubRestricted || {})) if (key.startsWith(`${ctx.chat.id}:`)) {
+          const restrictedUserId = key.slice(String(ctx.chat.id).length + 1);
+          try { await restoreChatSubscriptionRestriction(ctx.chat.id, restrictedUserId); } catch {}
+        }
+        save(); return ctx.reply('🗑️ تم حذف جهات اشتراك الدردشة وإيقاف النظام لهذه المجموعة فقط.');
+      }
       g.userStats ||= {};
       g.userStats[uid] ||= { messages: 0 };
       g.knownMembers ||= {};
@@ -580,7 +634,7 @@ export function registerMessages(bot, shared) {
         }
       }
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason', 'earnings-reward-delivery'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'edit-required-chat', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason', 'earnings-reward-delivery'].includes(p.action)) {
           clearPending(ctx);
           const cancelledReminder = ['reminder-text', 'reminder-day', 'reminder-time'].includes(p.action);
           const cancelledEarnings = String(p.action || '').startsWith('earnings-');
@@ -776,10 +830,25 @@ export function registerMessages(bot, shared) {
           catch (error) { return ctx.reply(`❌ لم تتم إضافة جهة اشتراك الدردشة.\nالسبب: ${error.message}\n\nأصلح السبب ثم أرسل الجهة مرة ثانية، أو أرسل /cancel للإلغاء.`); }
           db.chatSubscriptions ||= {};
           for (const groupId of ids) {
-            db.chatSubscriptions[groupId] = { ...(db.chatSubscriptions[groupId] || {}), requiredChatId: target.id, title: target.title, username: target.username, url: target.url, enabled: true, updatedAt: Date.now() };
+            const current = db.chatSubscriptions[groupId] || {};
+            const targets = Array.isArray(current.requiredChats) ? current.requiredChats : (current.requiredChatId ? [{ id: String(current.requiredChatId), title: current.title, username: current.username || '', url: current.url || '' }] : []);
+            const nextTargets = [...targets.filter(item => String(item.id) !== String(target.id)), target];
+            db.chatSubscriptions[groupId] = { ...current, requiredChats: nextTargets, requiredChatId: target.id, title: target.title, username: target.username, url: target.url, enabled: true, updatedAt: Date.now() };
           }
           clearPending(ctx); save();
           return ctx.reply(`✅ تم التحقق من الجهة وحفظها بنجاح.\nالجهة: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}\nالمجموعات المحددة: ${ids.length}\n\n🔒 تم تفعيل الاشتراك لهذه المجموعات مباشرةً؛ لن تعمل الدردشة للأعضاء غير المشتركين حتى يكملوا الاشتراك.`, { reply_markup: new InlineKeyboard().text('💬 اشتراك الدردشة', 'chatsubmenu').row().text('💳 الاشتراكات', 'subscriptionsmenu') });
+        }
+
+        if (p.action === 'edit-required-chat') {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          let target;
+          try { target = await resolveSubscriptionTarget(ctx, text); }
+          catch (error) { return ctx.reply(`❌ لم يتم تعديل الجهة.\nالسبب: ${error.message}\nأرسل البيانات مرة ثانية أو /cancel للإلغاء.`); }
+          const index = Number(p.index);
+          if (!Number.isInteger(index) || !db.requiredChats?.[index]) { clearPending(ctx); return ctx.reply('❌ لم تعد الجهة المحددة موجودة.'); }
+          db.requiredChats[index] = { ...db.requiredChats[index], ...target, enabled: db.requiredChats[index].enabled !== false, updatedAt: Date.now() };
+          clearPending(ctx); save();
+          return ctx.reply(`✅ تم تعديل جهة الاشتراك بنجاح.\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}`, { reply_markup: new InlineKeyboard().text('📋 قائمة الجهات', 'requiredlist') });
         }
 
         if (p.action === 'add-required-chat') {
