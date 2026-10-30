@@ -231,7 +231,7 @@ export const UI_TEXT_CATALOG = [
   },
   {
     "kind": "button",
-    "from": "⭐ ستار",
+    "from": "💰 أرباحي",
     "category": "🔘 الأزرار والقوائم",
     "source": "keyboards.js"
   },
@@ -1725,7 +1725,7 @@ export const UI_TEXT_CATALOG = [
   },
   {
     "kind": "button",
-    "from": "⭐ ستار",
+    "from": "💰 أرباحي",
     "category": "🛡️ الإدارة وأزرار اللوحات",
     "source": "commands/callbacks.js"
   },

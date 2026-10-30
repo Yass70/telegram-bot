@@ -9,7 +9,7 @@ export function mainKeyboard(ctx, bot, ui = {}) {
     .url(label('addBot', '➕ أضف نغنوغ'), `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`).row()
     .text(label('management', '⚙️ الإدارة'), 'managementmenu')
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo').row()
-    .text('⭐ ستار', 'starmenu')
+    .text('💰 أرباحي', 'earningsmenu')
     .text('✨ لمسات نغنوغ', 'touchesmenu').row()
     .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
     .text(label('help', '📖 المساعدة'), 'help');
@@ -75,6 +75,7 @@ export function ownerKeyboard() {
     .text('📢 الإشعار العام', 'broadcastmenu')
     .text('💳 الاشتراكات', 'subscriptionsmenu').row()
     .text('📝 تحرير نصوص القوائم', 'globaltextmenu').row()
+    .text('💰 إدارة الأرباح والمكافآت', 'earningsadmin').row()
     .text('🏠 القائمة الرئيسية', 'home');
 }
 

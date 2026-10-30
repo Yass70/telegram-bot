@@ -5,6 +5,7 @@ import { helpKeyboard } from './keyboards.js';
 import { QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES } from './games/data.js';
 import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
+import { ensureEarnings, earningsBalance, awardReferral, redeemReward } from './earnings.js';
 
 export function setupCommands(bot, db, helpers) {
   const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
@@ -13,6 +14,7 @@ export function setupCommands(bot, db, helpers) {
   db.groupPoints ||= {};
   db.customizations ||= {};
   db.menuBack ||= {};
+  ensureEarnings(db);
 
   // نحفظ القائمة التي دخل المستخدم منها إلى الألعاب أو التحذيرات، حتى يعود إليها فعلاً.
   const inferMenuBack = (ctx, kind) => {
@@ -36,6 +38,7 @@ export function setupCommands(bot, db, helpers) {
   };
   const rememberMenuBack = (ctx, kind) => {
     db.menuBack ||= {};
+  ensureEarnings(db);
     db.menuBack[userKey(ctx)] ||= {};
     db.menuBack[userKey(ctx)][kind] = inferMenuBack(ctx, kind);
     save();
@@ -104,7 +107,7 @@ export function setupCommands(bot, db, helpers) {
       .add({ text: '📋 نسخ رابط المشاركة', copy_text: { text: link } }).row()
       .url('📤 مشاركة الرابط', shareUrl).row()
       .text('🔄 تحديث الإحصائيات', 'referralrefresh').row()
-      .text('↩️ ستار', 'starmenu')
+      .text('↩️ أرباحي', 'earningsmenu')
       .text('🏠 الرئيسية', 'home');
   };
   const showReferralLink = async ctx => {
@@ -117,9 +120,9 @@ export function setupCommands(bot, db, helpers) {
 ${link}
 
 -︰الأشخاص المنضمّون برابطك : ❨ ${stats.joinedCount} ❩
--︰نقاط الجوائز : ❨ ${stats.rewardPoints} ❩
+-︰نقاط الأرباح : ❨ ${earningsBalance(db, uid)} ❩
 
-✦ يُحتسب المستخدم الجديد مرة واحدة فقط عند بدء البوت عبر رابطك.
+✦ تُحتسب الدعوة مرة واحدة بعد أول /start لمستخدم جديد عبر رابطك.
 ╰━━━━━━━━━━━━━━━━━━━━╯`;
     return answer(ctx, text, { reply_markup: referralLinkKeyboard(uid) });
   };
@@ -127,20 +130,15 @@ ${link}
   bot.command('start', async ctx => {
     ensureReferralData();
     const uid = String(ctx.from?.id || '');
-    const alreadyKnown = (db.users || []).includes(uid);
+    const alreadyPrivate = (db.privateUsers || []).map(String).includes(uid);
     const payload = String(ctx.match || '').trim();
     const match = payload.match(/^ref_(\d+)$/);
-    // تكافأ الإحالة فقط إذا كان هذا أول تسجيل للمستخدم، ولا يُسمح بإحالة النفس أو تكرارها.
-    if (uid && !alreadyKnown && !db.userMeta[uid] && match) {
+    // تُسجّل الإحالة مرة واحدة فقط عند أول /start لحساب جديد، مع إبقاء رصيد ستار التاريخي دون تعديل.
+    if (uid && !alreadyPrivate && match) {
       const referrerId = String(match[1]);
       if (referrerId !== uid && (db.users || []).includes(referrerId)) {
-        db.referrals[referrerId] ||= { joinedCount: 0, rewardPoints: 0 };
-        if (!db.referralByUser[uid]) {
-          db.referralByUser[uid] = referrerId;
-          db.referrals[referrerId].joinedCount = Math.max(0, Number(db.referrals[referrerId].joinedCount) || 0) + 1;
-          db.referrals[referrerId].rewardPoints = Math.max(0, Number(db.referrals[referrerId].rewardPoints) || 0) + 1;
-          save();
-        }
+        const result = awardReferral(db, referrerId, uid);
+        if (result.ok) save();
       }
     }
     ensureUser(ctx);
@@ -343,6 +341,7 @@ ${link}
     inferMenuBack, rememberMenuBack, menuBackTarget, normalizeAnswer,
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
     ensureReferralData, referralLinkFor, referralStatsFor, referralMenuKeyboard,
+    ensureEarnings, earningsBalance, redeemReward,
     referralLinkKeyboard, showReferralLink, publicCommandsKeyboard,
     QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES
   };

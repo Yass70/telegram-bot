@@ -45,6 +45,7 @@ export const freshDB = () => ({
   userMeta: {},
   referrals: {},
   referralByUser: {},
+  earnings: { settings: { enabled: true, pointsPerReferral: 1 }, linkUsers: {}, wallets: {}, referralRecords: {}, rewards: {}, redemptionRequests: {}, ledger: [] },
   stats: { messages: 0, deletedLinks: 0, floodEvents: 0, welcomed: 0 }
 });
 
@@ -97,6 +98,10 @@ function load() {
     db.userMeta ||= {};
     db.referrals ||= {};
     db.referralByUser ||= {};
+    db.earnings ||= {};
+    db.earnings.settings ||= { enabled: true, pointsPerReferral: 1 };
+    db.earnings.wallets ||= {}; db.earnings.linkUsers ||= {}; db.earnings.referralRecords ||= {}; db.earnings.rewards ||= {};
+    db.earnings.redemptionRequests ||= {}; db.earnings.ledger ||= [];
     for (const [id, oldGroup] of Object.entries(db.groups)) {
       const g = { ...freshGroup(), ...oldGroup };
       g.id ||= id; g.replies ||= []; g.admins ||= [];
