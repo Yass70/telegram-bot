@@ -26,6 +26,42 @@ export function registerMessages(bot, shared) {
     QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES
   } = shared;
 
+  async function resolveSubscriptionTarget(ctx, input) {
+    const parts = String(input || '').split('|').map(value => value.trim());
+    const targetRef = parts[0] || '';
+    const suppliedUrl = parts[1] || '';
+    if (!targetRef) throw new Error('لم ترسل معرف القناة أو المجموعة. أرسل @username أو آيدي يبدأ بـ -100.');
+    if (suppliedUrl && !/^https:\/\/t\.me\/(?:\+|joinchat\/|[A-Za-z0-9_]{5,})/i.test(suppliedUrl)) {
+      throw new Error('رابط الدعوة غير صالح. استخدم رابطاً يبدأ بـ https://t.me/');
+    }
+    let targetChat;
+    try {
+      targetChat = await ctx.api.getChat(/^-?\d+$/.test(targetRef) ? Number(targetRef) : targetRef);
+    } catch (error) {
+      const description = String(error?.description || error?.message || 'غير معروف');
+      if (/chat not found/i.test(description)) throw new Error('تيليغرام لم يعثر على القناة أو المجموعة. تحقق من الآيدي أو المعرف، وتأكد أن البوت موجود فيها.');
+      if (/not enough rights|forbidden/i.test(description)) throw new Error('البوت لا يملك صلاحية الوصول إلى هذه الجهة. أضفه إليها واجعله مشرفاً.');
+      throw new Error(`تعذّر الوصول إلى الجهة: ${description}`);
+    }
+    let botMember;
+    try {
+      botMember = await ctx.api.getChatMember(targetChat.id, bot.botInfo.id);
+    } catch (error) {
+      throw new Error(`وصلت إلى الجهة لكن تعذّر فحص رتبة نغنوغ: ${error?.description || error?.message || 'خطأ غير معروف'}. أضف البوت مشرفاً ثم أعد المحاولة.`);
+    }
+    if (!['administrator', 'creator'].includes(botMember.status)) {
+      throw new Error(`نغنوغ موجود في «${targetChat.title || targetChat.username || targetChat.id}» لكنه ليس مشرفاً. ارفعه إلى مشرف حتى يستطيع فحص اشتراك الأعضاء.`);
+    }
+    let url = targetChat.username ? `https://t.me/${targetChat.username}` : (suppliedUrl || targetChat.invite_link || '');
+    if (!url && typeof ctx.api.exportChatInviteLink === 'function') {
+      try { url = await ctx.api.exportChatInviteLink(targetChat.id); } catch {}
+    }
+    if (!url || !/^https:\/\/t\.me\//i.test(url)) {
+      throw new Error('تم العثور على الجهة والتحقق من إشراف نغنوغ، لكن لم أجد رابطاً صالحاً لفتحها. أرسل رابط الدعوة معها بهذا الشكل: -1001234567890 | https://t.me/+xxxx');
+    }
+    return { id: String(targetChat.id), title: targetChat.title || (targetChat.username ? `@${targetChat.username}` : String(targetChat.id)), username: targetChat.username || '', url };
+  }
+
   bot.on('message', async ctx => {
     ensureUser(ctx);
     const msg = ctx.message;
@@ -39,22 +75,6 @@ export function registerMessages(bot, shared) {
 
       const isAdmin = (await userIsAdmin(ctx.chat.id, ctx.from.id)) || (g.admins || []).includes(String(ctx.from.id)) || isOwner(ctx);
       const uid = userKey(ctx);
-      // اشتراك الدردشة: إعداد مستقل لكل مجموعة، مع استثناء المشرفين والمالك.
-      const chatSub = db.chatSubscriptions?.[String(ctx.chat.id)];
-      if (chatSub?.enabled && chatSub.requiredChatId && !isAdmin && !isOwner(ctx)) {
-        let subscribed = false;
-        let membershipCheckFailed = false;
-        try { const member = await ctx.api.getChatMember(/^-?\d+$/.test(String(chatSub.requiredChatId)) ? Number(chatSub.requiredChatId) : chatSub.requiredChatId, msg.from.id); subscribed = ['member','administrator','creator'].includes(member.status) || (member.status === 'restricted' && member.is_member); }
-        catch (err) { membershipCheckFailed = true; console.warn('[chat-subscription] membership check failed; allowing message to avoid a false lock:', err?.description || err?.message || err); }
-        if (membershipCheckFailed) { /* A failed API check must not lock the whole group by mistake. */ }
-        else if (!subscribed) {
-          try { await ctx.api.deleteMessage(ctx.chat.id, msg.message_id); } catch {}
-          const kb = new InlineKeyboard(); if (chatSub.url) kb.url('📣 اشترك الآن', chatSub.url).row();
-          kb.text('✅ تحقّق من الاشتراك', `chatsubverify:${ctx.chat.id}`);
-          try { await ctx.api.sendMessage(ctx.chat.id, `🔒 حتى تگدر تراسل هنا، اشترك أولاً في «${chatSub.title || 'القناة/المجموعة المطلوبة'}».`, { reply_markup: kb }); } catch {}
-          return;
-        }
-      }
       g.userStats ||= {};
       g.userStats[uid] ||= { messages: 0 };
       g.knownMembers ||= {};
@@ -736,36 +756,30 @@ export function registerMessages(bot, shared) {
         if (p.action === 'chat-sub-set') {
           if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
           const ids = (Array.isArray(p.groupIds) ? p.groupIds : [p.groupId]).map(String).filter(Boolean);
-          const parts = String(text || '').split('|').map(v => v.trim());
-          const targetRef = parts[0] || '';
-          const suppliedUrl = parts[1] || '';
-          if (!targetRef) return ctx.reply('أرسل @channel أو آيدي جهة الاشتراك.');
-          let targetChat;
-          try { targetChat = await ctx.api.getChat(/^-?\d+$/.test(targetRef) ? Number(targetRef) : targetRef); }
-          catch { return ctx.reply('❌ ما كدرت أوصل لجهة الاشتراك. تأكد من الآيدي/المعرف وأن نغنوغ موجود ومشرف بها.'); }
-          let botMember;
-          try { botMember = await ctx.api.getChatMember(targetChat.id, bot.botInfo.id); }
-          catch { return ctx.reply('❌ تعذر فحص صلاحية نغنوغ داخل جهة الاشتراك. أضفه مشرفاً ثم أعد المحاولة.'); }
-          if (!['administrator','creator'].includes(botMember.status)) return ctx.reply('❌ لازم يكون نغنوغ مشرفاً في جهة الاشتراك حتى يتحقق من العضوية.');
-          const url = targetChat.username ? `https://t.me/${targetChat.username}` : (/^https:\/\/t\.me\//i.test(suppliedUrl) ? suppliedUrl : '');
-          if (!url) return ctx.reply('الجهة خاصة أو ما إلها معرف عام. أرسلها هكذا: -1001234567890 | https://t.me/+رابط_الدعوة');
+          if (!ids.length) return ctx.reply('❌ لم يتم تحديد مجموعة. ارجع وحدد المجموعة ثم حاول مرة ثانية.');
+          let target;
+          try { target = await resolveSubscriptionTarget(ctx, text); }
+          catch (error) { return ctx.reply(`❌ لم تتم إضافة جهة اشتراك الدردشة.\nالسبب: ${error.message}\n\nأصلح السبب ثم أرسل الجهة مرة ثانية، أو أرسل /cancel للإلغاء.`); }
           db.chatSubscriptions ||= {};
           for (const groupId of ids) {
-            db.chatSubscriptions[groupId] = { ...(db.chatSubscriptions[groupId] || {}), requiredChatId: String(targetChat.id), title: targetChat.title || targetChat.username || String(targetChat.id), url, updatedAt: Date.now() };
+            db.chatSubscriptions[groupId] = { ...(db.chatSubscriptions[groupId] || {}), requiredChatId: target.id, title: target.title, username: target.username, url: target.url, enabled: true, updatedAt: Date.now() };
           }
           clearPending(ctx); save();
-          return ctx.reply(`✅ تم حفظ جهة الاشتراك «${targetChat.title || targetChat.username || targetChat.id}» للمجموعات المحددة (${ids.length}).\nالتشغيل والإيقاف من لوحة اشتراك الدردشة.`, { reply_markup: new InlineKeyboard().text('💬 اشتراك الدردشة', 'chatsubmenu').row().text('💳 الاشتراكات', 'subscriptionsmenu') });
+          return ctx.reply(`✅ تم التحقق من الجهة وحفظها بنجاح.\nالجهة: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}\nالمجموعات المحددة: ${ids.length}\n\n🔒 تم تفعيل الاشتراك لهذه المجموعات مباشرةً؛ لن تعمل الدردشة للأعضاء غير المشتركين حتى يكملوا الاشتراك.`, { reply_markup: new InlineKeyboard().text('💬 اشتراك الدردشة', 'chatsubmenu').row().text('💳 الاشتراكات', 'subscriptionsmenu') });
         }
 
         if (p.action === 'add-required-chat') {
-          clearPending(ctx);
-          let title = text;
-          let id = text;
-          let url = text.startsWith('@') ? `https://t.me/${text.replace('@', '')}` : '';
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          let target;
+          try { target = await resolveSubscriptionTarget(ctx, text); }
+          catch (error) { return ctx.reply(`❌ لم تتم إضافة القناة أو المجموعة.\nالسبب: ${error.message}\n\nأصلح السبب ثم أرسل الجهة مرة ثانية، أو أرسل /cancel للإلغاء.`); }
           db.requiredChats ||= [];
-          db.requiredChats.push({ id, title, url });
-          save();
-          return answer(ctx, `✅ تم إضافة القناة أو المجموعة للاشتراك الإجباري بنجاح!`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          const existingIndex = db.requiredChats.findIndex(item => String(item.id) === target.id);
+          const record = { ...target, addedAt: Date.now() };
+          if (existingIndex >= 0) db.requiredChats[existingIndex] = { ...db.requiredChats[existingIndex], ...record };
+          else db.requiredChats.push(record);
+          clearPending(ctx); save();
+          return answer(ctx, `✅ تم التحقق من الجهة وإضافتها للاشتراك الإجباري.\n\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}\n\nسيُطلب من المستخدمين الاشتراك بها قبل استخدام البوت.`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
         }
 
         if (p.action === 'edit-welcome') {
