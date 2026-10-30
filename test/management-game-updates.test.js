@@ -88,3 +88,31 @@ test('subscription gates cover private commands and group buttons with actionabl
   assert.match(messages, /السبب:/);
   assert.match(callbacks, /تم التحقق من اشتراكك بنجاح/);
 });
+
+test('subscription targets support multiple chat requirements and legacy single-target data', () => {
+  const helpers = read('../helpers.js');
+  const messages = read('../commands/messages.js');
+  const callbacks = read('../commands/callbacks.js');
+  assert.match(helpers, /Array\.isArray\(setting\?\.requiredChats\)/);
+  assert.match(helpers, /isJoinedMember\(member\)/);
+  assert.match(messages, /requiredChats: nextTargets/);
+  assert.match(callbacks, /chatsubtargetdel:/);
+});
+
+test('chat subscription activation validates enforcement permissions and restores temporary restrictions', () => {
+  const helpers = read('../helpers.js');
+  const callbacks = read('../commands/callbacks.js');
+  assert.match(helpers, /can_delete_messages/);
+  assert.match(helpers, /can_restrict_members/);
+  assert.match(helpers, /restrictChatMember/);
+  assert.match(helpers, /restoreChatSubscriptionRestriction/);
+  assert.match(callbacks, /ensureGroupSubscriptionPermissions\(ctx, id\)/);
+});
+
+test('group admins can configure their own chat subscription without changing other groups', () => {
+  const messages = read('../commands/messages.js');
+  assert.match(messages, /اشتراك_دردشة/);
+  assert.match(messages, /ايقاف اشتراك الدردشة/);
+  assert.match(messages, /حذف_اشتراك_دردشة/);
+  assert.match(messages, /chatSubscriptions\[String\(ctx\.chat\.id\)\]/);
+});
