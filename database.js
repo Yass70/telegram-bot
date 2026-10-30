@@ -33,6 +33,8 @@ export const freshDB = () => ({
   chatSubscriptions: {},
   chatSubscriptionSelection: {},
   chatSubscriptionAdminGroups: {},
+  subscriptionAlerts: {},
+  chatSubPromptAt: {},
   points: {},
   groupPoints: {},
   activeGames: {},
@@ -60,7 +62,7 @@ function load() {
     if (!fs.existsSync(DATA_FILE)) return;
     const old = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     db = { ...freshDB(), ...old };
-    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.menuBack ||= {}; db.pending ||= {}; db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {};
+    db.groups ||= {}; db.selected ||= {}; db.protectionBack ||= {}; db.menuBack ||= {}; db.pending ||= {}; db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {};
     // تطبيع قوائم المستخدمين القديمة فقط؛ بعض النسخ خزّنتها ككائن بدل مصفوفة.
     // لا نحوّل requiredChats إلى نصوص، لأن كل عنصر يجب أن يبقى كائناً فيه id وurl وtitle.
     const normalizeIdList = (value) => {
@@ -81,7 +83,7 @@ function load() {
         ? Object.values(db.requiredChats) : [];
       db.requiredChats = oldChats.filter((chat) => chat && typeof chat === 'object' && chat.id != null);
     }
-    db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {};
+    db.chatSubscriptions ||= {}; db.chatSubscriptionSelection ||= {}; db.chatSubscriptionAdminGroups ||= {}; db.subscriptionAlerts ||= {}; db.chatSubPromptAt ||= {};
     db.stats = { ...freshDB().stats, ...(db.stats || {}) };
     db.points ||= {};
     db.groupPoints ||= {};

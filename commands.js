@@ -8,13 +8,29 @@ import { registerMessages } from './commands/messages.js';
 import { ensureEarnings, earningsBalance, awardReferral, redeemReward } from './earnings.js';
 
 export function setupCommands(bot, db, helpers) {
-  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
+  const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, chatSubscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
 
   db.activeGames ||= {};
   db.groupPoints ||= {};
   db.customizations ||= {};
   db.menuBack ||= {};
   ensureEarnings(db);
+
+  // بوابة موحّدة تسبق كل الأوامر والرسائل والأزرار، حتى لا يمكن تجاوز الاشتراك الإجباري.
+  bot.use(async (ctx, next) => {
+    const isCallback = Boolean(ctx.callbackQuery);
+    const callbackData = String(ctx.callbackQuery?.data || '');
+    const isMessage = Boolean(ctx.message);
+    if (!isCallback && !isMessage) return next();
+    if (isPrivate(ctx) && !isOwner(ctx) && callbackData !== 'checksubscription') {
+      if (!await subscriptionGate(ctx)) return;
+    }
+    if (isGroup(ctx)) {
+      const isVerify = callbackData.startsWith('chatsubverify:');
+      if (!isVerify && !await chatSubscriptionGate(ctx, { callback: isCallback })) return;
+    }
+    return next();
+  });
 
   // نحفظ القائمة التي دخل المستخدم منها إلى الألعاب أو التحذيرات، حتى يعود إليها فعلاً.
   const inferMenuBack = (ctx, kind) => {
