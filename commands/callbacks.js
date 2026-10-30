@@ -29,6 +29,7 @@ export function registerCallbacks(bot, shared) {
     inferMenuBack, rememberMenuBack, menuBackTarget, normalizeAnswer,
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
     ensureReferralData, referralLinkFor, referralStatsFor, referralMenuKeyboard,
+    ensureEarnings, earningsBalance, redeemReward,
     referralLinkKeyboard, showReferralLink, publicCommandsKeyboard,
     QUESTIONS_DB, SHUAR_LIST, N_PHRASES
   } = shared;
@@ -101,8 +102,8 @@ export function registerCallbacks(bot, shared) {
       return;
     }
 
-    const ownerOnlyActions = ['ownerpanel', 'botstats', 'botusers', 'botgroups', 'botnew24h', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
-    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botgroupspage:') || data.startsWith('botnew24hpage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext') || data.startsWith('activegroup:') || data.startsWith('activegroupinvite:')) {
+    const ownerOnlyActions = ['earningsadmin', 'earningsadminstats', 'earningssettings', 'earningsrewardsadmin', 'earningsrewardadd', 'earningsusers', 'earningsusersearch', 'earningsrankadmin', 'earningsrateprompt', 'earningsenabledtoggle', 'earningscancel', 'ownerpanel', 'botstats', 'botusers', 'botgroups', 'botnew24h', 'activatedgroups', 'botsettings', 'globalprotection', 'requiredmenu', 'requiredadd', 'requiredlist', 'subscriptionsmenu', 'chatsubmenu', 'chatsubsetselected', 'chatsubenable_selected', 'chatsubdisable_selected', 'broadcastmenu', 'broadcastsend', 'broadcastcancel'];
+    if (ownerOnlyActions.includes(data) || data.startsWith('botuserspage:') || data.startsWith('botgroupspage:') || data.startsWith('botnew24hpage:') || data.startsWith('botuser:') || data.startsWith('reqdel:') || (data.startsWith('chatsub') && !data.startsWith('chatsubverify:')) || data.startsWith('globaltext') || data.startsWith('activegroup:') || data.startsWith('activegroupinvite:') || data.startsWith('earningsrewardedit:') || data.startsWith('earningsrewardtoggle:') || data.startsWith('earningsrewarddelete:') || data.startsWith('earningsmanual:')) {
       if (!isOwner(ctx)) {
         await ctx.answerCallbackQuery({ text: '❌ الزر غير مخصص إلك', show_alert: true });
         return;
@@ -305,19 +306,134 @@ export function registerCallbacks(bot, shared) {
         ? new Date(Number(meta.firstSeenAt)).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
         : 'غير متاح للحسابات المسجلة قبل إضافة الميزة';
       const referralStats = referralStatsFor(userId);
-      const text = `╭━━━〔 👤 بطاقة نغنوغ الشخصية 〕━━━╮\n\n-︰الاسم : ❨ ${name} ❩\n\n-︰معرّفك : ❨ ${username} ❩\n\n-︰ايديك : ❨ ${userId} ❩\n\n-︰تاريخ انضمامك : ❨ ${joinedAt} ❩\n\n-︰نقاط الجوائز : ❨ ${referralStats.rewardPoints} ❩\n\n-︰الأشخاص المنضمّون برابطك : ❨ ${referralStats.joinedCount} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`;
-      return answer(ctx, text, { reply_markup: new InlineKeyboard().text('⭐ ستار', 'starmenu').row().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
+      const text = `╭━━━〔 👤 بطاقة نغنوغ الشخصية 〕━━━╮\n\n-︰الاسم : ❨ ${name} ❩\n\n-︰معرّفك : ❨ ${username} ❩\n\n-︰ايديك : ❨ ${userId} ❩\n\n-︰تاريخ انضمامك : ❨ ${joinedAt} ❩\n\n-︰رصيد ستار السابق : ❨ ${referralStats.rewardPoints} ❩\n-︰نقاط الأرباح : ❨ ${earningsBalance(db, userId)} ❩\n-︰دعواتك الناجحة : ❨ ${referralStats.joinedCount} ❩\n\n╰━━━━━━━━━━━━━━━━━━━━╯`;
+      return answer(ctx, text, { reply_markup: new InlineKeyboard().text('💰 أرباحي', 'earningsmenu').row().text(getCustomization(ctx).labels?.home || '🔙 القائمة الرئيسية', 'home') });
     }
 
-    if (data === 'starmenu') {
-      const stats = referralStatsFor(String(ctx.from.id));
-      return answer(ctx, `╭━━━〔 ⭐ ستار | نغنوغ 🐈‍⬛ 〕━━━╮\n\n-︰طريقة جمع الجوائز : ❨ ادعُ أشخاصاً جدد إلى نغنوغ عبر رابطك ❩\n\n-︰المنضمّون برابطك : ❨ ${stats.joinedCount} ❩\n-︰نقاط الجوائز : ❨ ${stats.rewardPoints} ❩\n\n✦ اضغط على «رابط مشاركة» حتى تحصل على رابطك الخاص وتتابع إحصائياتك.\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: referralMenuKeyboard() });
+    if (data === 'starmenu' || data === 'earningsmenu') {
+      ensureEarnings(db);
+      const uid = String(ctx.from.id);
+      const stats = referralStatsFor(uid);
+      const balance = earningsBalance(db, uid);
+      const wallet = db.earnings.wallets[uid] || {};
+      const link = referralLinkFor(uid);
+      const kb = new InlineKeyboard().text('🔗 رابط الدعوة', 'earningslink').row()
+        .text('🎁 متجر المكافآت', 'earningsstore').text('📜 سجل العمليات', 'earningshistory').row()
+        .text('🏆 الأكثر دعوةً', 'earningsrank').row()
+        .text('🔙 الرئيسية', 'home');
+      return answer(ctx, `╭━━━〔 💰 أرباحي | نغنوغ 〕━━━╮\n\n💰 رصيد الأرباح: ${balance} نقطة\n👥 الدعوات الناجحة: ${stats.joinedCount}\n\n🔗 رابطك الشخصي:\n${link}\n\n✦ تحصل على نقاط عند تسجيل مستخدم جديد لأول مرة عبر رابطك.\n✦ نقاط الألعاب ورصيد ستار السابق منفصلان تماماً.
+✦ هذه نقاط داخلية للاستبدال بالمكافآت، وليست أموالاً قابلة للسحب.\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
 
-    if (data === 'referrallink' || data === 'referralrefresh') {
-      return showReferralLink(ctx);
+    if (data === 'earningslink' || data === 'referrallink' || data === 'referralrefresh') {
+      const uid = String(ctx.from.id), link = referralLinkFor(uid);
+      ensureEarnings(db); db.earnings.linkUsers[uid] = true; save();
+      const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('🐈‍⬛ تعال جرّب بوت نغنوغ ❤️')}`;
+      const kb = new InlineKeyboard().add({ text: '📋 نسخ الرابط', copy_text: { text: link } }).row()
+        .url('📤 مشاركة الرابط', shareUrl).row().text('🔄 تحديث', 'earningsmenu').text('↩️ أرباحي', 'earningsmenu');
+      return answer(ctx, `🔗 رابط دعوتك الخاص\n\n${link}\n\nالدعوة تُحتسب بعد أن يضغط الشخص Start لأول مرة عبر رابطك، ولا تُحتسب الحسابات القديمة أو الدعوات المكررة.`, { reply_markup: kb });
     }
-    
+
+    if (data === 'earningsstore') {
+      ensureEarnings(db);
+      const rewards = Object.values(db.earnings.rewards).filter(r => r && r.active);
+      const kb = new InlineKeyboard();
+      for (const reward of rewards.slice(0, 30)) kb.text(`${String(reward.name).slice(0, 30)} — ${reward.price} نقطة`, `earningreward:${reward.id}`).row();
+      kb.text('↩️ أرباحي', 'earningsmenu');
+      return answer(ctx, rewards.length ? `🎁 متجر مكافآت نغنوغ\n\nرصيدك الحالي: ${earningsBalance(db, ctx.from.id)} نقطة\nاختَر المكافأة حتى تشوف تفاصيلها.` : '🎁 متجر المكافآت\n\nحالياً ماكو مكافآت متاحة. تابع القسم لاحقاً.', { reply_markup: kb });
+    }
+
+    if (data.startsWith('earningreward:')) {
+      ensureEarnings(db);
+      const id = data.slice('earningreward:'.length), reward = db.earnings.rewards[id];
+      if (!reward || !reward.active) return answer(ctx, 'هذه المكافأة غير متاحة حالياً.', { reply_markup: new InlineKeyboard().text('🎁 المتجر', 'earningsstore') });
+      const balance = earningsBalance(db, ctx.from.id), price = Number(reward.price);
+      const kb = new InlineKeyboard();
+      if (balance >= price) {
+        const requestId = `${ctx.from.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        db.earnings.redemptionRequests[requestId] = { userId: String(ctx.from.id), rewardId: id, status: 'pending', createdAt: Date.now() };
+        save(); kb.text('✅ تأكيد الاستبدال', `earningconfirm:${requestId}`).row();
+      } else kb.text(`تحتاج ${price - balance} نقطة إضافية`, 'earningsmenu').row();
+      kb.text('↩️ المتجر', 'earningsstore');
+      return answer(ctx, `🎁 ${reward.name}\n\n${reward.description || 'لا يوجد وصف إضافي.'}\n\nالسعر: ${price} نقطة\nرصيدك: ${balance} نقطة${balance < price ? `\n\nرصيدك غير كافٍ؛ تحتاج ${price - balance} نقطة إضافية.` : '\n\nهل تريد تأكيد الاستبدال؟'}`, { reply_markup: kb });
+    }
+
+    if (data.startsWith('earningconfirm:')) {
+      ensureEarnings(db);
+      const requestId = data.slice('earningconfirm:'.length);
+      const req = db.earnings.redemptionRequests[requestId];
+      if (!req || req.userId !== String(ctx.from.id) || req.status !== 'pending') return answer(ctx, '⚠️ هذا الطلب استُخدم أو انتهت صلاحيته، افتح المتجر وابدأ طلباً جديداً.');
+      const result = redeemReward(db, ctx.from.id, requestId);
+      if (!result.ok) {
+        if (result.reason === 'insufficient') return answer(ctx, `رصيدك غير كافٍ. تحتاج ${result.needed} نقطة إضافية.`);
+        if (result.reason === 'unavailable') return answer(ctx, 'المكافأة لم تعد متاحة. لم يتم خصم أي نقاط.');
+        return answer(ctx, '⚠️ هذا الطلب استُخدم أو انتهت صلاحيته. افتح المتجر وابدأ طلباً جديداً.');
+      }
+      save();
+      return answer(ctx, `✅ تم تسجيل استبدال «${result.reward.name}» بنجاح.\n\nالمخصوم: ${Number(result.reward.price)} نقطة\nرصيدك المتبقي: ${result.balance} نقطة\n\nسيتم التواصل معك بخصوص تسليم المكافأة إذا كانت تتطلب ذلك.`, { reply_markup: new InlineKeyboard().text('💰 أرباحي', 'earningsmenu').row().text('🎁 المتجر', 'earningsstore') });
+    }
+
+    if (data === 'earningshistory') {
+      ensureEarnings(db);
+      const rows = db.earnings.ledger.filter(x => String(x.userId) === String(ctx.from.id)).slice(-15).reverse();
+      const lines = rows.map(x => `${new Date(x.createdAt).toLocaleString('ar-IQ')} — ${x.amount > 0 ? '+' : ''}${x.amount} نقطة — ${x.type === 'referral' ? 'دعوة ناجحة' : x.type === 'manual_add' ? 'إضافة يدوية' : x.type === 'manual_deduct' ? 'خصم يدوي' : 'استبدال مكافأة'}${x.details?.rewardName ? ` (${x.details.rewardName})` : ''}${x.details?.reason ? ` — ${x.details.reason}` : ''}`);
+      return answer(ctx, `📜 سجل عمليات الأرباح\n\n${lines.length ? lines.join('\n') : 'ما عندك عمليات مسجلة لحد الآن.'}`, { reply_markup: new InlineKeyboard().text('↩️ أرباحي', 'earningsmenu') });
+    }
+
+    if (data === 'earningsrank') {
+      ensureEarnings(db);
+      const rows = Object.entries(db.referrals || {}).map(([id, legacy]) => [id, Math.max(Number(legacy?.joinedCount)||0, Number(db.earnings.wallets[id]?.successfulReferrals)||0)]).filter(([,count])=>count>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      const lines = rows.map(([id,count],i) => `${['🥇','🥈','🥉'][i] || `${i+1}.`} ${db.userMeta?.[id]?.firstName || `مستخدم ${id}`} — ${count} دعوة`);
+      return answer(ctx, `🏆 أكثر المستخدمين دعوةً\n\n${lines.length ? lines.join('\n') : 'لا توجد إحالات جديدة مسجلة بعد.'}`, { reply_markup: new InlineKeyboard().text('↩️ أرباحي', 'earningsmenu') });
+    }
+
+    if (data === 'earningscancel') { clearPending(ctx); return answer(ctx, 'تم إلغاء العملية.', { reply_markup: new InlineKeyboard().text('💰 إدارة الأرباح','earningsadmin') }); }
+
+    if (data === 'earningsadmin') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت من الخاص فقط.');
+      ensureEarnings(db);
+      const e = db.earnings;
+      const totalRef = Object.values(db.referrals || {}).reduce((n,r)=>n+(Number(r?.joinedCount)||0),0);
+      const totalAwarded = e.ledger.filter(x => x.type === 'referral').reduce((n,x)=>n+Number(x.amount||0),0);
+      const kb = new InlineKeyboard().text('⚙️ إعدادات الأرباح', 'earningssettings').row()
+        .text('🎁 إدارة المكافآت', 'earningsrewardsadmin').row()
+        .text('📊 الإحصائيات', 'earningsadminstats').row()
+        .text('👤 إدارة أرصدة المستخدمين', 'earningsusers').row()
+        .text('🔙 لوحة المالك', 'ownerpanel');
+      return answer(ctx, `💰 إدارة الأرباح والمكافآت\n\nالحالة: ${e.settings.enabled ? '🟢 تعمل' : '🔴 متوقفة'}\nالنقاط لكل دعوة: ${e.settings.pointsPerReferral}\nالإحالات الجديدة المسجلة: ${totalRef}\nنقاط الإحالات الممنوحة: ${totalAwarded}`, { reply_markup: kb });
+    }
+
+    if (data === 'earningssettings') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'هذا القسم خاص بالمالك.');
+      ensureEarnings(db);
+      return answer(ctx, `⚙️ إعدادات الأرباح\n\nالنظام: ${db.earnings.settings.enabled ? '🟢 مفعّل' : '🔴 متوقف'}\nقيمة الدعوة الناجحة: ${db.earnings.settings.pointsPerReferral} نقطة`, { reply_markup: new InlineKeyboard().text(db.earnings.settings.enabled ? '🔴 إيقاف النظام' : '🟢 تشغيل النظام', 'earningsenabledtoggle').row().text('✏️ تحديد نقاط كل دعوة', 'earningsrateprompt').row().text('❌ إلغاء العملية', 'earningscancel').row().text('↩️ إدارة الأرباح', 'earningsadmin') });
+    }
+    if (data === 'earningsenabledtoggle') { if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'غير مسموح.'); db.earnings.settings.enabled = !db.earnings.settings.enabled; save(); return answer(ctx, `تم ${db.earnings.settings.enabled ? 'تشغيل' : 'إيقاف'} نظام الأرباح.`, { reply_markup: new InlineKeyboard().text('↩️ الإعدادات', 'earningssettings') }); }
+    if (data === 'earningsrateprompt') { if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'غير مسموح.'); pending(ctx, { action: 'earnings-rate' }); return answer(ctx, 'أرسل عدد النقاط الصحيحة لكل دعوة ناجحة (رقم أكبر من صفر). اكتب /cancel للإلغاء.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'earningscancel') }); }
+    if (data === 'earningsadminstats') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'غير مسموح.'); ensureEarnings(db);
+      const e=db.earnings, users=Object.values(e.wallets), refs=Object.values(db.referrals||{}).reduce((n,r)=>n+(Number(r?.joinedCount)||0),0), red=e.ledger.filter(x=>x.type==='redemption').length;
+      const top=Object.entries(db.referrals||{}).sort((a,b)=>(Number(b[1]?.joinedCount)||0)-(Number(a[1]?.joinedCount)||0)).slice(0,5).map(([id,w],i)=>`${i+1}. ${db.userMeta?.[id]?.firstName || id}: ${Number(w.joinedCount)||0}`).join('\n');
+      return answer(ctx, `📊 إحصائيات الأرباح\n\nمستخدمون فتحوا رابطهم الخاص: ${Object.keys(e.linkUsers || {}).length}\nإجمالي الإحالات المسجلة: ${refs}\nنقاط الإحالات الموزعة: ${e.ledger.filter(x=>x.type==='referral').reduce((n,x)=>n+Number(x.amount||0),0)}\nعمليات الاستبدال: ${red}\n\n🏆 الأكثر دعوةً\n${top || 'لا توجد بيانات بعد.'}`, { reply_markup: new InlineKeyboard().text('↩️ إدارة الأرباح', 'earningsadmin') });
+    }
+    if (data === 'earningsrewardsadmin') {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'غير مسموح.'); ensureEarnings(db);
+      const kb=new InlineKeyboard().text('➕ إضافة مكافأة', 'earningsrewardadd').row();
+      for (const r of Object.values(db.earnings.rewards)) kb.text(`${r.active?'🟢':'⚪'} ${String(r.name).slice(0,24)} (${r.price})`, `earningsrewardedit:${r.id}`).row();
+      kb.text('↩️ إدارة الأرباح','earningsadmin');
+      return answer(ctx, '🎁 إدارة المكافآت\nاختَر مكافأة لتعديلها أو إيقافها أو حذفها.', { reply_markup: kb });
+    }
+    if (data === 'earningsrewardadd') { if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx, 'غير مسموح.'); pending(ctx,{action:'earnings-reward-name'}); return answer(ctx,'أرسل اسم المكافأة الجديدة. /cancel للإلغاء.'); }
+    if (data.startsWith('earningsrewardedit:')) {
+      if (!isOwner(ctx) || !isPrivate(ctx)) return answer(ctx,'غير مسموح.'); const id=data.slice('earningsrewardedit:'.length), r=db.earnings?.rewards?.[id]; if(!r) return answer(ctx,'المكافأة غير موجودة.');
+      return answer(ctx, `🎁 ${r.name}\nالوصف: ${r.description}\nالسعر: ${r.price}\nالحالة: ${r.active?'متاحة':'متوقفة'}`, {reply_markup:new InlineKeyboard().text(r.active?'🔴 إيقاف':'🟢 تفعيل',`earningsrewardtoggle:${id}`).text('🗑️ حذف',`earningsrewarddelete:${id}`).row().text('✏️ تعديل الاسم والوصف والسعر','earningsrewardeditprompt:'+id).row().text('↩️ المكافآت','earningsrewardsadmin')});
+    }
+    if (data.startsWith('earningsrewardeditprompt:')) { if(!isOwner(ctx)||!isPrivate(ctx))return answer(ctx,'غير مسموح.'); const id=data.slice('earningsrewardeditprompt:'.length); if(!db.earnings?.rewards?.[id])return answer(ctx,'المكافأة غير موجودة.'); pending(ctx,{action:'earnings-reward-edit-name',rewardId:id}); return answer(ctx,'أرسل الاسم الجديد للمكافأة.'); }
+    if (data.startsWith('earningsrewardtoggle:')) { if(!isOwner(ctx)||!isPrivate(ctx))return answer(ctx,'غير مسموح.'); const r=db.earnings?.rewards?.[data.slice('earningsrewardtoggle:'.length)]; if(!r)return answer(ctx,'غير موجودة.'); r.active=!r.active; save(); return answer(ctx,`تم ${r.active?'تفعيل':'إيقاف'} المكافأة.`,{reply_markup:new InlineKeyboard().text('↩️ المكافآت','earningsrewardsadmin')}); }
+    if (data.startsWith('earningsrewarddelete:')) { if(!isOwner(ctx)||!isPrivate(ctx))return answer(ctx,'غير مسموح.'); const id=data.slice('earningsrewarddelete:'.length); if(db.earnings?.rewards?.[id]) delete db.earnings.rewards[id]; save(); return answer(ctx,'تم حذف المكافأة من المتجر. السجلات السابقة محفوظة.',{reply_markup:new InlineKeyboard().text('↩️ المكافآت','earningsrewardsadmin')}); }
+    if (data === 'earningsusers' || data === 'earningsusersearch') { if(!isOwner(ctx)||!isPrivate(ctx))return answer(ctx,'غير مسموح.'); pending(ctx,{action:'earnings-user-search'}); return answer(ctx,'أرسل آيدي المستخدم أو @username للبحث عن رصيده.'); }
+    if (data.startsWith('earningsmanual:')) { if(!isOwner(ctx)||!isPrivate(ctx))return answer(ctx,'غير مسموح.'); const [_,kind,id]=data.split(':'); pending(ctx,{action:'earnings-manual-amount',targetId:id,kind}); return answer(ctx,`أرسل عدد النقاط المراد ${kind==='add'?'إضافتها':'خصمها'} للمستخدم ${id}.`); }
+
     if (data === 'userreplies') {
       return answer(ctx, `${customText(ctx, 'replies', 'replies')}\n${customText(ctx, 'descriptions', 'replies') || ''}`, { reply_markup: new InlineKeyboard().text('👥 مجموعاتي', 'mygroups').row().text('🔙 القائمة الرئيسية', 'home') });
     }
@@ -817,7 +933,7 @@ export function registerCallbacks(bot, shared) {
       try { members = String(await bot.api.getChatMemberCount(g.id)); } catch {}
       return answer(ctx, `╭━━━〔 👥 تفاصيل المجموعة 〕━━━╮\n\n-︰الاسم : ❨ ${g.title || 'بدون اسم'} ❩\n-︰المعرّف : ❨ ${g.id} ❩\n-︰عدد الأعضاء : ❨ ${members} ❩\n-︰الحالة : ❨ 🟢 مفعّلة ❩\n╰━━━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
-    if (data.startsWith('activegroupinvite:')) {
+    if (data.startsWith('activegroupinvite:') || data.startsWith('earningsrewardedit:') || data.startsWith('earningsrewardtoggle:') || data.startsWith('earningsrewarddelete:') || data.startsWith('earningsmanual:')) {
       if (!isOwner(ctx)) return answer(ctx, 'هذا القسم خاص بمالك البوت.');
       const id = data.slice('activegroupinvite:'.length);
       const g = db.groups[id];

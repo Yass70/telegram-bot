@@ -9,6 +9,7 @@ import { downloadSocialVideo, cleanupDownloadedVideo, validateSocialVideoUrl } f
 import { InputFile } from 'grammy';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
+import { ensureEarnings, addManualEarnings } from '../earnings.js';
 
 export function registerMessages(bot, shared) {
   const {
@@ -559,17 +560,74 @@ export function registerMessages(bot, shared) {
         }
       }
       if (p) {
-        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set'].includes(p.action)) {
+        if (/^\/cancel(?:@\w+)?$/i.test(text) && ['reminder-text', 'reminder-day', 'reminder-time', 'global-ui-old', 'global-ui-new', 'global-ui-confirm', 'global-catalog-new', 'chat-sub-set', 'earnings-rate', 'earnings-reward-name', 'earnings-reward-description', 'earnings-reward-price', 'earnings-reward-edit-name', 'earnings-reward-edit-description', 'earnings-reward-edit-price', 'earnings-user-search', 'earnings-manual-amount', 'earnings-manual-reason'].includes(p.action)) {
           clearPending(ctx);
           const cancelledReminder = ['reminder-text', 'reminder-day', 'reminder-time'].includes(p.action);
+          const cancelledEarnings = String(p.action || '').startsWith('earnings-');
           const cancelledChatSub = p.action === 'chat-sub-set';
-          const replyMarkup = cancelledReminder
+          const replyMarkup = cancelledEarnings
+            ? new InlineKeyboard().text('💰 إدارة الأرباح', 'earningsadmin')
+            : cancelledReminder
             ? new InlineKeyboard().text('⏰ قائمة ذكّرني', 'remindermenu').text('🏠 الرئيسية', 'home')
             : cancelledChatSub
               ? new InlineKeyboard().text('💬 اشتراك الدردشة', 'chatsubmenu').row().text('💳 الاشتراكات', 'subscriptionsmenu')
               : new InlineKeyboard().text('📝 تحرير نصوص القوائم', 'globaltextmenu').row().text('👑 لوحة المالك', 'ownerpanel');
-          return ctx.reply(cancelledReminder ? '❌ تم إلغاء إنشاء التذكير.' : cancelledChatSub ? '❌ تم إلغاء إعداد جهة الاشتراك.' : '❌ تم إلغاء تحرير نصوص القوائم.', { reply_markup: replyMarkup });
+          return ctx.reply(cancelledEarnings ? '❌ تم إلغاء عملية الأرباح.' : cancelledReminder ? '❌ تم إلغاء إنشاء التذكير.' : cancelledChatSub ? '❌ تم إلغاء إعداد جهة الاشتراك.' : '❌ تم إلغاء تحرير نصوص القوائم.', { reply_markup: replyMarkup });
         }
+        if (String(p.action || '').startsWith('earnings-')) {
+          if (!isOwner(ctx) || !isPrivate(ctx)) { clearPending(ctx); return ctx.reply('هذا الإجراء خاص بمالك البوت من الخاص فقط.'); }
+          ensureEarnings(db);
+          const value = String(text || '').trim();
+          if (p.action === 'earnings-rate') {
+            const rate = Number(value);
+            if (!Number.isSafeInteger(rate) || rate < 1 || rate > 1000000) return ctx.reply('أرسل رقماً صحيحاً من 1 إلى 1,000,000.');
+            db.earnings.settings.pointsPerReferral = rate; clearPending(ctx); save();
+            return ctx.reply(`✅ تم تحديد مكافأة الدعوة الواحدة بـ ${rate} نقطة.`, { reply_markup: new InlineKeyboard().text('⚙️ إعدادات الأرباح','earningssettings') });
+          }
+          if (p.action === 'earnings-reward-name' || p.action === 'earnings-reward-edit-name') {
+            if (!value || value.length > 70) return ctx.reply('أرسل اسماً من 1 إلى 70 حرفاً.');
+            pending(ctx, { action: p.action === 'earnings-reward-name' ? 'earnings-reward-description' : 'earnings-reward-edit-description', rewardId: p.rewardId, name: value });
+            return ctx.reply('أرسل وصفاً مختصراً للمكافأة (حتى 300 حرف).');
+          }
+          if (p.action === 'earnings-reward-description' || p.action === 'earnings-reward-edit-description') {
+            if (value.length > 300) return ctx.reply('الوصف طويل؛ اختصره إلى 300 حرف.');
+            pending(ctx, { action: p.action === 'earnings-reward-description' ? 'earnings-reward-price' : 'earnings-reward-edit-price', rewardId: p.rewardId, name: p.name, description: value });
+            return ctx.reply('أرسل سعر المكافأة بنقاط الأرباح (رقم صحيح أكبر من صفر).');
+          }
+          if (p.action === 'earnings-reward-price' || p.action === 'earnings-reward-edit-price') {
+            const price = Number(value);
+            if (!Number.isSafeInteger(price) || price < 1 || price > 100000000) return ctx.reply('أرسل سعراً صحيحاً من 1 إلى 100,000,000 نقطة.');
+            let id = p.rewardId;
+            if (p.action === 'earnings-reward-price') id = `reward-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+            const previous = db.earnings.rewards[id] || {};
+            db.earnings.rewards[id] = { ...previous, id, name: p.name, description: p.description, price, active: previous.active ?? true, createdAt: previous.createdAt || Date.now(), updatedAt: Date.now() };
+            clearPending(ctx); save();
+            return ctx.reply(`✅ تم حفظ المكافأة «${p.name}» بسعر ${price} نقطة.`, { reply_markup: new InlineKeyboard().text('🎁 إدارة المكافآت','earningsrewardsadmin').row().text('💰 إدارة الأرباح','earningsadmin') });
+          }
+          if (p.action === 'earnings-user-search') {
+            const query = value.replace(/^@/, '').toLowerCase();
+            const id = /^\d+$/.test(query) ? query : Object.entries(db.userMeta || {}).find(([,meta]) => String(meta.username || '').toLowerCase() === query)?.[0];
+            if (!id) return ctx.reply('ما لكيت مستخدماً بهذا المعرف أو اسم المستخدم. جرّب آيدي رقمي أو @username مسجّل سابقاً.');
+            const wallet = db.earnings.wallets[id] || { balance: 0, successfulReferrals: 0 };
+            const name = db.userMeta?.[id]?.firstName || `مستخدم ${id}`;
+            clearPending(ctx);
+            return ctx.reply(`👤 ${name}\nID: ${id}\nالرصيد: ${Number(wallet.balance)||0} نقطة\nالدعوات الجديدة: ${Number(wallet.successfulReferrals)||0}`, { reply_markup: new InlineKeyboard().text('➕ إضافة نقاط', `earningsmanual:add:${id}`).text('➖ خصم نقاط', `earningsmanual:deduct:${id}`).row().text('🔎 بحث عن مستخدم آخر','earningsusers').row().text('↩️ إدارة الأرباح','earningsadmin') });
+          }
+          if (p.action === 'earnings-manual-amount') {
+            const amount = Number(value);
+            if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100000000) return ctx.reply('أرسل عدداً صحيحاً من 1 إلى 100,000,000.');
+            pending(ctx, { action: 'earnings-manual-reason', targetId: p.targetId, kind: p.kind, amount });
+            return ctx.reply('أرسل سبب العملية حتى يُحفظ في سجل المستخدم.');
+          }
+          if (p.action === 'earnings-manual-reason') {
+            if (!value || value.length > 300) return ctx.reply('السبب مطلوب، وبحد أقصى 300 حرف.');
+            const result = addManualEarnings(db, p.targetId, p.amount, p.kind === 'add' ? 'manual_add' : 'manual_deduct', value, ctx.from.id);
+            if (!result.ok) return ctx.reply(result.insufficient ? `رصيد المستخدم غير كافٍ؛ رصيده الحالي ${result.balance} نقطة.` : 'تعذّر تنفيذ العملية. تحقق من المعرف والمبلغ.');
+            clearPending(ctx); save();
+            return ctx.reply(`✅ تم ${p.kind === 'add' ? 'إضافة' : 'خصم'} ${p.amount} نقطة للمستخدم ${p.targetId}.\nالرصيد الجديد: ${result.balance}\nالسبب محفوظ في السجل.`, { reply_markup: new InlineKeyboard().text('💰 إدارة الأرباح','earningsadmin') });
+          }
+        }
+
         if (p.action === 'reminder-text') {
           if (!isPrivate(ctx)) { clearPending(ctx); return ctx.reply('إنشاء التذكير متاح من الخاص فقط.'); }
           const reminderText = String(text || '').trim();
