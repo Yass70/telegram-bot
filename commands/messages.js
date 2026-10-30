@@ -70,7 +70,7 @@ export function registerMessages(bot, shared) {
         current.enabled = true; current.updatedAt = Date.now();
         db.chatSubscriptions[String(ctx.chat.id)] = current;
         clearPending(ctx); save();
-        return ctx.reply(`✅ تمت إضافة جهة الاشتراك وتفعيلها لهذه المجموعة.\nالجهة: ${target.title}\nالرابط: ${target.url}\nعدد الجهات المطلوبة: ${current.requiredChats.length}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ، لكن تيليغرام لا يتيح للبوت التأكد آلياً أن رابط الدعوة الخاص يعود إلى هذا الـ Chat ID؛ تأكد من صحة الرابط.' : ''}`);
+        return ctx.reply(`✅ تمت إضافة جهة الاشتراك وتفعيلها لهذه المجموعة.\nالجهة: ${target.title}\nالرابط: ${target.url}\nعدد الجهات المطلوبة: ${current.requiredChats.length}${target.createsJoinRequest ? '\n\n⏳ رابط الانضمام يتطلب موافقة مشرفي الجهة؛ سيظهر للمستخدم أنه ينتظر الموافقة.' : ''}`);
       }
       if (isAdmin && /^(?:\/)?(?:اشتراك_دردشة|اشتراك الدردشة)$/i.test(rawText)) {
         try { await ensureGroupSubscriptionPermissions(ctx, ctx.chat.id); }
@@ -872,7 +872,7 @@ export function registerMessages(bot, shared) {
           if (!Number.isInteger(index) || !db.requiredChats?.[index]) { clearPending(ctx); return ctx.reply('❌ لم تعد الجهة المحددة موجودة.'); }
           db.requiredChats[index] = { ...db.requiredChats[index], ...target, enabled: db.requiredChats[index].enabled !== false, updatedAt: Date.now() };
           clearPending(ctx); save();
-          return ctx.reply(`✅ تم تعديل جهة الاشتراك بنجاح.\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ فقط؛ لا يمكن للبوت إثبات أن رابط الدعوة يعود إلى هذا المعرّف.' : ''}`, { reply_markup: new InlineKeyboard().text('📋 قائمة الجهات', 'requiredlist') });
+          return ctx.reply(`✅ تم تعديل جهة الاشتراك بنجاح.\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.createsJoinRequest ? '\n\n⏳ رابط الانضمام يتطلب موافقة مشرفي الجهة.' : ''}`, { reply_markup: new InlineKeyboard().text('📋 قائمة الجهات', 'requiredlist') });
         }
 
         if (p.action === 'add-required-chat') {
@@ -886,7 +886,7 @@ export function registerMessages(bot, shared) {
           if (existingIndex >= 0) db.requiredChats[existingIndex] = { ...db.requiredChats[existingIndex], ...record };
           else db.requiredChats.push(record);
           clearPending(ctx); save();
-          return answer(ctx, `✅ تم التحقق من الجهة وإضافتها للاشتراك الإجباري.\n\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.privateInviteSupplied ? '\n\n⚠️ تم التحقق من Chat ID وصلاحيات نغنوغ فقط؛ لا يمكن للبوت إثبات أن رابط الدعوة يعود إلى هذا المعرّف.' : ''}\n\nسيُطلب من المستخدمين الاشتراك بها قبل استخدام البوت.`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
+          return answer(ctx, `✅ تم التحقق من الجهة وإضافتها للاشتراك الإجباري.\n\nالاسم: ${target.title}\nالمعرّف: ${target.id}\nالرابط: ${target.url}${target.createsJoinRequest ? '\n\n⏳ رابط الانضمام يتطلب موافقة مشرفي الجهة.' : ''}\n\nسيُطلب من المستخدمين الاشتراك بها قبل استخدام البوت.`, { reply_markup: new InlineKeyboard().text('🔐 إدارة الاشتراك الإجباري', 'requiredmenu') });
         }
 
         if (p.action === 'edit-welcome') {

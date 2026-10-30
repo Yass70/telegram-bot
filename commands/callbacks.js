@@ -1222,7 +1222,7 @@ export function registerCallbacks(bot, shared) {
       const chatId = String(data.slice('chatsubverify:'.length));
       const result = await checkChatSubscription(chatId, ctx.from.id);
       if (!result.required) return answer(ctx, 'هذا الاشتراك غير مفعّل حالياً.');
-      if (result.technicalError) return answer(ctx, '⚠️ تعذّر التحقق بسبب مشكلة تقنية أو نقص صلاحيات نغنوغ. تم تنبيه المالك، حاول بعد قليل.');
+      if (result.technicalError) { const details = (result.errors || []).map(item => `${item.target?.title || item.target?.id}: ${item.error?.description || item.error?.message || 'خطأ غير معروف'}`).join(' | ').slice(0, 500); return answer(ctx, `⚠️ تعذّر التحقق؛ لم نعتبرك مشتركاً. تم تنبيه المالك. السبب: ${details || 'تعذّر الوصول إلى الجهة أو فحص صلاحيات البوت'}`); }
       if (result.ok) {
         try { await restoreChatSubscriptionRestriction(chatId, ctx.from.id); }
         catch { return answer(ctx, '✅ اشتراكك مكتمل، لكن تعذّر رفع التقييد تلقائياً. نبهنا المالك؛ اطلب من مشرف المجموعة رفع التقييد.'); }
@@ -1233,7 +1233,8 @@ export function registerCallbacks(bot, shared) {
       for (const target of (result.missing || [])) if (target.url) kb.url(`📣 اشترك في ${String(target.title || 'الجهة').slice(0, 28)}`, target.url).row();
       kb.text('✅ تحقّق من الاشتراك', `chatsubverify:${chatId}`);
       const names = (result.missing || []).map(item => item.title || item.id).join('، ');
-      return answer(ctx, `❌ بعدك مو مشترك بالجهات التالية: ${names || 'الجهة المطلوبة'}. اشترك بها ثم أعد التحقق.`, { reply_markup: kb });
+      const waiting = result.pendingApproval?.length ? `\n\n⏳ طلب الانضمام إلى ${result.pendingApproval.map(item => item.title || item.id).join('، ')} بانتظار موافقة مشرفي الجهة. بعد قبولك اضغط التحقق مرة ثانية.` : '';
+      return answer(ctx, `${waiting ? '⏳ طلب الانضمام لم تتم الموافقة عليه بعد.' : `❌ بعدك مو مشترك بالجهات التالية: ${names || 'الجهة المطلوبة'}. اشترك بها ثم أعد التحقق.`}${waiting}`, { reply_markup: kb });
     }
     if (data === 'checksubscription') {
       const allowed = await subscriptionGate(ctx);
