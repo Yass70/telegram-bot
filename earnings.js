@@ -6,12 +6,52 @@ export function ensureEarnings(db) {
   db.earnings.linkUsers ||= {};
   db.earnings.referralRecords ||= {};
   db.earnings.rewards ||= {};
+  db.earnings.categories ||= {};
   db.earnings.redemptionRequests ||= {};
   db.earnings.ledger ||= [];
   db.earnings.settings.enabled = db.earnings.settings.enabled !== false;
   const rate = Number(db.earnings.settings.pointsPerReferral);
   db.earnings.settings.pointsPerReferral = Number.isSafeInteger(rate) && rate > 0 ? rate : 1;
+  // ترحيل آمن: الجوائز القديمة تبقى ظاهرة داخل قسم قديم تلقائياً.
+  const rewards = Object.values(db.earnings.rewards);
+  if (rewards.some(r => r && (!r.categoryId || !db.earnings.categories[String(r.categoryId)]))) {
+    const legacyId = 'legacy-default';
+    db.earnings.categories[legacyId] ||= { id: legacyId, name: 'المكافآت السابقة', emoji: '🎁', active: true, legacy: true, createdAt: Date.now() };
+    for (const reward of rewards) if (reward && (!reward.categoryId || !db.earnings.categories[String(reward.categoryId)])) reward.categoryId = legacyId;
+  }
+  for (const category of Object.values(db.earnings.categories)) {
+    if (!category || typeof category !== 'object') continue;
+    category.id ||= Object.keys(db.earnings.categories).find(id => db.earnings.categories[id] === category) || `category-${Date.now()}`;
+    category.name = String(category.name || 'قسم');
+    category.emoji = String(category.emoji || '🎁');
+    category.active = category.active !== false;
+  }
   return db.earnings;
+}
+
+
+export function createEarningsCategory(db, name, emoji = '🎁') {
+  const e = ensureEarnings(db), cleanName = String(name || '').trim(), cleanEmoji = String(emoji || '🎁').trim();
+  if (!cleanName || cleanName.length > 45 || cleanEmoji.length > 8) return { ok: false, reason: 'invalid' };
+  const id = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  e.categories[id] = { id, name: cleanName, emoji: cleanEmoji || '🎁', active: true, createdAt: Date.now(), updatedAt: Date.now() };
+  return { ok: true, category: e.categories[id] };
+}
+
+export function deleteEarningsCategory(db, categoryId) {
+  const e = ensureEarnings(db), id = String(categoryId), category = e.categories[id];
+  if (!category) return { ok: false, reason: 'missing' };
+  if (Object.values(e.rewards).some(r => String(r?.categoryId || '') === id)) return { ok: false, reason: 'has_rewards' };
+  if (Object.values(e.redemptionRequests).some(r => String(r?.categoryId || e.rewards[String(r?.rewardId)]?.categoryId || '') === id)) return { ok: false, reason: 'has_requests' };
+  delete e.categories[id];
+  return { ok: true };
+}
+
+export function moveEarningsReward(db, rewardId, categoryId) {
+  const e = ensureEarnings(db), reward = e.rewards[String(rewardId)], category = e.categories[String(categoryId)];
+  if (!reward || !category || category.active === false) return { ok: false, reason: 'unavailable' };
+  reward.categoryId = String(categoryId); reward.updatedAt = Date.now();
+  return { ok: true, reward, category };
 }
 
 export function earningsBalance(db, userId) {
@@ -61,11 +101,26 @@ export function addManualEarnings(db, userId, amount, type, reason, adminId) {
   return { ok: true, balance: w.balance };
 }
 
+
+export function prepareRedemptionRequest(db, userId, rewardId) {
+  const e = ensureEarnings(db), uid = String(userId), id = String(rewardId), reward = e.rewards[id];
+  if (!reward || !reward.active || (reward.categoryId && e.categories[String(reward.categoryId)]?.active === false)) return { ok: false, reason: 'unavailable' };
+  const price = Number(reward.price);
+  if (!Number.isSafeInteger(price) || price < 1) return { ok: false, reason: 'unavailable' };
+  const balance = earningsBalance(db, uid);
+  if (balance < price) return { ok: false, reason: 'insufficient', balance, needed: price - balance, price };
+  const existing = Object.entries(e.redemptionRequests).find(([, req]) => req && req.userId === uid && req.rewardId === id && req.status === 'pending');
+  if (existing) return { ok: true, requestId: existing[0], request: existing[1], reused: true, balance, price };
+  const requestId = `${uid}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const request = e.redemptionRequests[requestId] = { userId: uid, rewardId: id, status: 'pending', createdAt: Date.now() };
+  return { ok: true, requestId, request, reused: false, balance, price };
+}
+
 export function redeemReward(db, userId, requestId) {
   const e = ensureEarnings(db), uid = String(userId), req = e.redemptionRequests[String(requestId)];
   if (!req || req.userId !== uid || req.status !== 'pending') return { ok: false, reason: 'used' };
   const reward = e.rewards[String(req.rewardId)];
-  if (!reward || !reward.active) return { ok: false, reason: 'unavailable' };
+  if (!reward || !reward.active || (reward.categoryId && e.categories[String(reward.categoryId)]?.active === false)) return { ok: false, reason: 'unavailable' };
   const wallet = e.wallets[uid] || { balance: 0, spent: 0 };
   const price = Number(reward.price);
   if (!Number.isSafeInteger(price) || price < 1) return { ok: false, reason: 'unavailable' };
@@ -75,7 +130,7 @@ export function redeemReward(db, userId, requestId) {
   if (deliveryType !== 'manual' && !String(reward.deliveryPayload || reward.featureKey || '').trim()) return { ok: false, reason: 'no_delivery' };
   req.status = deliveryType === 'manual' ? 'awaiting_delivery' : 'delivering';
   req.operationId ||= `NG-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  req.deliveryType = deliveryType; req.rewardName = String(reward.name || 'مكافأة'); req.price = price;
+  req.deliveryType = deliveryType; req.rewardName = String(reward.name || 'مكافأة'); req.price = price; req.categoryId = String(reward.categoryId || ''); req.categoryName = String(e.categories[String(reward.categoryId)]?.name || '');
   req.redeemedAt = Date.now(); req.deliveryPayload = String(reward.deliveryPayload || ''); req.featureKey = String(reward.featureKey || '');
   if (reward.stock !== undefined && reward.stock !== null && Number.isFinite(Number(reward.stock))) { reward.stock = Number(reward.stock) - 1; req.stockReserved = true; }
   wallet.balance -= price; wallet.spent = (Number(wallet.spent) || 0) + price; e.wallets[uid] = wallet;
@@ -86,6 +141,7 @@ export function redeemReward(db, userId, requestId) {
 export function setRedemptionStatus(db, requestId, status, actorId, reason = '') {
   const e = ensureEarnings(db), req = e.redemptionRequests[String(requestId)];
   if (!req) return { ok: false, reason: 'missing' };
+  if (req.status === 'pending' || req.status === 'cancelled') return { ok: false, reason: 'not_redeemed' };
   if (!['delivered', 'failed', 'preparing'].includes(status)) return { ok: false, reason: 'invalid_status' };
   if (['delivered', 'failed'].includes(req.status)) return { ok: false, reason: 'closed' };
   if (status === 'failed' && !req.refundedAt) {
