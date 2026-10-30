@@ -1,3 +1,4 @@
+import { ensureTelegramJoinLink } from './chatTarget.js';
 import { InlineKeyboard } from 'grammy';
 import {
   mainKeyboard,
@@ -243,7 +244,7 @@ async function notifySubscriptionProblem(scope, chat, error) {
 
 async function ensureSubscriptionLink(setting, scope = 'required') {
   const targetId = String(setting?.id || setting?.requiredChatId || '');
-  const cacheKey = `${scope}:${targetId}`;
+  const cacheKey = `${scope}:${targetId}:${String(setting?.url || '')}:${String(setting?.inviteLinkCreatedAt || '')}`;
   const cachedAt = Number(subscriptionValidationCache.get(cacheKey) || 0);
   if (setting?.url && /^https:\/\/t\.me\//i.test(setting.url) && Date.now() - cachedAt < 60_000) return setting;
   try {
@@ -254,12 +255,14 @@ async function ensureSubscriptionLink(setting, scope = 'required') {
     }
     setting.id = String(chat.id);
     setting.title = chat.title || (chat.username ? `@${chat.username}` : setting.title || String(chat.id));
-    setting.username = chat.username || setting.username || '';
-    setting.url = chat.username ? `https://t.me/${chat.username}` : (chat.invite_link || '');
-    if (!setting.url && typeof bot.api.exportChatInviteLink === 'function') {
-      try { setting.url = await bot.api.exportChatInviteLink(chat.id); } catch {}
-    }
-    if (!setting.url) throw new Error('الجهة خاصة ولا يتوفر رابط دعوة. أرسل رابط دعوة صالحاً من لوحة المالك.');
+    setting.username = chat.username || '';
+    const join = await ensureTelegramJoinLink(bot.api, chat, botMember, { target: setting });
+    setting.url = join.url;
+    setting.inviteLink = join.inviteLink;
+    setting.inviteLinkGeneratedByBot = join.inviteLinkGeneratedByBot;
+    setting.inviteLinkCreatedAt = join.inviteLinkCreatedAt;
+    setting.inviteLinkExpiresAt = join.inviteLinkExpiresAt || 0;
+    setting.createsJoinRequest = join.createsJoinRequest === true;
     subscriptionValidationCache.set(cacheKey, Date.now());
     save();
     return setting;
@@ -271,25 +274,30 @@ async function ensureSubscriptionLink(setting, scope = 'required') {
 
 async function checkSubscription(userId) {
   const missingChannels = [];
+  const pendingApproval = [];
   const errors = [];
   for (const ch of (Array.isArray(db.requiredChats) ? db.requiredChats : []).filter(item => item && item.enabled !== false)) {
     try {
       await ensureSubscriptionLink(ch, 'required');
       const member = await bot.api.getChatMember(normalizeChatIdentifier(ch.id), Number(userId));
-      if (!isJoinedMember(member)) missingChannels.push(ch);
+      if (!isJoinedMember(member)) {
+        const pending = db.chatJoinRequests?.[String(ch.id)]?.[String(userId)];
+        if (pending && Date.now() - Number(pending.at || 0) < 7 * 24 * 60 * 60 * 1000) pendingApproval.push(ch);
+        else missingChannels.push(ch);
+      } else if (db.chatJoinRequests?.[String(ch.id)]) { delete db.chatJoinRequests[String(ch.id)][String(userId)]; save(); }
     } catch (error) {
       errors.push({ chat: ch, error });
       await notifySubscriptionProblem('required', ch, error);
     }
   }
-  return { ok: missingChannels.length === 0 && errors.length === 0, missingChannels, errors };
+  return { ok: missingChannels.length === 0 && pendingApproval.length === 0 && errors.length === 0, missingChannels, pendingApproval, errors };
 }
 
 function subscriptionKeyboard(channels, callback = 'checksubscription') {
   const kb = new InlineKeyboard();
   for (const ch of channels || []) {
-    if (ch?.url && /^https:\/\/t\.me\//i.test(ch.url)) {
-      kb.url(`🔗 اشترك في: ${String(ch.title || 'القناة/المجموعة').slice(0, 35)}`, ch.url).row();
+    if (ch?.url && /^https:\/\/t\.me\/(?:[A-Za-z0-9_]{5,32}|\+[A-Za-z0-9_-]{8,}|joinchat\/[A-Za-z0-9_-]{8,})$/i.test(ch.url)) {
+      kb.url(`🔗 اشترك في: ${String(ch.title || 'القناة/المجموعة').slice(0, 28)}`, ch.url).row();
     }
   }
   kb.text('✅ تحققت من الاشتراكات', callback);
@@ -300,17 +308,19 @@ async function subscriptionGate(ctx) {
   if (isOwner(ctx) || !isPrivate(ctx) || !Array.isArray(db.requiredChats) || db.requiredChats.length === 0) return true;
   const result = await checkSubscription(ctx.from.id);
   if (result.errors.length) {
-    const failed = result.errors.map(item => item.chat?.title || item.chat?.id).join('، ');
+    const failed = result.errors.map(item => `${item.chat?.title || item.chat?.id}: ${item.error?.description || item.error?.message || 'تعذّر الوصول'}`).join(' | ').slice(0, 500);
     const kb = subscriptionKeyboard(result.missingChannels);
     kb.row().text('🔄 إعادة المحاولة', 'checksubscription');
-    const notice = `⚠️ تعذّر التحقق من بعض جهات الاشتراك حالياً (${failed}). تم تنبيه مالك البوت لإصلاح الصلاحيات. إذا ظهرت جهات أخرى بالأسفل، اشترك بها أيضاً ثم أعد المحاولة.`;
+    const waiting = result.pendingApproval?.length ? `\n\n⏳ طلب الانضمام قيد مراجعة مشرفي: ${result.pendingApproval.map(item => item.title || item.id).join('، ')}. انتظر الموافقة ثم اضغط التحقق مرة أخرى.` : '';
+    const notice = `⚠️ تعذّر التحقق من بعض جهات الاشتراك حالياً (${failed}). تم تنبيه مالك البوت لإصلاح الصلاحيات. إذا ظهرت جهات أخرى بالأسفل، اشترك بها أيضاً ثم أعد المحاولة.${waiting}`;
     if (ctx.callbackQuery) await safeEdit(ctx, notice, kb);
     else await ctx.reply(notice, { reply_markup: kb });
     return false;
   }
   if (result.ok) return true;
   const kb = subscriptionKeyboard(result.missingChannels);
-  const text = `🔒 عذراً، لاستخدام بوت نغنوغ 🐈‍⬛ يجب الاشتراك في الجهات التالية أولاً، ثم اضغط «تحققت من الاشتراكات»:`;
+  const waiting = result.pendingApproval?.length ? `\n\n⏳ أرسلت طلب انضمام إلى: ${result.pendingApproval.map(item => item.title || item.id).join('، ')}. انتظر موافقة المشرف، وبعد قبولك اضغط زر التحقق.` : '';
+  const text = `🔒 عذراً، لاستخدام بوت نغنوغ 🐈‍⬛ يجب الاشتراك في الجهات التالية أولاً، ثم اضغط «تحققت من الاشتراكات».${waiting}`;
   if (ctx.callbackQuery) await safeEdit(ctx, text, kb);
   else await ctx.reply(text, { reply_markup: kb });
   return false;
@@ -323,12 +333,19 @@ async function checkChatSubscription(chatId, userId) {
     : (setting?.requiredChatId ? [{ id: String(setting.requiredChatId), title: setting.title, username: setting.username || '', url: setting.url || '' }] : []);
   if (!setting?.enabled || !targets.length) return { required: false, ok: true, setting };
   const missing = [];
+  const pendingApproval = [];
   const errors = [];
-  for (const target of targets) {
+  for (let index = 0; index < targets.length; index++) {
+    const target = targets[index];
     try {
       const resolved = await ensureSubscriptionLink({ ...target, id: target.id || target.requiredChatId }, 'chat');
+      targets[index] = resolved;
       const member = await bot.api.getChatMember(normalizeChatIdentifier(resolved.id), Number(userId));
-      if (!isJoinedMember(member)) missing.push(resolved);
+      if (!isJoinedMember(member)) {
+        const pending = db.chatJoinRequests?.[String(resolved.id)]?.[String(userId)];
+        if (pending && Date.now() - Number(pending.at || 0) < 7 * 24 * 60 * 60 * 1000) pendingApproval.push(resolved);
+        else missing.push(resolved);
+      } else if (db.chatJoinRequests?.[String(resolved.id)]) { delete db.chatJoinRequests[String(resolved.id)][String(userId)]; save(); }
     } catch (error) {
       errors.push({ target, error });
       await notifySubscriptionProblem('chat', { ...setting, ...target, id: target.id }, error);
@@ -341,8 +358,9 @@ async function checkChatSubscription(chatId, userId) {
     setting.title = targets[0].title;
     setting.username = targets[0].username || '';
     setting.url = targets[0].url || '';
+    save();
   }
-  return { required: true, ok: missing.length === 0 && errors.length === 0, setting, missing, errors, technicalError: errors.length > 0 };
+  return { required: true, ok: missing.length === 0 && pendingApproval.length === 0 && errors.length === 0, setting, missing, pendingApproval, errors, technicalError: errors.length > 0 };
 }
 
 async function ensureGroupSubscriptionPermissions(ctx, groupId) {
@@ -400,7 +418,8 @@ async function chatSubscriptionGate(ctx, { callback = false } = {}) {
   for (const target of (result.missing || [])) if (target.url && /^https:\/\/t\.me\//i.test(target.url)) kb.url(`📣 اشترك الآن: ${String(target.title || 'الجهة المطلوبة').slice(0, 22)}`, target.url).row();
   kb.text('✅ تحقّق من الاشتراك', `chatsubverify:${ctx.chat.id}`);
   const missingNames = (result.missing || []).map(item => item.title || item.id).join('، ');
-  const text = `🔒 لاستخدام الدردشة، اشترك أولاً في الجهات التالية: ${missingNames}، ثم اضغط زر التحقق.`;
+  const waiting = result.pendingApproval?.length ? `\n\n⏳ طلب الانضمام إلى ${result.pendingApproval.map(item => item.title || item.id).join('، ')} بانتظار موافقة المشرف. بعد قبولك اضغط زر التحقق.` : '';
+  const text = `🔒 لاستخدام الدردشة، اشترك أولاً في الجهات التالية: ${missingNames || 'الجهات المطلوبة'}، ثم اضغط زر التحقق.${waiting}`;
   if (callback) {
     try { await ctx.answerCallbackQuery({ text: '🔒 عليك الاشتراك أولاً حتى تستخدم أزرار الدردشة.', show_alert: true }); } catch {}
     const throttleKey = `${ctx.chat.id}:${ctx.from.id}`;

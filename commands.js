@@ -34,6 +34,17 @@ export function setupCommands(bot, db, helpers) {
     return next();
   });
 
+  // حفظ طلبات الانضمام المعلّقة حتى نعرض للمستخدم رسالة انتظار الموافقة بدلاً من اعتباره مشتركاً.
+  bot.on('chat_join_request', async ctx => {
+    const chatId = String(ctx.chatJoinRequest?.chat?.id || '');
+    const userId = String(ctx.chatJoinRequest?.from?.id || '');
+    if (!chatId || !userId) return;
+    db.chatJoinRequests ||= {};
+    db.chatJoinRequests[chatId] ||= {};
+    db.chatJoinRequests[chatId][userId] = { at: Date.now(), userChatId: ctx.chatJoinRequest.user_chat_id || null };
+    save();
+  });
+
   registerChannelManager(bot, { db, save, isOwner });
   registerQrLikeCallbacks(bot, { db, save, archiveChannel: process.env.QR_IMAGE_CHANNEL || '@QRiii5i' });
 

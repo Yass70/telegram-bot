@@ -74,6 +74,77 @@ export function isPrivateInviteLink(value) {
 
 function apiReason(error) { return String(error?.description || error?.message || 'خطأ غير معروف'); }
 
+/**
+ * Return a usable join URL. Public chats always use their canonical username URL.
+ * For private chats, never expose a numeric Chat ID as a URL and never trust an
+ * arbitrary invite hash: create a fresh bot-owned invite link through Bot API.
+ */
+export async function ensureTelegramJoinLink(api, chat, botMember, options = {}) {
+  if (chat?.username) {
+    return {
+      url: `https://t.me/${chat.username}`,
+      inviteLink: '',
+      inviteLinkGeneratedByBot: false,
+      inviteLinkCreatedAt: 0,
+      createsJoinRequest: false,
+    };
+  }
+
+  const existing = options.target || {};
+  const now = Date.now();
+  const maxAge = Number(options.maxStoredInviteAgeMs || 6 * 60 * 60 * 1000);
+  const expiry = Number(existing.inviteLinkExpiresAt || 0);
+  const createdAt = Number(existing.inviteLinkCreatedAt || 0);
+  if (existing.inviteLinkGeneratedByBot === true
+      && typeof existing.inviteLink === 'string'
+      && /^https:\/\/t\.me\/(?:\+|joinchat\/)/i.test(existing.inviteLink)
+      && (!expiry || expiry * 1000 > now + 60_000)
+      && createdAt > 0 && now - createdAt < maxAge) {
+    return {
+      url: existing.inviteLink,
+      inviteLink: existing.inviteLink,
+      inviteLinkGeneratedByBot: true,
+      inviteLinkCreatedAt: createdAt,
+      inviteLinkExpiresAt: expiry,
+      createsJoinRequest: existing.createsJoinRequest === true,
+    };
+  }
+
+  const canInvite = botMember?.status === 'creator' || botMember?.can_invite_users === true;
+  if (!canInvite) {
+    throw new Error('الجهة خاصة ولا يوجد لها رابط عام. يحتاج نغنوغ صلاحية «دعوة المستخدمين عبر رابط» لإنشاء رابط انضمام صالح؛ فعّل can_invite_users للبوت ثم أعد المحاولة.');
+  }
+  if (typeof api.createChatInviteLink !== 'function') {
+    throw new Error('إصدار Telegram Bot API المتاح لا يدعم إنشاء روابط الدعوة. حدّث grammY/Telegram Bot API ثم أعد المحاولة.');
+  }
+
+  // A supplied private invite means the owner intends an approval-based route.
+  // We create our own fresh invite with the same join-request behavior instead
+  // of trusting an invite hash that the Bot API cannot inspect or validate.
+  const createsJoinRequest = options.createsJoinRequest === true;
+  let invite;
+  try {
+    invite = await api.createChatInviteLink(chat.id, {
+      name: `نغنوغ اشتراك ${String(chat.title || 'جهة').slice(0, 20)}`,
+      creates_join_request: createsJoinRequest,
+    });
+  } catch (error) {
+    const reason = apiReason(error);
+    throw new Error(`تعذّر إنشاء رابط انضمام خاص صالح. تأكد من صلاحية «دعوة المستخدمين عبر رابط» لدى نغنوغ. السبب: ${reason}`);
+  }
+  if (!invite?.invite_link || !/^https:\/\/t\.me\/(?:\+|joinchat\/)/i.test(invite.invite_link)) {
+    throw new Error('أعاد تيليغرام نتيجة لا تحتوي على رابط دعوة صالح؛ لم تُحفظ الجهة.');
+  }
+  return {
+    url: invite.invite_link,
+    inviteLink: invite.invite_link,
+    inviteLinkGeneratedByBot: true,
+    inviteLinkCreatedAt: now,
+    inviteLinkExpiresAt: Number(invite.expire_date || 0),
+    createsJoinRequest: invite.creates_join_request === true,
+  };
+}
+
 /** Resolve with Telegram Bot API and enforce per-service requirements before persistence. */
 export async function resolveTelegramChatTarget(ctx, input, options = {}) {
   const parsed = normalizeChatTargetInput(input);
@@ -106,19 +177,17 @@ export async function resolveTelegramChatTarget(ctx, input, options = {}) {
     if (!['administrator', 'creator'].includes(userMember.status)) throw new Error('تيليغرام لم يؤكد أنك مالك أو مشرف في هذه الجهة؛ لم تتم إضافتها.');
   }
 
-  let url = chat.username ? `https://t.me/${chat.username}` : (parsed.suppliedInvite || chat.invite_link || '');
-  if (!url && typeof ctx.api.exportChatInviteLink === 'function') {
-    try { url = await ctx.api.exportChatInviteLink(chat.id); } catch {}
-  }
-  if (!url) throw new Error('تم التحقق من الجهة وصلاحيات نغنوغ، لكن لا يوجد رابط عام أو دعوة متاحة. للجهة الخاصة أرسل Chat ID ثم | ثم رابط الدعوة الخاص.');
-  // A supplied invite link cannot be mapped back to a chat by Bot API. We verify the Chat ID and bot role independently.
+  const join = await ensureTelegramJoinLink(ctx.api, chat, botMember, {
+    target: options.existingTarget,
+    createsJoinRequest: parsed.isPrivateInvite || options.createsJoinRequest === true,
+  });
   return {
     id: String(chat.id),
     type: chat.type,
     title: chat.title || (chat.username ? `@${chat.username}` : String(chat.id)),
     username: chat.username || '',
-    url,
+    ...join,
     privateInviteSupplied: parsed.isPrivateInvite,
-    inviteAssociationVerified: !parsed.isPrivateInvite,
+    inviteAssociationVerified: true,
   };
 }

@@ -142,7 +142,7 @@ ${String(e.description||e.message||'').slice(0,180)}`,kbHome());} }
     if (ctx.message && isPrivate(ctx)) {
       const p = session(id);
       if (p?.action === 'chmgr-add-channel') {
-        const raw = String(ctx.message.text||'').trim(); if(!raw) return ctx.reply('أرسل @username أو رابطاً عاماً من t.me/telegram.me أو Chat ID رقمي.');
+        const raw = String(ctx.message.text||'').trim(); if(!raw) return ctx.reply('أرسل @username أو رابطاً عاماً من t.me/telegram.me أو Chat ID رقمياً. للجهة الخاصة أرسل Chat ID ثم | ثم رابط الدعوة؛ سينشئ نغنوغ رابطاً جديداً من صلاحياته.');
         try {
           const chat = await resolveTelegramChatTarget(ctx, raw, {
             botId: ctx.me?.id || bot.botInfo?.id,
@@ -151,9 +151,9 @@ ${String(e.description||e.message||'').slice(0,180)}`,kbHome());} }
             requireUserAdmin: true,
           });
           const u=data(id); if(u.channels.some(c=>c.id===String(chat.id))){clear(id);return ctx.reply('القناة مضافة مسبقاً.',{reply_markup:kbHome()});}
-          const channel={id:String(chat.id),title:chat.title,username:chat.username,url:chat.url,addedAt:new Date().toISOString()};
+          const channel={...chat,id:String(chat.id),title:chat.title,username:chat.username,url:chat.url,addedAt:new Date().toISOString()};
           u.channels.push(channel); clear(id); save();
-          return ctx.reply(`✅ تمت إضافة القناة: ${channel.title}\nتم التحقق من صلاحية إشرافك ومن صلاحية نغنوغ على النشر.${chat.privateInviteSupplied ? '\nتنبيه: تعذّر على Telegram Bot API إثبات أن رابط الدعوة الخاص يعود إلى Chat ID؛ تأكد من صحة الرابط.' : ''}`,{reply_markup:kbHome()});
+          return ctx.reply(`✅ تمت إضافة القناة: ${channel.title}\nتم التحقق من صلاحية إشرافك ومن صلاحية نغنوغ على النشر، ورابط الانضمام محفوظ مع بيانات القناة.${chat.createsJoinRequest ? '\nرابط الانضمام مضبوط على طلب موافقة المشرف.' : ''}`,{reply_markup:kbHome()});
         } catch(e) { return ctx.reply(`❌ لم أستطع إضافة القناة.\nالسبب: ${String(e.description||e.message||'خطأ غير معروف').slice(0,240)}\nأصلح السبب ثم أعد الإرسال أو اضغط إلغاء.`,{reply_markup:back()}); }
       }
       if (p?.action === 'chmgr-compose') {
