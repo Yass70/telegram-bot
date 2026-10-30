@@ -69,10 +69,35 @@ export function redeemReward(db, userId, requestId) {
   const wallet = e.wallets[uid] || { balance: 0, spent: 0 };
   const price = Number(reward.price);
   if (!Number.isSafeInteger(price) || price < 1) return { ok: false, reason: 'unavailable' };
+  if (reward.stock !== undefined && reward.stock !== null && Number.isFinite(Number(reward.stock)) && Number(reward.stock) <= 0) return { ok: false, reason: 'out_of_stock' };
   if ((Number(wallet.balance) || 0) < price) return { ok: false, reason: 'insufficient', needed: price - (Number(wallet.balance) || 0) };
-  // Mark request before returning; Node's single-threaded callback execution plus synchronous state mutation prevents repeated callbacks.
-  req.status = 'completed'; req.completedAt = Date.now();
+  const deliveryType = ['manual', 'text', 'link', 'code', 'feature'].includes(reward.deliveryType) ? reward.deliveryType : 'manual';
+  if (deliveryType !== 'manual' && !String(reward.deliveryPayload || reward.featureKey || '').trim()) return { ok: false, reason: 'no_delivery' };
+  req.status = deliveryType === 'manual' ? 'awaiting_delivery' : 'delivering';
+  req.operationId ||= `NG-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  req.deliveryType = deliveryType; req.rewardName = String(reward.name || 'مكافأة'); req.price = price;
+  req.redeemedAt = Date.now(); req.deliveryPayload = String(reward.deliveryPayload || ''); req.featureKey = String(reward.featureKey || '');
+  if (reward.stock !== undefined && reward.stock !== null && Number.isFinite(Number(reward.stock))) { reward.stock = Number(reward.stock) - 1; req.stockReserved = true; }
   wallet.balance -= price; wallet.spent = (Number(wallet.spent) || 0) + price; e.wallets[uid] = wallet;
-  addEarningsLedger(db, uid, -price, 'redemption', { rewardId: String(reward.id), rewardName: reward.name });
-  return { ok: true, reward, balance: wallet.balance };
+  addEarningsLedger(db, uid, -price, 'redemption', { requestId: String(requestId), operationId: req.operationId, rewardId: String(reward.id), rewardName: req.rewardName, status: req.status });
+  return { ok: true, reward, request: req, balance: wallet.balance };
+}
+
+export function setRedemptionStatus(db, requestId, status, actorId, reason = '') {
+  const e = ensureEarnings(db), req = e.redemptionRequests[String(requestId)];
+  if (!req) return { ok: false, reason: 'missing' };
+  if (!['delivered', 'failed', 'preparing'].includes(status)) return { ok: false, reason: 'invalid_status' };
+  if (['delivered', 'failed'].includes(req.status)) return { ok: false, reason: 'closed' };
+  if (status === 'failed' && !req.refundedAt) {
+    if (req.stockReserved && !req.stockRestored) { const reward = e.rewards[String(req.rewardId)]; if (reward && reward.stock !== undefined && reward.stock !== null && Number.isFinite(Number(reward.stock))) reward.stock = Number(reward.stock) + 1; req.stockRestored = true; }
+    const wallet = e.wallets[String(req.userId)] ||= { balance: 0, earned: 0, spent: 0, successfulReferrals: 0 };
+    wallet.balance = (Number(wallet.balance) || 0) + Number(req.price || 0);
+    wallet.spent = Math.max(0, (Number(wallet.spent) || 0) - Number(req.price || 0));
+    req.refundedAt = Date.now();
+    addEarningsLedger(db, req.userId, Number(req.price || 0), 'redemption_refund', { requestId: String(requestId), operationId: req.operationId, reason: String(reason || 'تعذر التسليم'), actorId: String(actorId) });
+  }
+  req.status = status; req.statusUpdatedAt = Date.now(); req.statusUpdatedBy = String(actorId);
+  if (reason) req.statusReason = String(reason).slice(0, 300);
+  if (status === 'delivered') req.deliveredAt = Date.now();
+  return { ok: true, request: req, balance: earningsBalance(db, req.userId) };
 }

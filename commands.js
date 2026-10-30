@@ -5,7 +5,7 @@ import { helpKeyboard } from './keyboards.js';
 import { QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES } from './games/data.js';
 import { registerCallbacks } from './commands/callbacks.js';
 import { registerMessages } from './commands/messages.js';
-import { ensureEarnings, earningsBalance, awardReferral, redeemReward } from './earnings.js';
+import { ensureEarnings, earningsBalance, awardReferral, redeemReward, setRedemptionStatus } from './earnings.js';
 
 export function setupCommands(bot, db, helpers) {
   const { isOwner, isPrivate, isGroup, userKey, save, ensureUser, registerPrivateStart, groupFor, selectedGroup, setSelected, getCustomization, customText, getHomeKeyboard, HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, chatSubscriptionGate, selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats, showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, showProfileCard, handleViolation, showOwnerPanel, uiText } = helpers;
@@ -357,7 +357,7 @@ ${link}
     inferMenuBack, rememberMenuBack, menuBackTarget, normalizeAnswer,
     groupScores, leaderboardText, protectionBackTarget, protectionKeyboard,
     ensureReferralData, referralLinkFor, referralStatsFor, referralMenuKeyboard,
-    ensureEarnings, earningsBalance, redeemReward,
+    ensureEarnings, earningsBalance, redeemReward, setRedemptionStatus,
     referralLinkKeyboard, showReferralLink, publicCommandsKeyboard,
     QUESTIONS_DB, SHUAR_LIST, PERSONAL_QUESTIONS_LIST, N_PHRASES
   };
