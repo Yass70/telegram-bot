@@ -78,13 +78,16 @@ test('private chat ID is resolved independently from its invite link', async () 
     me: { id: 999 }, from: { id: 111 },
     api: {
       async getChat(ref) { assert.equal(ref, '-1001234567890'); return { id: -1001234567890, type: 'supergroup', title: 'Private group' }; },
-      async getChatMember() { return { status: 'administrator' }; },
+      async getChatMember() { return { status: 'administrator', can_invite_users: true }; },
+      async createChatInviteLink(chatId, options) { assert.equal(String(chatId), '-1001234567890'); assert.equal(options.creates_join_request, true); return { invite_link: 'https://t.me/+FreshBotCreatedInvite123', creates_join_request: true }; },
     },
   };
   const result = await resolveTelegramChatTarget(ctx, '-1001234567890 | https://t.me/+AbCdEfGh12345678', { allowedTypes: ['channel', 'group', 'supergroup'] });
   assert.equal(result.id, '-1001234567890');
-  assert.equal(result.url, 'https://t.me/+AbCdEfGh12345678');
-  assert.equal(result.inviteAssociationVerified, false);
+  assert.equal(result.url, 'https://t.me/+FreshBotCreatedInvite123');
+  assert.equal(result.inviteAssociationVerified, true);
+  assert.equal(result.inviteLinkGeneratedByBot, true);
+  assert.equal(result.createsJoinRequest, true);
 });
 
 test('the three product entry points share one Telegram target resolver', async () => {
@@ -99,4 +102,87 @@ test('the three product entry points share one Telegram target resolver', async 
   assert.match(manager, /resolveTelegramChatTarget\(ctx, raw/);
   assert.match(callbacks, /data === 'requiredadd'/);
   assert.match(callbacks, /data\.startsWith\('chatsubset:'\)/);
+});
+
+
+test('private chat without invite creates a fresh normal invite link', async () => {
+  const calls = [];
+  const ctx = {
+    me: { id: 999 }, from: { id: 111 },
+    api: {
+      async getChat() { return { id: -1001234567890, type: 'channel', title: 'Private channel' }; },
+      async getChatMember(chatId, userId) { return { status: 'administrator', can_post_messages: true, can_invite_users: true }; },
+      async createChatInviteLink(chatId, options) { calls.push(options); return { invite_link: 'https://t.me/+NewPrivateInvite987654321', expire_date: 0, creates_join_request: false }; },
+    },
+  };
+  const result = await resolveTelegramChatTarget(ctx, '-1001234567890', { allowedTypes: ['channel'], requireBotPost: true });
+  assert.equal(result.url, 'https://t.me/+NewPrivateInvite987654321');
+  assert.equal(result.inviteLinkGeneratedByBot, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].creates_join_request, false);
+});
+
+test('private chat refuses to save when bot cannot create an invite link', async () => {
+  const ctx = {
+    me: { id: 999 }, from: { id: 111 },
+    api: {
+      async getChat() { return { id: -1001234567890, type: 'supergroup', title: 'Private group' }; },
+      async getChatMember() { return { status: 'administrator', can_invite_users: false }; },
+    },
+  };
+  await assert.rejects(() => resolveTelegramChatTarget(ctx, '-1001234567890', { allowedTypes: ['group', 'supergroup'] }), /صلاحية «دعوة المستخدمين عبر رابط»/);
+});
+
+test('stored expired invite is rotated using createChatInviteLink', async () => {
+  const ctx = {
+    me: { id: 999 }, from: { id: 111 },
+    api: {
+      async getChat() { return { id: -1001234567890, type: 'supergroup', title: 'Private group' }; },
+      async getChatMember() { return { status: 'administrator', can_invite_users: true }; },
+      async createChatInviteLink() { return { invite_link: 'https://t.me/+ReplacementInvite12345678' }; },
+    },
+  };
+  const result = await resolveTelegramChatTarget(ctx, '-1001234567890', { allowedTypes: ['group', 'supergroup'], existingTarget: { inviteLink: 'https://t.me/+OldInvite12345678', inviteLinkGeneratedByBot: true, inviteLinkCreatedAt: Date.now() - 1000, inviteLinkExpiresAt: Math.floor(Date.now() / 1000) - 10 } });
+  assert.equal(result.url, 'https://t.me/+ReplacementInvite12345678');
+});
+
+
+test('a recent bot-generated private invite is reused instead of trusting a supplied URL', async () => {
+  const saved = { inviteLink: 'https://t.me/+BotGeneratedInvite123456', inviteLinkGeneratedByBot: true, inviteLinkCreatedAt: Date.now() - 1000, inviteLinkExpiresAt: 0, createsJoinRequest: false };
+  const ctx = {
+    me: { id: 999 }, from: { id: 111 },
+    api: {
+      async getChat() { return { id: -1001234567890, type: 'supergroup', title: 'Private group' }; },
+      async getChatMember() { return { status: 'administrator', can_invite_users: true }; },
+      async createChatInviteLink() { assert.fail('a recent generated invite should be reused'); },
+    },
+  };
+  const result = await resolveTelegramChatTarget(ctx, '-1001234567890', { allowedTypes: ['group', 'supergroup'], existingTarget: saved });
+  assert.equal(result.url, saved.inviteLink);
+});
+
+
+test('all subscription gates use Bot API membership and track pending approval separately', async () => {
+  const fs = await import('node:fs/promises');
+  const helpers = await fs.readFile(new URL('../helpers.js', import.meta.url), 'utf8');
+  const commands = await fs.readFile(new URL('../commands.js', import.meta.url), 'utf8');
+  assert.match(helpers, /bot\.api\.getChatMember\(normalizeChatIdentifier\(ch\.id\), Number\(userId\)\)/);
+  assert.match(helpers, /bot\.api\.getChatMember\(normalizeChatIdentifier\(resolved\.id\), Number\(userId\)\)/);
+  assert.match(helpers, /function isJoinedMember\(member\)/);
+  assert.match(commands, /bot\.on\('chat_join_request'/);
+  assert.match(helpers, /pendingApproval/);
+});
+
+test('private target links are not constructed from numeric Chat IDs', async () => {
+  const ctx = {
+    me: { id: 999 }, from: { id: 111 },
+    api: {
+      async getChat() { return { id: -1001234567890, type: 'supergroup', title: 'Private group' }; },
+      async getChatMember() { return { status: 'administrator', can_invite_users: true }; },
+      async createChatInviteLink() { return { invite_link: 'https://t.me/+ValidInviteLink123456' }; },
+    },
+  };
+  const result = await resolveTelegramChatTarget(ctx, '-1001234567890', { allowedTypes: ['group', 'supergroup'] });
+  assert.notEqual(result.url, result.id);
+  assert.match(result.url, /^https:\/\/t\.me\/\+/);
 });
