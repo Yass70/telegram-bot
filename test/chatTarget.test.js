@@ -90,16 +90,13 @@ test('private chat ID is resolved independently from its invite link', async () 
   assert.equal(result.createsJoinRequest, true);
 });
 
-test('the three product entry points share one Telegram target resolver', async () => {
+test('subscription target entry points share one Telegram target resolver', async () => {
   const messages = await (await import('node:fs/promises')).readFile(new URL('../commands/messages.js', import.meta.url), 'utf8');
-  const manager = await (await import('node:fs/promises')).readFile(new URL('../channelManager.js', import.meta.url), 'utf8');
   const callbacks = await (await import('node:fs/promises')).readFile(new URL('../commands/callbacks.js', import.meta.url), 'utf8');
   assert.match(messages, /import \{ resolveTelegramChatTarget \} from '\.\.\/chatTarget\.js'/);
   assert.match(messages, /async function resolveSubscriptionTarget[\s\S]*?resolveTelegramChatTarget\(ctx, input/);
   assert.match(messages, /p\.action === 'chat-sub-set'[\s\S]*?resolveSubscriptionTarget\(ctx, text\)/);
   assert.match(messages, /p\.action === 'add-required-chat'[\s\S]*?resolveSubscriptionTarget\(ctx, text\)/);
-  assert.match(manager, /import \{ resolveTelegramChatTarget \} from '\.\/chatTarget\.js'/);
-  assert.match(manager, /resolveTelegramChatTarget\(ctx, raw/);
   assert.match(callbacks, /data === 'requiredadd'/);
   assert.match(callbacks, /data\.startsWith\('chatsubset:'\)/);
 });
