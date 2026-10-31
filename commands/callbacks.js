@@ -2,8 +2,8 @@ import { InlineKeyboard } from 'grammy';
 import { UI_TEXT_CATALOG } from '../uiTextCatalog.js';
 import { replaceByRules } from '../globalTextOverrides.js';
 import { handleActiveGameCallback } from '../games/callbacks.js';
-import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard, groupManagementKeyboard } from '../keyboards.js';
-import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
+import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, groupManagementKeyboard, remainingServicesKeyboard } from '../keyboards.js';
+import { makeNameBatch, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
 import { ADHKAR_LABELS, randomDhikr } from '../adhkar.js';
 import { QR_TYPE_LABELS } from '../qrPayload.js';
 import { deleteEarningsCategory, moveEarningsReward, prepareRedemptionRequest } from '../earnings.js';
@@ -23,7 +23,7 @@ export function registerCallbacks(bot, shared) {
   };
   const {
     db, isOwner, isPrivate, isGroup, userKey, save, ensureUser, groupFor,
-    selectedGroup, setSelected, getCustomization, applyGlobalCustomizationChange, customText, getHomeKeyboard,
+    selectedGroup, setSelected, applyGlobalCustomizationChange, customText, getHomeKeyboard,
     HELP_TEXT, safeEdit, answer, userIsAdmin, userCanManage, subscriptionGate, checkChatSubscription, ensureGroupSubscriptionPermissions, restoreChatSubscriptionRestriction, notifySubscriptionProblem,
     selectedGroupKeyboard, showGroups, showGroupSettings, showGroupStats,
     showReplyList, pending, clearPending, ownerRequiredMenu, showRequiredList, subscriptionsMenu,
@@ -166,12 +166,9 @@ export function registerCallbacks(bot, shared) {
       });
     }
 
-    // لمسات: زخرفة أسماء بالعربية والإنجليزية، مع دفعات قابلة للنسخ.
-    if (data === 'touchesmenu') {
+    if (data === 'remainingservicesmenu') {
       clearPending(ctx);
-      db.touchSessions ||= {};
-      delete db.touchSessions[userKey(ctx)];
-      return answer(ctx, '* ( قسم لمسة نغنوغ ❤️‍🔥 )*\nمتوفر مجموعة من الأدوات اللي تسهّل عليك احتياجاتك وتضيف لمسة نغنوغ 🐈‍⬛ ✦\n\n𓆩 ✧ 𓆪 *زخرفة الأسماء*\n𓆩 🎧 𓆪 *فصل الصوت عن الموسيقى*\n𓆩 ⏰ 𓆪 *ذكّرني + أذكار*\n𓆩 🎬 𓆪 *تحميل الفيديوهات* بسهولة\n𓆩 ▦ 𓆪 *إنشاء باركود* للروابط والنصوص والصور وغيرها\n𓆩 📢 𓆪 *إدارة القنوات* — ربط قنواتك وإنشاء المنشورات وجدولتها\n\n✦ *اختَر الخدمة اللي تحتاجها من الأزرار بالأسفل.⬇️*', { reply_markup: touchesMenuKeyboard(), parse_mode: 'Markdown' });
+      return answer(ctx, '🧩 باقي الخدمات\n\nاختَر الخدمة اللي تحتاجها من القائمة أدناه.', { reply_markup: remainingServicesKeyboard(bot) });
     }
     if (data === 'remindermenu') {
       clearPending(ctx);
@@ -207,7 +204,7 @@ export function registerCallbacks(bot, shared) {
       return answer(ctx, `╭━━━〔 ${ADHKAR_LABELS[type]} 〕━━━╮\n\n${dhikr}\n\n╰━━━━━━━━━━━━━━━━━━╯`, { reply_markup: kb });
     }
     if (data === 'qrmenu') {
-      if (!isPrivate(ctx)) return answer(ctx, '▦ إنشاء الباركود متاح بالخاص فقط.');
+      if (!isPrivate(ctx)) return answer(ctx, '▦ إنشاء رمز QR متاح بالخاص فقط.');
       clearPending(ctx);
       const kb = new InlineKeyboard()
         .text('🔗 رابط', 'qrtype:url').text('📝 نص', 'qrtype:text').row()
@@ -215,15 +212,15 @@ export function registerCallbacks(bot, shared) {
         .text('✉️ بريد', 'qrtype:email').text('📍 موقع', 'qrtype:location').row()
         .text('👤 جهة اتصال', 'qrtype:contact').text('🖼️ صورة', 'qrtype:image').row()
         .text('🏠 القائمة الرئيسية', 'home');
-      return answer(ctx, '▦ *إنشاء الباركود — نغنوغ*\n\nاختَر نوع الباركود اللي تريد تنشئه. راح أجهزه إلك كصورة PNG قابلة للمسح بكاميرا الهاتف.\n\n🖼️ خيار الصورة ينشرها في قناة @QRiii5i ثم ينشئ باركود يفتح منشورها.', { reply_markup: kb, parse_mode: 'Markdown' });
+      return answer(ctx, '▦ *إنشاء رمز QR — نغنوغ*\n\nاختَر نوع الباركود اللي تريد تنشئه. راح أجهزه إلك كصورة PNG قابلة للمسح بكاميرا الهاتف.\n\n🖼️ خيار الصورة ينشرها في قناة @QRiii5i ثم ينشئ باركود يفتح منشورها.', { reply_markup: kb, parse_mode: 'Markdown' });
     }
     if (data.startsWith('qrtype:')) {
       if (!isPrivate(ctx)) return answer(ctx, 'إنشاء الباركود متاح بالخاص فقط.');
       const type = data.slice(7);
-      if (!Object.hasOwn(QR_TYPE_LABELS, type)) return answer(ctx, 'نوع الباركود غير معروف.');
+      if (!Object.hasOwn(QR_TYPE_LABELS, type)) return answer(ctx, 'نوع رمز QR غير معروف.');
       if (type === 'image') {
         pending(ctx, { action: 'qr-image' });
-        return answer(ctx, '🖼️ أرسل الصورة اللي تريد تحويلها إلى باركود.\n\nراح أنشرها في قناة @QRiii5i، وبعدها أرسل لك باركود يفتح منشور الصورة.\nللإلغاء اضغط الزر أدناه.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع الباركود', 'qrmenu') });
+        return answer(ctx, '🖼️ أرسل الصورة اللي تريد تحويلها إلى باركود.\n\nراح أنشرها في قناة @QRiii5i، وبعدها أرسل لك باركود يفتح منشور الصورة.\nللإلغاء اضغط الزر أدناه.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع رمز QR', 'qrmenu') });
       }
       pending(ctx, { action: 'qr-input', type });
       const prompts = {
@@ -235,11 +232,11 @@ export function registerCallbacks(bot, shared) {
         location: '📍 أرسل رابط الموقع من خرائط Google ويبدأ بـ https://.',
         contact: '👤 أرسل بيانات جهة الاتصال بهذا الترتيب:\nالاسم | رقم الهاتف | البريد الإلكتروني'
       };
-      return answer(ctx, `${QR_TYPE_LABELS[type]}\n\n${prompts[type]}\n\nتگدر تلغي العملية بأي وقت.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع الباركود', 'qrmenu') });
+      return answer(ctx, `${QR_TYPE_LABELS[type]}\n\n${prompts[type]}\n\nتگدر تلغي العملية بأي وقت.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'qrcancel').row().text('↩️ أنواع رمز QR', 'qrmenu') });
     }
     if (data === 'qrcancel') {
       clearPending(ctx);
-      return answer(ctx, '❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
+      return answer(ctx, '❌ تم إلغاء إنشاء رمز QR.', { reply_markup: new InlineKeyboard().text('▦ أنواع رمز QR', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'touchesdecorate') {
       clearPending(ctx);
@@ -735,71 +732,6 @@ export function registerCallbacks(bot, shared) {
         );
       }
       return showGroupSettings(ctx);
-    }
-
-    // قوائم التخصيص[cite: 3, 4]
-    if (data === 'custommenu') {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      clearPending(ctx);
-      return answer(ctx, uiText ? uiText(ctx, 'customMenu', '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯') : '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
-    }
-
-    if (data === 'customuimenu') {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      return answer(ctx, '🔘 اختَر اسم الزر الذي تريد تغييره. التغيير يظهر إلك وحدك في القائمة الرئيسية.', { reply_markup: customizationUILabelsKeyboard(getCustomization(ctx)) });
-    }
-
-    if (data.startsWith('customlabel:')) {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      const key = data.split(':')[1];
-      const allowed = ['groups', 'addBot', 'management', 'profile', 'customize', 'help', 'back', 'home', 'cancel'];
-      if (!allowed.includes(key)) return answer(ctx, 'اسم الزر غير معروف.');
-      pending(ctx, { action: 'custom-label', key });
-      return answer(ctx, `🔘 أرسل الاسم الجديد للزر.\n\nالاسم الحالي: ${getCustomization(ctx).labels?.[key] || 'الافتراضي'}\n\nأرسل نصاً قصيراً، بحد أقصى 50 حرفاً.`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'customuimenu') });
-    }
-
-    if (data === 'customhelp') {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      pending(ctx, { action: 'custom-help' });
-      return answer(ctx, `📖 أرسل نص قسم المساعدة الجديد.\n\nالنص الحالي:\n${customText(ctx, 'helpText') || HELP_TEXT}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'custommenu') });
-    }
-
-    if (data === 'customdescmenu') {
-      return answer(ctx, '╭─〔 📝 تخصيص شروحات الأزرار 〕─╮\nاختَر القسم الذي تريد تعديل شرحه.', { reply_markup: customizationDescriptionsKeyboard() });
-    }
-
-    if (data === 'customreplymenu') {
-      return answer(ctx, '╭─〔 💬 تخصيص ردود نغنوغ 〕─╮\nاختَر الرد الذي تريد تعديله.', { reply_markup: customizationRepliesKeyboard() });
-    }
-
-    if (data.startsWith('customdesc:')) {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      const key = data.split(':')[1];
-      pending(ctx, { action: 'custom-description', key });
-      return answer(ctx, `📝 الشرح الحالي للقسم (${key}):\n${customText(ctx, 'descriptions', key) || 'غير محدد'}\n\nأرسل الشرح الجديد برسالة واحدة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customdescmenu') });
-    }
-
-    if (data.startsWith('customreply:')) {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      const key = data.split(':')[1];
-      pending(ctx, { action: 'custom-reply', key });
-      return answer(ctx, `💬 الرد الحالي للقسم (${key}):\n${customText(ctx, 'replies', key) || 'غير محدد'}\n\nأرسل الرد الجديد برسالة واحدة.`, { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'customreplymenu') });
-    }
-
-    if (data === 'customstart') {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      pending(ctx, { action: 'custom-start' });
-      return answer(ctx, `👋 أرسل مقدمة /start الجديدة.\n\nالنص الحالي:\n${customText(ctx, 'startText')}`, { reply_markup: new InlineKeyboard().text(getCustomization(ctx).labels?.cancel || '❌ إلغاء', 'custommenu') });
-    }
-
-    if (data === 'customreset') {
-      if (!isPrivate(ctx)) return answer(ctx, 'التخصيص متاح من الخاص فقط.');
-      db.customizations ||= {};
-      // استعادة المستخدم تمسح تخصيصه الشخصي فقط؛ تعديلات المالك العامة تبقى هي الافتراضي للجميع.
-      delete db.customizations[userKey(ctx)];
-      clearPending(ctx);
-      save();
-      return answer(ctx, '♻️ تمت استعادة تخصيصك الشخصي.\nرجعت واجهتك إلى النصوص الافتراضية المعتمدة من المالك، بما فيها تعديلات «تحرير نصوص القوائم» العامة. لم تتغير واجهات بقية المستخدمين.', { reply_markup: customizationKeyboard(getCustomization(ctx)) });
     }
 
     if (data === 'groupstats') return showGroupStats(ctx);

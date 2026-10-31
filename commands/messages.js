@@ -568,7 +568,7 @@ export function registerMessages(bot, shared) {
       if (p?.action === 'qr-image') {
         if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
           clearPending(ctx);
-          return ctx.reply('❌ تم إلغاء طلب الصورة.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
+          return ctx.reply('❌ تم إلغاء طلب الصورة.', { reply_markup: new InlineKeyboard().text('▦ أنواع رمز QR', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
         }
         if (!Array.isArray(msg.photo) || !msg.photo.length) {
           return ctx.reply('❌ أرسل صورة كصورة من المعرض، مو كملف أو نص. أو اضغط إلغاء.');
@@ -594,7 +594,7 @@ export function registerMessages(bot, shared) {
           const qr = await makeQrBuffer(imageUrl);
           await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-image-qr.png'), {
             caption: `✅ تم إنشاء باركود الصورة بنجاح.\n\n📷 عند مسح الباركود راح يفتح منشور الصورة في قناة @${channelUsername}.\n🔗 ${imageUrl}`,
-            reply_markup: new InlineKeyboard().url('🖼️ فتح الصورة', imageUrl).row().text('▦ إنشاء باركود آخر', 'qrmenu').text('🏠 القائمة الرئيسية', 'home')
+            reply_markup: new InlineKeyboard().url('🖼️ فتح الصورة', imageUrl).row().text('▦ إنشاء رمز QR آخر', 'qrmenu').text('🏠 القائمة الرئيسية', 'home')
           });
           clearPending(ctx);
           return;
@@ -606,7 +606,7 @@ export function registerMessages(bot, shared) {
       if (p?.action === 'qr-input') {
         if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
           clearPending(ctx);
-          return ctx.reply('❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
+          return ctx.reply('❌ تم إلغاء إنشاء رمز QR.', { reply_markup: new InlineKeyboard().text('▦ أنواع رمز QR', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
         }
         if (!text) return ctx.reply('❌ أرسل البيانات كنص، أو اضغط إلغاء.');
         try {
@@ -614,7 +614,7 @@ export function registerMessages(bot, shared) {
           const qr = await makeQrBuffer(payload);
           await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-qr.png'), {
             caption: `✅ تم إنشاء ${QR_TYPE_LABELS[p.type] || 'الباركود'} بنجاح.\n\nامسح الصورة بكاميرا الهاتف لفتح المحتوى.`,
-            reply_markup: new InlineKeyboard().text('▦ إنشاء باركود آخر', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home').text('🏠 الرئيسية', 'home')
+            reply_markup: new InlineKeyboard().text('▦ إنشاء رمز QR آخر', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home').text('🏠 الرئيسية', 'home')
           });
           clearPending(ctx);
           return;
@@ -914,33 +914,6 @@ export function registerMessages(bot, shared) {
           }
         }
 
-        if (['custom-start', 'custom-description', 'custom-reply', 'custom-label', 'custom-help'].includes(p.action)) {
-          if (!text) return ctx.reply('❌ النص فارغ. أرسل نصاً يحتوي على أحرف.');
-          const c = getCustomization(ctx);
-          if (p.action === 'custom-start') c.startText = text;
-          if (p.action === 'custom-help') c.helpText = text;
-          if (p.action === 'custom-label') {
-            const allowedLabels = ['groups', 'addBot', 'management', 'profile', 'customize', 'help', 'back', 'home', 'cancel'];
-            if (!allowedLabels.includes(p.key)) { clearPending(ctx); return ctx.reply('اسم الزر غير معروف.'); }
-            if (text.length > 50) return ctx.reply('❌ خلي اسم الزر 50 حرف أو أقل. جرّب مرة ثانية.');
-            c.labels ||= {}; c.labels[p.key] = text;
-          }
-          if (p.action === 'custom-description') {
-            c.descriptions ||= {};
-            if (!['settings', 'groups', 'account', 'replies'].includes(p.key)) { clearPending(ctx); return ctx.reply('القسم غير معروف.'); }
-            c.descriptions[p.key] = text;
-          }
-          if (p.action === 'custom-reply') {
-            c.replies ||= {};
-            if (!['account', 'replies', 'nogroups'].includes(p.key)) { clearPending(ctx); return ctx.reply('القسم غير معروف.'); }
-            c.replies[p.key] = text;
-          }
-          save();
-          clearPending(ctx);
-          return ctx.reply('✅ تم حفظ التعديل الخاص بيك بنجاح ❤️', {
-            reply_markup: new InlineKeyboard().text('🎨 قائمة التخصيص', 'custommenu').row().text('🏠 القائمة الرئيسية', 'home')
-          });
-        }
         if (p.action === 'reply-trigger') {
           const g = db.groups[p.groupId];
           if (!g || !await userCanManage(ctx, g)) { clearPending(ctx); return ctx.reply('عيني، ما عندك صلاحية تعدّل ردود هالمجموعة.'); }
