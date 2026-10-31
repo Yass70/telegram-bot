@@ -568,7 +568,7 @@ export function registerMessages(bot, shared) {
       if (p?.action === 'qr-image') {
         if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
           clearPending(ctx);
-          return ctx.reply('❌ تم إلغاء طلب الصورة.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
+          return ctx.reply('❌ تم إلغاء طلب الصورة.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
         }
         if (!Array.isArray(msg.photo) || !msg.photo.length) {
           return ctx.reply('❌ أرسل صورة كصورة من المعرض، مو كملف أو نص. أو اضغط إلغاء.');
@@ -594,7 +594,7 @@ export function registerMessages(bot, shared) {
           const qr = await makeQrBuffer(imageUrl);
           await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-image-qr.png'), {
             caption: `✅ تم إنشاء باركود الصورة بنجاح.\n\n📷 عند مسح الباركود راح يفتح منشور الصورة في قناة @${channelUsername}.\n🔗 ${imageUrl}`,
-            reply_markup: new InlineKeyboard().url('🖼️ فتح الصورة', imageUrl).row().text('▦ إنشاء باركود آخر', 'qrmenu').text('↩️ لمسة نغنوغ', 'touchesmenu')
+            reply_markup: new InlineKeyboard().url('🖼️ فتح الصورة', imageUrl).row().text('▦ إنشاء باركود آخر', 'qrmenu').text('🏠 القائمة الرئيسية', 'home')
           });
           clearPending(ctx);
           return;
@@ -606,7 +606,7 @@ export function registerMessages(bot, shared) {
       if (p?.action === 'qr-input') {
         if (/^\/cancel(?:@\w+)?$/i.test(rawText)) {
           clearPending(ctx);
-          return ctx.reply('❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
+          return ctx.reply('❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
         }
         if (!text) return ctx.reply('❌ أرسل البيانات كنص، أو اضغط إلغاء.');
         try {
@@ -614,7 +614,7 @@ export function registerMessages(bot, shared) {
           const qr = await makeQrBuffer(payload);
           await ctx.replyWithPhoto(new InputFile(qr, 'naghnogh-qr.png'), {
             caption: `✅ تم إنشاء ${QR_TYPE_LABELS[p.type] || 'الباركود'} بنجاح.\n\nامسح الصورة بكاميرا الهاتف لفتح المحتوى.`,
-            reply_markup: new InlineKeyboard().text('▦ إنشاء باركود آخر', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home')
+            reply_markup: new InlineKeyboard().text('▦ إنشاء باركود آخر', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home').text('🏠 الرئيسية', 'home')
           });
           clearPending(ctx);
           return;
@@ -626,7 +626,7 @@ export function registerMessages(bot, shared) {
         if (!isPrivate(ctx)) { clearPending(ctx); return ctx.reply('📥 أرسل رابط الفيديو بالخاص فقط.'); }
         if (/^\/cancel(?:@\w+)?$/i.test(text)) {
           clearPending(ctx);
-          return ctx.reply('❌ تم إلغاء تحميل الفيديو.', { reply_markup: new InlineKeyboard().text('📥 تحميل فيديو', 'touchesdownload').row().text('↩️ لمسات نغنوغ', 'touchesmenu') });
+          return ctx.reply('❌ تم إلغاء تحميل الفيديو.', { reply_markup: new InlineKeyboard().text('📥 تحميل فيديو', 'touchesdownload').row().text('🏠 القائمة الرئيسية', 'home') });
         }
         const linkMatch = text.match(/https?:\/\/[^\s<>]+/i);
         const videoUrl = linkMatch?.[0]?.replace(/[),.!؟،]+$/, '') || '';
@@ -646,13 +646,13 @@ export function registerMessages(bot, shared) {
           }
           try { await ctx.api.deleteMessage(ctx.chat.id, status.message_id); } catch {}
           clearPending(ctx);
-          return ctx.reply('📥 *هل ترغب بتحميل فيديو آخر؟*', { parse_mode: 'Markdown', reply_markup: new InlineKeyboard().text('📥 نعم، فيديو آخر', 'touchesdownload').row().text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home') });
+          return ctx.reply('📥 *هل ترغب بتحميل فيديو آخر؟*', { parse_mode: 'Markdown', reply_markup: new InlineKeyboard().text('📥 نعم، فيديو آخر', 'touchesdownload').row().text('🏠 القائمة الرئيسية', 'home').text('🏠 الرئيسية', 'home') });
         } catch (error) {
           const message = String(error?.message || 'تعذر تحميل الفيديو.');
           try { await ctx.api.editMessageText(ctx.chat.id, status.message_id, `❌ ${message}`); }
           catch { try { await ctx.reply(`❌ ${message}`); } catch {} }
           clearPending(ctx);
-          return ctx.reply('تگدر تجرب رابطاً آخر من إحدى المنصات المدعومة.', { reply_markup: new InlineKeyboard().text('🔄 جرّب رابطاً آخر', 'touchesdownload').row().text('↩️ لمسات نغنوغ', 'touchesmenu') });
+          return ctx.reply('تگدر تجرب رابطاً آخر من إحدى المنصات المدعومة.', { reply_markup: new InlineKeyboard().text('🔄 جرّب رابطاً آخر', 'touchesdownload').row().text('🏠 القائمة الرئيسية', 'home') });
         } finally {
           if (downloaded) await cleanupDownloadedVideo(downloaded);
         }

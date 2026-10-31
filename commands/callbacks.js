@@ -180,7 +180,7 @@ export function registerCallbacks(bot, shared) {
         .text('📋 تذكيراتي الحالية', 'reminderlist').row()
         .text('🌙 أذكار المساء', 'adhkar:evening').text('🌅 أذكار الصباح', 'adhkar:morning').row()
         .text('😴 أذكار النوم', 'adhkar:sleep').text('📖 أذكار القرآن', 'adhkar:quran').row()
-        .text('↩️ لمسات نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
+        .text('🏠 القائمة الرئيسية', 'home');
       return answer(ctx, '* ( قسـم ذكرني ⏰ )*\n✦ خلّي نغنوغ يذكّرك بالأشياء المهمة بوقتها، وخلّي الأذكار قريبة منك بكل يوم. 🤍\n\n📌 *تذكير خاص:* حدّد الموعد اللي تريده، ونغنوغ يتولّى تذكيرك بيه.\n⚠️ جميع المواعيد حالياً حسب توقيت بغداد 🇮🇶', { reply_markup: kb, parse_mode: 'Markdown' });
     }
     if (data === 'remindercreate') {
@@ -214,7 +214,7 @@ export function registerCallbacks(bot, shared) {
         .text('📶 Wi-Fi', 'qrtype:wifi').text('📞 هاتف', 'qrtype:phone').row()
         .text('✉️ بريد', 'qrtype:email').text('📍 موقع', 'qrtype:location').row()
         .text('👤 جهة اتصال', 'qrtype:contact').text('🖼️ صورة', 'qrtype:image').row()
-        .text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
+        .text('🏠 القائمة الرئيسية', 'home');
       return answer(ctx, '▦ *إنشاء الباركود — نغنوغ*\n\nاختَر نوع الباركود اللي تريد تنشئه. راح أجهزه إلك كصورة PNG قابلة للمسح بكاميرا الهاتف.\n\n🖼️ خيار الصورة ينشرها في قناة @QRiii5i ثم ينشئ باركود يفتح منشورها.', { reply_markup: kb, parse_mode: 'Markdown' });
     }
     if (data.startsWith('qrtype:')) {
@@ -239,7 +239,7 @@ export function registerCallbacks(bot, shared) {
     }
     if (data === 'qrcancel') {
       clearPending(ctx);
-      return answer(ctx, '❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('↩️ لمسة نغنوغ', 'touchesmenu') });
+      return answer(ctx, '❌ تم إلغاء إنشاء الباركود.', { reply_markup: new InlineKeyboard().text('▦ أنواع الباركود', 'qrmenu').row().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'touchesdecorate') {
       clearPending(ctx);
@@ -247,18 +247,18 @@ export function registerCallbacks(bot, shared) {
     }
     if (data === 'touchesvocal') {
       clearPending(ctx);
-      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('↩️ لمسات نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home') });
+      return answer(ctx, '🎚️ فصل الصوت عن الموسيقى\n\n⚠️ الخدمة متوقفة حالياً.\n📩 للاستفسار، راسل المطور.', { reply_markup: new InlineKeyboard().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'touchesdownload') {
       if (!isPrivate(ctx)) return answer(ctx, '📥 تحميل الفيديو متاح بالخاص فقط. افتح محادثة نغنوغ واضغط الزر من هناك.');
       clearPending(ctx);
       pending(ctx, { action: 'video-download-link' });
-      const developer = new InlineKeyboard().text('❌ إلغاء', 'videodownloadcancel').row().text('↩️ لمسة نغنوغ', 'touchesmenu').row().url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
+      const developer = new InlineKeyboard().text('❌ إلغاء', 'videodownloadcancel').row().text('🏠 القائمة الرئيسية', 'home').row().url('👨🏻‍💻 المطوّر', 'https://t.me/llll6llll6');
       return answer(ctx, '*أهلاً بك في قسم تحميل الفيديوهات*\n🐾 المنصات المدعومة حالياً :\n\n:- ( أنــــستغرام - Instagram ) ✅\n:- ( تيــك تــوك - TikTok ) ❌\n:- ( فـيس بــوك - Facebook ) ❌\n:- ( يـــوتيـــوب - YouTube ) ❌\n:- ( بــــينترست - Pinterest ) ❌\n:- ( سناب شات - Snapchat ) ❌\n━━━━━━━━━━━━━━━━━━\n⚠️ لازم يكون الرابط متاحاً للعامة، الحد الأقصى للملف 45 ميغابايت.\n:- للاستفسار والتفاصيل: يُرجى التواصل مع المطوّر.\n:- قم بإرسال رابط الفيديو.', { reply_markup: developer, parse_mode: 'Markdown' });
     }
     if (data === 'videodownloadcancel') {
       clearPending(ctx);
-      return answer(ctx, '❌ تم إلغاء طلب تحميل الفيديو.', { reply_markup: new InlineKeyboard().text('📥 تحميل فيديو', 'touchesdownload').row().text('↩️ لمسات نغنوغ', 'touchesmenu') });
+      return answer(ctx, '❌ تم إلغاء طلب تحميل الفيديو.', { reply_markup: new InlineKeyboard().text('📥 تحميل فيديو', 'touchesdownload').row().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'reminderlist') {
       if (!isPrivate(ctx)) return answer(ctx, '📋 سجل التذكيرات متاح بالخاص فقط.');
@@ -272,7 +272,7 @@ export function registerCallbacks(bot, shared) {
       clearPending(ctx);
       db.touchSessions ||= {};
       delete db.touchSessions[userKey(ctx)];
-      return answer(ctx, 'تم إلغاء طلب الزخرفة. إذا تحب ترجع، اختَر الزخرفة من القائمة.', { reply_markup: touchesMenuKeyboard() });
+      return answer(ctx, 'تم إلغاء طلب الزخرفة. إذا تحب ترجع، اختَر الزخرفة من القائمة.', { reply_markup: new InlineKeyboard().text('🏠 القائمة الرئيسية', 'home') });
     }
     if (data === 'toucheslang:ar' || data === 'toucheslang:en') {
       const language = data.endsWith(':en') ? 'en' : 'ar';
@@ -280,7 +280,7 @@ export function registerCallbacks(bot, shared) {
       pending(ctx, { action: 'touches-name', language });
       return answer(ctx, language === 'en'
         ? '🇬🇧 Send the English name you want to decorate.\n\nI will give you 10 different styles per batch.'
-        : '🇮🇶 دزلي الاسم العربي اللي تريد تزخرفه.\n\nراح أطيك 10 زخارف مختلفة بكل دفعة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel').text('↩️ اختيار اللغة', 'touchesdecorate') });
+        : '🇮🇶 دزلي الاسم العربي اللي تريد تزخرفه.\n\nراح أطيك 10 زخارف مختلفة بكل دفعة.', { reply_markup: new InlineKeyboard().text('❌ إلغاء', 'touchescancel').text('🏠 الرئيسية', 'home') });
     }
     if (data === 'touchesmore') {
       db.touchSessions ||= {};
