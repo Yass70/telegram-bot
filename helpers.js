@@ -5,8 +5,7 @@ import {
   ownerKeyboard,
   warningsKeyboard,
   groupSettingsKeyboard,
-  repliesKeyboard,
-  customizationKeyboard
+  repliesKeyboard
 } from './keyboards.js';
 import { cloneValue, getCustomizationDefaults, applyGlobalCustomizationChange, applyGlobalDefaultsToCustomization } from './globalCustomizationDefaults.js';
 
@@ -112,7 +111,7 @@ function selectedGroup(ctx) {
 function setSelected(ctx, id) { db.selected[userKey(ctx)] = String(id); save(); }
 
 const DEFAULT_CUSTOMIZATION = {
-  labels: { groups: '👥 مجموعاتي', addBot: '➕ أضفني للمجموعة', management: '⚙️ الإدارة', profile: '👤 ملفي الشخصي', customize: '🎨 تخصيص نغنوغ', help: '📖 المساعدة', back: '↩️ رجوع', home: '🏠 الرئيسية', cancel: '❌ إلغاء' },
+  labels: { groups: '👥 مجموعاتي', addBot: '➕ أضفني للمجموعة', management: '⚙️ الإدارة', profile: '👤 ملفي الشخصي', help: '📖 المساعدة', back: '↩️ رجوع', home: '🏠 الرئيسية', cancel: '❌ إلغاء' },
   helpText: '',
   uiTexts: { management: '╭━━━〔 ⚙️ قسم الإدارة | نغنوغ 🐈‍⬛ 〕━━━╮\n\n-︰🎮 الألعاب : ❨ ألعاب وتحدّيات داخل المجموعة ❩\n-︰💬 الأوامر التفاعلية : ❨ بطاقة العضو والردود والعبارات الشعرية ❩\n-︰👑 أوامر المشرفين : ❨ أدوات الإدارة حسب الصلاحيات ❩\n-︰⚠️ التحذيرات والعقوبات : ❨ إعدادات التعامل مع المخالفات ❩\n\n✦ اختَر القسم المطلوب من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯', groups: '╭━━━〔 👥 مجموعاتي | نغنوغ 🐈‍⬛ 〕━━━╮\n\n✦ هنا تظهر المجموعات المفعّلة المرتبطة بحسابك.\n\n-︰اختَر المجموعة : ❨ لعرض التفاصيل وإدارة الإعدادات المتاحة ❩\n\n👇🏻 اضغط على اسم المجموعة من الأزرار أدناه.\n╰━━━━━━━━━━━━━━━━━━━━╯', customMenu: '╭━━━〔 🎨 تخصيص نغنوغ 〕━━━╮\n\nمن هنا تكدر تخصّص النصوص وأسماء الأزرار اللي تظهر إلك بالخاص فقط.\n✦ تعديلاتك شخصية وما تغيّر واجهة بقية المستخدمين أو إعدادات المجموعات.\n\n╰━━━━━━━━━━━━━━━━━━╯' },
   startText: '╭━━━〔 🐈‍⬛ أهلاً بيك بنغنوغ 🐾 〕━━━╮\n\n-︰🛡️ الحماية : ❨ أدوات للحد من السبام والمخالفات ❩\n-︰⚙️ الإدارة : ❨ خيارات حسب الصلاحيات المتاحة ❩\n-︰🎮 الترفيه : ❨ ألعاب وتحدّيات للأعضاء ❩\n-︰🏆 النقاط : ❨ إحصائيات ونقاط للأنشطة المدعومة ❩\n-︰💬 التفاعل : ❨ ردود تلقائية ومخصّصة ❩\n\n✦ اختَر القسم اللي تحتاجه من الأزرار أدناه.\n\n🎁 نغنوغ هدية من المطوّر إلكم ❤️\n╰━━━━━━━━━━━━━━━━━━━━╯',
@@ -169,10 +168,6 @@ function uiText(ctx, key, fallback) { const value = getCustomization(ctx).uiText
 
 function getHomeKeyboard(ctx) {
   const kb = mainKeyboard(ctx, bot, getCustomization(ctx));
-  const hasCustomizationButton = (kb.inline_keyboard || []).some(row =>
-    row.some(button => button.callback_data === 'custommenu')
-  );
-  if (!hasCustomizationButton) kb.row().text('🎨 تخصيص البوت', 'custommenu');
   if (isOwner(ctx)) {
     kb.row().text('💳 الاشتراكات', 'subscriptionsmenu').text('👑 لوحة المالك', 'ownerpanel');
   }

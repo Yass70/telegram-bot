@@ -9,7 +9,6 @@
 - commands/callbacks.js
 - touches.js
 - commands.js
-- channelManager.js
 - commands/messages.js
 
 طريقة التركيب:

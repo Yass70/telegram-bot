@@ -212,17 +212,6 @@ export function makeNameBatch(name, language, previous = []) {
   return results.slice(0, 10);
 }
 
-export function touchesMenuKeyboard() {
-  return new InlineKeyboard()
-    .text('✨ زخرفة الأسماء', 'touchesdecorate')
-    .text('▦ إنشاء الباركود', 'qrmenu').row()
-    .text('⏰ ذكّرني', 'remindermenu').row()
-    .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
-    .text('📥 تحميل الفيديوهات', 'touchesdownload').row()
-    .text('📢 إدارة القنوات', 'chmgr:home').row()
-    .text('🏠 القائمة الرئيسية', 'home');
-}
-
 export function touchesLanguageKeyboard() {
   return new InlineKeyboard()
     .text('🇮🇶 العربية', 'toucheslang:ar')

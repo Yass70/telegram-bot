@@ -2,73 +2,22 @@ import { InlineKeyboard } from 'grammy';
 
 export function mainKeyboard(ctx, bot, ui = {}) {
   const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
-  const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
-  // واجهة الخدمات الرئيسية: الأدوات الأكثر استخداماً ظاهرة مباشرة وبترتيب متوازن.
   return new InlineKeyboard()
-    .text('▦ إنشاء الباركود', 'qrmenu')
-    .text('✨ زخرفة الأسماء', 'touchesdecorate').row()
-    .text('⏰ ذكّرني', 'remindermenu')
-    .text('🎚️ فصل الصوت عن الموسيقى', 'touchesvocal').row()
-    .text('📥 تحميل الفيديوهات', 'touchesdownload')
-    .text('📢 إدارة القنوات', 'chmgr:home').row()
     .text(label('profile', '👤 ملفي الشخصي'), 'accountinfo')
     .text('💰 أرباحي', 'earningsmenu').row()
-    .text(label('customize', '🎨 تخصيص نغنوغ'), 'custommenu')
-    .text(label('help', '📖 المساعدة'), 'help').row()
-    .text('👥 إدارة المجموعات', 'groupmanagementmenu');
+    .text(label('help', '📖 المساعدة'), 'help')
+    .text('باقي الخدمات🧩', 'remainingservicesmenu');
 }
 
-export function groupManagementKeyboard(bot) {
-  const botUsername = bot.botInfo?.username || 'YZ_VIDbot';
-  const addBotUrl = `https://t.me/${botUsername}?startgroup=true&admin=delete_messages+restrict_members+pin_messages`;
+export function remainingServicesKeyboard(bot) {
   return new InlineKeyboard()
-    .url('➕ أضفني للمجموعة', addBotUrl).row()
-    .text('👥 مجموعاتي', 'mygroups').row()
-    .text('⚙️ الإدارة', 'managementmenu').row()
+    .text('👥 إدارة مجموعاتي', 'groupmanagementmenu').row()
+    .text('🎧 فصل الصوت عن الموسيقى', 'touchesvocal').row()
+    .text('✨ زخرفة الأسماء', 'touchesdecorate').row()
+    .text('▦ إنشاء رمز QR', 'qrmenu').row()
+    .text('📥 تحميل فيديوهات', 'touchesdownload').row()
+    .text('⏰ ذكّرني', 'remindermenu').row()
     .text('🏠 القائمة الرئيسية', 'home');
-}
-
-export function customizationKeyboard(ui = {}) {
-  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
-  return new InlineKeyboard()
-    .text('👋 رسالة البداية', 'customstart')
-    .text('📝 شروحات الأقسام', 'customdescmenu').row()
-    .text('🔘 أسماء الأزرار', 'customuimenu')
-    .text('📖 نص المساعدة', 'customhelp').row()
-    .text('♻️ استعادة الافتراضي', 'customreset').row()
-    .text(label('home', '↩️ القائمة الرئيسية'), 'home');
-}
-
-export function customizationUILabelsKeyboard(ui = {}) {
-  const label = (key, fallback) => typeof ui?.labels?.[key] === 'string' && ui.labels[key].trim() ? ui.labels[key] : fallback;
-  return new InlineKeyboard()
-    .text('👥 مجموعاتي', 'customlabel:groups')
-    .text('➕ إضافة البوت', 'customlabel:addBot').row()
-    .text('⚙️ الإدارة', 'customlabel:management')
-    .text('👤 الملف الشخصي', 'customlabel:profile').row()
-    .text('🎨 التخصيص', 'customlabel:customize')
-    .text('📖 المساعدة', 'customlabel:help').row()
-    .text('↩️ الرجوع', 'customlabel:back')
-    .text('🏠 الرئيسية', 'customlabel:home').row()
-    .text('❌ الإلغاء', 'customlabel:cancel').row()
-    .text(label('back', '↩️ العودة إلى التخصيص'), 'custommenu');
-}
-
-export function customizationDescriptionsKeyboard() {
-  return new InlineKeyboard()
-    .text('⚙️ إعدادات المجموعة', 'customdesc:settings')
-    .text('👥 مجموعاتي', 'customdesc:groups').row()
-    .text('👤 الملف الشخصي', 'customdesc:account')
-    .text('💬 الردود التلقائية', 'customdesc:replies').row()
-    .text('↩️ العودة إلى التخصيص', 'custommenu');
-}
-
-export function customizationRepliesKeyboard() {
-  return new InlineKeyboard()
-    .text('👤 نص الملف الشخصي', 'customreply:account')
-    .text('💬 نص الردود التلقائية', 'customreply:replies').row()
-    .text('👥 نص عدم وجود مجموعات', 'customreply:nogroups').row()
-    .text('↩️ العودة إلى التخصيص', 'custommenu');
 }
 
 export function helpKeyboard(ui = {}) {
