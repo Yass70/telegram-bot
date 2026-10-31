@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy';
 import { UI_TEXT_CATALOG } from '../uiTextCatalog.js';
 import { replaceByRules } from '../globalTextOverrides.js';
 import { handleActiveGameCallback } from '../games/callbacks.js';
-import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard } from '../keyboards.js';
+import { helpKeyboard, warningsKeyboard, groupSettingsKeyboard, repliesKeyboard, customizationKeyboard, customizationDescriptionsKeyboard, customizationRepliesKeyboard, customizationUILabelsKeyboard, groupManagementKeyboard } from '../keyboards.js';
 import { makeNameBatch, touchesMenuKeyboard, touchesLanguageKeyboard, touchesBatchKeyboard, touchesBatchText } from '../touches.js';
 import { ADHKAR_LABELS, randomDhikr } from '../adhkar.js';
 import { QR_TYPE_LABELS } from '../qrPayload.js';
@@ -157,6 +157,14 @@ export function registerCallbacks(bot, shared) {
     };
 
     if (data === 'home') return showHomeFunc(ctx);
+
+    // قائمة إدارة المجموعات تجمع روابط الإضافة والمجموعات وأدوات الإدارة في مكان واحد.
+    if (data === 'groupmanagementmenu') {
+      if (!isPrivate(ctx)) return answer(ctx, '👥 إدارة المجموعات متاحة من الخاص فقط.');
+      return answer(ctx, '╭━━━〔 👥 إدارة المجموعات 〕━━━╮\n\nمن هنا تگدر تضيف نغنوغ لمجموعة، تستعرض مجموعاتك، أو تدخل إلى أدوات الإدارة.\n\nاختَر الإجراء المطلوب من الأزرار أدناه. 🐾\n╰━━━━━━━━━━━━━━━━━━━━╯', {
+        reply_markup: groupManagementKeyboard(bot)
+      });
+    }
 
     // لمسات: زخرفة أسماء بالعربية والإنجليزية، مع دفعات قابلة للنسخ.
     if (data === 'touchesmenu') {
