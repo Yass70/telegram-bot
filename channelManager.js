@@ -8,7 +8,7 @@ const kbHome = () => new InlineKeyboard()
   .text('✍️ إنشاء منشور', 'chmgr:compose').text('📅 جدولة المنشورات', 'chmgr:schedule').row()
   .text('🗂️ المسودات', 'chmgr:drafts').text('📌 إدارة المنشورات', 'chmgr:posts').row()
   .text('📊 الإحصائيات', 'chmgr:stats').text('⚙️ إعدادات القنوات', 'chmgr:settings').row()
-  .text('❓ المساعدة', 'chmgr:help').row().text('↩️ لمسة نغنوغ', 'touchesmenu');
+  .text('❓ المساعدة', 'chmgr:help').row().text('🏠 القائمة الرئيسية', 'home');
 const back = () => new InlineKeyboard().text('↩️ إدارة القنوات', 'chmgr:home').text('❌ إلغاء', 'chmgr:cancel');
 
 export function registerChannelManager(bot, { db, save, isOwner }) {

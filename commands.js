@@ -183,7 +183,7 @@ ${link}
         .text('📋 تذكيراتي الحالية', 'reminderlist').row()
         .text('🌙 أذكار المساء', 'adhkar:evening').text('🌅 أذكار الصباح', 'adhkar:morning').row()
         .text('😴 أذكار النوم', 'adhkar:sleep').text('📖 أذكار القرآن', 'adhkar:quran').row()
-        .text('↩️ لمسة نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
+        .text('🏠 القائمة الرئيسية', 'home');
       return ctx.reply('✦ ( قسـم ذكرني ⏰ )\n✦ خلّي نغنوغ يذكّرك بالأشياء المهمة بوقتها، وخلّي الأذكار قريبة منك بكل يوم. 🤍\n\n📌 تذكير خاص: حدّد الموعد اللي تريده، ونغنوغ يتولّى تذكيرك بيه.\n⚠️ جميع المواعيد حالياً حسب توقيت بغداد 🇮🇶', { reply_markup: kb });
     }
     const c = getCustomization(ctx);

@@ -227,7 +227,7 @@ export function touchesLanguageKeyboard() {
   return new InlineKeyboard()
     .text('🇮🇶 العربية', 'toucheslang:ar')
     .text('🇬🇧 English', 'toucheslang:en').row()
-    .text('↩️ رجوع إلى لمسات', 'touchesmenu');
+    .text('🏠 القائمة الرئيسية', 'home');
 }
 
 export function touchesBatchKeyboard(results) {
@@ -238,7 +238,7 @@ export function touchesBatchKeyboard(results) {
     const label = [...result].length <= 64 ? result : [...result].slice(0, 64).join('');
     kb.add({ text: label, copy_text: { text: result } }).row();
   });
-  return kb.text('🔄 زخارف جديدة (10)', 'touchesmore').row().text('↩️ لمسات نغنوغ', 'touchesmenu').text('🏠 الرئيسية', 'home');
+  return kb.text('🔄 زخارف جديدة (10)', 'touchesmore').row().text('🏠 القائمة الرئيسية', 'home');
 }
 
 export function touchesBatchText(name, language, results, batchNumber = 1) {
